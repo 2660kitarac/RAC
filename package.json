@@ -1,0 +1,22 @@
+{
+  "name": "rac-cloud",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "NODE_OPTIONS='--max-old-space-size=2048' NEXT_TURBOPACK=0 next build",
+    "build:cf": "NODE_OPTIONS='--max-old-space-size=2048' NEXT_TURBOPACK=0 opennextjs-cloudflare build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply rac-cloud-db --local",
+    "db:migrate:prod": "wrangler d1 migrations apply rac-cloud-db",
+    "db:seed:local": "wrangler d1 execute rac-cloud-db --local --file=./migrations/seed.sql",
+    "db:console:local": "wrangler d1 execute rac-cloud-db --local",
+    "db:console:prod": "wrangler d1 execute rac-cloud-db"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.78.0"
+  }
+}

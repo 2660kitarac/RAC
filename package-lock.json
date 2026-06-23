@@ -1,0 +1,16 @@
+{
+  "name": "rac-cloud",
+  "version": "0.2.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "rac-cloud",
+      "version": "0.2.0",
+      "dependencies": {},
+      "devDependencies": {
+        "wrangler": "^3.78.0"
+      }
+    }
+  }
+}

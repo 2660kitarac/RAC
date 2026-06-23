@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rac-cloud",
+  "main": ".open-next/worker.js",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "compatibility_date": "2025-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // D1 Database バインディング
+  // 【初回セットアップ手順】
+  // 1. npx wrangler d1 create rac-cloud-db
+  // 2. 出力された database_id を下記 "database_id" に設定する
+  // 3. npx wrangler d1 migrations apply rac-cloud-db --local  （ローカル開発）
+  // 4. npx wrangler d1 migrations apply rac-cloud-db          （本番デプロイ後）
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fd8844cf-cba3-4f18-9986-e52d20b548d5-db",
+      "database_id": "ccae0cce-0ed8-4fc0-88f4-51c7bb99f0d7"
+    }
+  ]
+}
