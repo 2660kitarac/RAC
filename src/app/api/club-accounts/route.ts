@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const bcrypt = await import('bcryptjs');
     const { nanoid } = await import('@/lib/utils');
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     // メール重複チェック
     const existing = await db

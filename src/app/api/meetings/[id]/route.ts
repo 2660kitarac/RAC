@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const meeting = await db.select().from(meetings).where(eq(meetings.id, id)).get();
     if (!meeting) return NextResponse.json({ error: '見つかりません' }, { status: 404 });
     return NextResponse.json({ meeting });
@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     const allowed = ['title','meetingNumber','theme','date','startTime','endTime',
@@ -47,7 +47,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     await db.update(meetings).set({ deletedAt: new Date().toISOString() }).where(eq(meetings.id, id));
     return NextResponse.json({ success: true });
   } catch (e: any) {

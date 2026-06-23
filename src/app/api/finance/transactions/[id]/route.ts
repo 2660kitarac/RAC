@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -37,7 +37,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     await db.update(transactions)
       .set({ deletedAt: new Date().toISOString() })
       .where(eq(transactions.id, params.id));

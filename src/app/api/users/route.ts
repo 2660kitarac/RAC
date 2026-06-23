@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const role = url.searchParams.get('role');
     const isActive = url.searchParams.get('isActive');
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const conditions = and(
       clubId ? eq(users.clubId, clubId) : undefined,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
     const {
       email, password, name, nameKana, phone,

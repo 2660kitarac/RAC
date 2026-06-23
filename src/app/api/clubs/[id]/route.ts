@@ -13,7 +13,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const result = await db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
     if (!result.length) return NextResponse.json({ error: 'クラブが見つかりません' }, { status: 404 });
 
@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -60,7 +60,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     await db.update(clubs).set({
       deletedAt: new Date().toISOString(),

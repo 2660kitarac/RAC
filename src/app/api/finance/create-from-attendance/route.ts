@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const [attendance] = await db
       .select()

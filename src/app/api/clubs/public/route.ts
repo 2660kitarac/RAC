@@ -6,7 +6,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 // GET /api/clubs/public - 認証不要のクラブ一覧（登録フォーム・MU登録で使用）
 export async function GET() {
   try {
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const results = await db
       .select({

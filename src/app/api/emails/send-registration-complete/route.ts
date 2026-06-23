@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const { meetingId, name, email, feeAmount, mealRequired } = await request.json();
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const [meeting] = await db
       .select({

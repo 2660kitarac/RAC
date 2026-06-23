@@ -3,13 +3,17 @@
  *
  * Next.js App Router の Server Component / Server Action / Route Handler から呼ぶ。
  * @opennextjs/cloudflare が Symbol.for("__cloudflare-context__") に env を注入する。
+ *
+ * NOTE: getCloudflareContext({ async: true }) を使用すること。
+ * syncモードは静的ルートやトップレベル呼び出しで HTTP 500 を引き起こす。
  */
 import { getDb } from './index';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
-export function getDbFromContext() {
+export async function getDbFromContext() {
   try {
-    const { env } = getCloudflareContext();
+    // async: true でsyncモードのエラーを回避
+    const { env } = await getCloudflareContext({ async: true });
     if (!env?.DB) {
       throw new Error(
         'D1 Database バインディング(DB)が見つかりません。' +

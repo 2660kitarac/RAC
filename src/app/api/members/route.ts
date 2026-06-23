@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const url = new URL(request.url);
     const clubId = url.searchParams.get('clubId') || session.user.clubId;
     const search = url.searchParams.get('search') || '';
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
     const {
       name, nameKana, email, phone, role = 'member', memberType = 'RAC',

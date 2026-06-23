@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '入力が不正です' }, { status: 400 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const [user] = await db
       .select({

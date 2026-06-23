@@ -11,7 +11,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     // 自分自身 or 管理者のみ更新可能
@@ -71,7 +71,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     await db.update(users)
       .set({ deletedAt: new Date().toISOString(), isActive: false })
       .where(eq(users.id, params.id));

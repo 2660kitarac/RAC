@@ -11,7 +11,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     const updateData: any = { updatedAt: new Date().toISOString() };
@@ -36,7 +36,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
     const { id } = await params;
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     await db.update(users).set({
       deletedAt: new Date().toISOString(),
       isActive: false,

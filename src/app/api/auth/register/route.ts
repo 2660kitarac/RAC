@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'パスワードは8文字以上にしてください' }, { status: 400 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     // メールアドレス重複チェック
     const [existing] = await db

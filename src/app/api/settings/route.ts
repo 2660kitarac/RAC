@@ -11,7 +11,7 @@ export async function GET(_: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     const userResult = await db.select({
       id: users.id,
@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
     const { target, ...data } = body;
 

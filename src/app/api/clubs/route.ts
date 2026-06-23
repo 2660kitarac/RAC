@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const url = new URL(request.url);
     const type = url.searchParams.get('type');
     const isActive = url.searchParams.get('isActive');
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
     const { name, shortName, slug, type, districtId, zoneId, district, area, email, phone, address, contactName, memo } = body;
 

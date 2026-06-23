@@ -10,7 +10,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const result = await db.select().from(receipts).where(eq(receipts.id, params.id)).limit(1);
     if (!result.length) return NextResponse.json({ error: '領収書が見つかりません' }, { status: 404 });
 
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const body = await request.json();
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -51,7 +51,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     await db.update(receipts)
       .set({ deletedAt: new Date().toISOString(), status: 'cancelled' })
       .where(eq(receipts.id, params.id));

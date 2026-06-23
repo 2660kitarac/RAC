@@ -7,7 +7,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const profile = await db.select({
     id: users.id, name: users.name, nameKana: users.nameKana,
     birthDate: users.birthDate, phone: users.phone,
@@ -23,7 +23,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const body = await request.json();
   await db.update(users).set({
     name: body.name, nameKana: body.nameKana ?? null,

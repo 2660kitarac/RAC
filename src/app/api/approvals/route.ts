@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
     const { searchParams } = new URL(request.url);
     const clubIdParam = searchParams.get('clubId');
 
