@@ -123,3 +123,10 @@ export function canManageAwards(role: UserRole | undefined): boolean {
 export function canApproveMembers(role: UserRole | undefined): boolean {
   return hasRole(role, ['system_owner', 'district_admin', 'club_account', 'club_admin']);
 }
+
+/** 地区スタッフ（system_owner / district_admin）
+ * @alias isDistrictAdmin - isDistrictAdminと同義。後方互換のためのエイリアス
+ */
+export function isDistrictStaff(role: UserRole | undefined): boolean {
+  return hasRole(role, ['system_owner', 'district_admin']);
+}
