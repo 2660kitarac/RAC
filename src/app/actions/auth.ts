@@ -76,7 +76,7 @@ export async function registerUser(input: RegisterInput) {
     const { eq } = await import('drizzle-orm');
     const { nanoid } = await import('@/lib/utils');
 
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     // メール重複チェック
     const existing = await db

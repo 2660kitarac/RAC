@@ -81,7 +81,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const { users } = await import('@/lib/db/schema');
           const { eq, and, isNull } = await import('drizzle-orm');
 
-          const db = getDbFromContext();
+          const db = await getDbFromContext();
 
           const [user] = await db
             .select({

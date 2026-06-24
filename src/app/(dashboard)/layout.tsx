@@ -19,7 +19,7 @@ export default async function DashboardRootLayout({
   let profile = null;
 
   try {
-    const db = getDbFromContext();
+    const db = await getDbFromContext();
 
     // ユーザープロフィール取得（クラブ情報含む）
     const result = await db

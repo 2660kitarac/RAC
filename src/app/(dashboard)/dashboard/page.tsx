@@ -5,6 +5,7 @@ import { users, clubs, meetings, annualFees, transactions, attendances, emails, 
 import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc } from 'drizzle-orm';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
+import MemberAttendanceCard from '@/components/dashboard/MemberAttendanceCard';
 
 export const metadata = { title: 'ダッシュボード' };
 
@@ -231,6 +232,17 @@ export default async function DashboardPage() {
 
   const nextMeeting = nextMeetingResult[0] || null;
 
+  // memberの場合はmemberType取得
+  let memberType = 'RAC';
+  if (isMember) {
+    const typeResult = await db
+      .select({ memberType: users.memberType })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    memberType = typeResult[0]?.memberType || 'RAC';
+  }
+
   return (
     <div className="space-y-4">
       {/* アナウンスバナー */}
@@ -242,6 +254,12 @@ export default async function DashboardPage() {
         nextMeeting={nextMeeting as any}
         memberAnnualFeeStatus={memberAnnualFeeStatus}
       />
+
+      {/* member向け：出席登録カード */}
+      {isMember && (
+        <MemberAttendanceCard memberType={memberType} />
+      )}
+
       <DashboardContent
         user={profile as any}
         nextMeeting={nextMeeting as any}

@@ -14,7 +14,7 @@ export default async function ClubTopPage({
 }) {
   const { slug } = await params;
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // クラブ情報をslugで取得
   const clubResult = await db

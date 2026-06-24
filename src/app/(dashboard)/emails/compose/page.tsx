@@ -12,7 +12,7 @@ export default async function EmailComposePage({ searchParams }: { searchParams:
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const userId = session.user.id;
   const clubId = session.user.clubId;
 

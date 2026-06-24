@@ -11,7 +11,7 @@ export default async function ClubsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // ユーザーのdistrictId取得
   const profileResult = await db

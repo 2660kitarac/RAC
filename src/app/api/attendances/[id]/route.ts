@@ -18,6 +18,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       'attendanceStatus', 'mealRequired', 'feeAmount', 'paymentStatus',
       'paymentMethod', 'paidAt', 'receiptRequired', 'receiptNameType',
       'receiptName', 'note', 'memberType',
+      // 参加形態（懇親会対応）
+      'participationType', 'afterPartyFeeAmount',
     ];
     for (const field of allowedFields) {
       if (field in body) updateData[field] = body[field];

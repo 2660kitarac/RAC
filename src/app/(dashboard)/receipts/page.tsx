@@ -18,7 +18,7 @@ export default async function ReceiptsPage({
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page || '1', 10));

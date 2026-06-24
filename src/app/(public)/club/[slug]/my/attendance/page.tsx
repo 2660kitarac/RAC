@@ -25,7 +25,7 @@ export default async function MyAttendancePage({
   const page = Math.max(1, parseInt(sp.page || '1', 10));
   const offset = (page - 1) * PAGE_SIZE;
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const userEmail = session.user.email!;
 
   // MU登録履歴（メールアドレスで紐付け・user_id が null のもの）

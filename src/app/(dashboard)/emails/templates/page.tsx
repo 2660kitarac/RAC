@@ -11,7 +11,7 @@ export default async function EmailTemplatesPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const clubId = session.user.clubId;
   const role = (session.user as any).role || 'member';
 

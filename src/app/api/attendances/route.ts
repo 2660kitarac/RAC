@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       clubId, clubName, memberType, attendanceStatus, registrationType,
       mealRequired, feeAmount, paymentStatus, paymentMethod,
       receiptRequired, receiptNameType, receiptName, note,
+      participationType, afterPartyFeeAmount,
     } = body;
 
     if (!meetingId) {
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       clubId: clubId || null,
       clubName: clubName || null,
       memberType: memberType || 'RAC',
-      attendanceStatus: attendanceStatus || 'attending',
+      attendanceStatus: attendanceStatus || 'undecided',
       registrationType: registrationType || 'member',
       mealRequired: mealRequired ?? false,
       feeAmount: feeAmount ?? 0,
@@ -99,7 +100,9 @@ export async function POST(request: NextRequest) {
       receiptNameType: receiptNameType || null,
       receiptName: receiptName || null,
       note: note || null,
-    });
+      participationType: participationType || 'meeting_only',
+      afterPartyFeeAmount: afterPartyFeeAmount ?? 0,
+    } as any);
 
     return NextResponse.json({ id, success: true }, { status: 201 });
   } catch (error) {

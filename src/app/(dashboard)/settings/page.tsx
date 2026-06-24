@@ -11,7 +11,7 @@ export default async function Settings() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const result = await db
     .select({

@@ -15,7 +15,7 @@ export default async function ClubAccountsPage() {
   const userRole = session.user.role || '';
   if (!['system_owner', 'district_admin'].includes(userRole)) redirect('/dashboard');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // クラブ一覧取得
   const clubList = await db

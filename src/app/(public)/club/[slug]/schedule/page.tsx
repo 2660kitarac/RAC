@@ -18,7 +18,7 @@ export default async function SchedulePage({
   const sp = await searchParams;
   const tab = sp.tab === 'other' ? 'other' : 'own';
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const club = await db
     .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName, districtId: clubs.districtId })

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, PartyPopper, Users } from 'lucide-react';
 import Link from 'next/link';
 import type { Meeting } from '@/types';
 
@@ -39,6 +39,17 @@ const meetingSchema = z.object({
   meal_fee: z.string().default('0'),
   status: z.enum(['draft', 'open', 'closed', 'finished', 'cancelled']),
   note: z.string().optional(),
+  // 定員
+  capacity: z.string().optional(),
+  // 懇親会
+  has_after_party: z.boolean().default(false),
+  after_party_venue: z.string().optional(),
+  after_party_start_time: z.string().optional(),
+  after_party_fee_rac: z.string().default('0'),
+  after_party_fee_rc: z.string().default('0'),
+  after_party_fee_obog: z.string().default('0'),
+  after_party_fee_guest: z.string().default('0'),
+  after_party_capacity: z.string().optional(),
 });
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
@@ -83,41 +94,60 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
       meal_fee: meeting?.meal_fee?.toString() || '0',
       status: (meeting?.status as MeetingFormData['status']) || 'draft',
       note: meeting?.note || '',
+      capacity: (meeting as any)?.capacity?.toString() || '',
+      has_after_party: (meeting as any)?.has_after_party || false,
+      after_party_venue: (meeting as any)?.after_party_venue || '',
+      after_party_start_time: (meeting as any)?.after_party_start_time?.substring(0, 5) || '',
+      after_party_fee_rac: (meeting as any)?.after_party_fee_rac?.toString() || '0',
+      after_party_fee_rc: (meeting as any)?.after_party_fee_rc?.toString() || '0',
+      after_party_fee_obog: (meeting as any)?.after_party_fee_obog?.toString() || '0',
+      after_party_fee_guest: (meeting as any)?.after_party_fee_guest?.toString() || '0',
+      after_party_capacity: (meeting as any)?.after_party_capacity?.toString() || '',
     },
   });
+
+  const hasAfterParty = watch('has_after_party');
 
   const onSubmit = async (data: MeetingFormData) => {
     setLoading(true);
     
     try {
-      const slug = meeting?.mu_registration_slug || generateSlug();
+      const slug = (meeting as any)?.mu_registration_slug || generateSlug();
       const baseUrl = window.location.origin;
       const registrationUrl = `${baseUrl}/mu/${slug}`;
 
-      const meetingData = {
-        club_id: clubId,
+      const commonPayload = {
         title: data.title,
-        meeting_number: data.meeting_number ? parseInt(data.meeting_number) : null,
+        meetingNumber: data.meeting_number ? parseInt(data.meeting_number) : null,
         theme: data.theme || null,
         date: data.date,
-        start_time: data.start_time || null,
-        end_time: data.end_time || null,
-        venue_name: data.venue_name || null,
-        venue_address: data.venue_address || null,
+        startTime: data.start_time || null,
+        endTime: data.end_time || null,
+        venueName: data.venue_name || null,
+        venueAddress: data.venue_address || null,
         committee: data.committee || null,
-        manager_user_id: data.manager_user_id || null,
+        managerUserId: data.manager_user_id || null,
         description: data.description || null,
-        program_detail: data.program_detail || null,
-        registration_deadline: data.registration_deadline || null,
-        fee_rac: parseInt(data.fee_rac) || 0,
-        fee_rc: parseInt(data.fee_rc) || 0,
-        fee_obog: parseInt(data.fee_obog) || 0,
-        fee_guest: parseInt(data.fee_guest) || 0,
-        meal_fee: parseInt(data.meal_fee) || 0,
-        mu_registration_slug: slug,
-        mu_registration_url: registrationUrl,
+        programDetail: data.program_detail || null,
+        registrationDeadline: data.registration_deadline || null,
+        feeRac: parseInt(data.fee_rac) || 0,
+        feeRc: parseInt(data.fee_rc) || 0,
+        feeObog: parseInt(data.fee_obog) || 0,
+        feeGuest: parseInt(data.fee_guest) || 0,
+        mealFee: parseInt(data.meal_fee) || 0,
         status: data.status,
         note: data.note || null,
+        // 定員
+        capacity: data.capacity ? parseInt(data.capacity) : null,
+        // 懇親会
+        hasAfterParty: data.has_after_party,
+        afterPartyVenue: data.has_after_party ? (data.after_party_venue || null) : null,
+        afterPartyStartTime: data.has_after_party ? (data.after_party_start_time || null) : null,
+        afterPartyFeeRac: data.has_after_party ? (parseInt(data.after_party_fee_rac) || 0) : 0,
+        afterPartyFeeRc: data.has_after_party ? (parseInt(data.after_party_fee_rc) || 0) : 0,
+        afterPartyFeeObog: data.has_after_party ? (parseInt(data.after_party_fee_obog) || 0) : 0,
+        afterPartyFeeGuest: data.has_after_party ? (parseInt(data.after_party_fee_guest) || 0) : 0,
+        afterPartyCapacity: data.has_after_party && data.after_party_capacity ? parseInt(data.after_party_capacity) : null,
       };
 
       if (mode === 'create') {
@@ -125,41 +155,21 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            clubId: meetingData.club_id, title: meetingData.title,
-            meetingNumber: meetingData.meeting_number, theme: meetingData.theme,
-            date: meetingData.date, startTime: meetingData.start_time,
-            endTime: meetingData.end_time, venueName: meetingData.venue_name,
-            venueAddress: meetingData.venue_address, committee: meetingData.committee,
-            managerUserId: meetingData.manager_user_id, description: meetingData.description,
-            programDetail: meetingData.program_detail,
-            registrationDeadline: meetingData.registration_deadline,
-            feeRac: meetingData.fee_rac, feeRc: meetingData.fee_rc,
-            feeObog: meetingData.fee_obog, feeGuest: meetingData.fee_guest,
-            mealFee: meetingData.meal_fee, muRegistrationSlug: slug,
-            muRegistrationUrl: registrationUrl, status: meetingData.status,
-            note: meetingData.note,
+            clubId,
+            muRegistrationSlug: slug,
+            muRegistrationUrl: registrationUrl,
+            ...commonPayload,
           }),
         });
         const newData = await res.json();
         if (!res.ok) throw new Error(newData.error);
         toast.success('例会を作成しました', { description: `MU登録URL: ${registrationUrl}` });
-        router.push(`/meetings/${newData.id}`);
+        router.push(`/meetings/${newData.meeting?.id || newData.id}`);
       } else if (meeting) {
         const res = await fetch(`/api/meetings/${meeting.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: meetingData.title, meetingNumber: meetingData.meeting_number,
-            theme: meetingData.theme, date: meetingData.date,
-            startTime: meetingData.start_time, endTime: meetingData.end_time,
-            venueName: meetingData.venue_name, venueAddress: meetingData.venue_address,
-            committee: meetingData.committee, managerUserId: meetingData.manager_user_id,
-            description: meetingData.description, programDetail: meetingData.program_detail,
-            registrationDeadline: meetingData.registration_deadline,
-            feeRac: meetingData.fee_rac, feeRc: meetingData.fee_rc,
-            feeObog: meetingData.fee_obog, feeGuest: meetingData.fee_guest,
-            mealFee: meetingData.meal_fee, status: meetingData.status, note: meetingData.note,
-          }),
+          body: JSON.stringify(commonPayload),
         });
         const resData = await res.json();
         if (!res.ok) throw new Error(resData.error);
@@ -310,20 +320,39 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
               </div>
             </div>
 
-            <div className="form-group">
-              <Label>ステータス</Label>
-              <Select onValueChange={v => setValue('status', v as MeetingFormData['status'])} defaultValue={watch('status')}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">下書き</SelectItem>
-                  <SelectItem value="open">募集中</SelectItem>
-                  <SelectItem value="closed">締切</SelectItem>
-                  <SelectItem value="finished">終了</SelectItem>
-                  <SelectItem value="cancelled">中止</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="form-group">
+                <Label>ステータス</Label>
+                <Select onValueChange={v => setValue('status', v as MeetingFormData['status'])} defaultValue={watch('status')}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">下書き</SelectItem>
+                    <SelectItem value="open">募集中</SelectItem>
+                    <SelectItem value="closed">締切</SelectItem>
+                    <SelectItem value="finished">終了</SelectItem>
+                    <SelectItem value="cancelled">中止</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="form-group">
+                <Label className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  例会定員（空欄=無制限）
+                </Label>
+                <div className="relative mt-1">
+                  <Input
+                    {...register('capacity')}
+                    type="number"
+                    min="1"
+                    placeholder="例: 30"
+                    className="pr-6"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">名</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -334,13 +363,12 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
             <CardTitle className="text-base">登録料設定</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { key: 'fee_rac', label: 'RAC登録料' },
                 { key: 'fee_rc', label: 'RC登録料' },
                 { key: 'fee_obog', label: 'OB・OG登録料' },
                 { key: 'fee_guest', label: 'ゲスト登録料' },
-                { key: 'meal_fee', label: 'お弁当代' },
               ].map(({ key, label }) => (
                 <div key={key} className="form-group">
                   <Label>{label}</Label>
@@ -360,7 +388,107 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
           </CardContent>
         </Card>
 
-        {/* 内容・プログラム */}
+        {/* 懇親会設定 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <PartyPopper className="h-4 w-4 text-purple-500" />
+              懇親会設定
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* 懇親会あり/なしトグル */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hasAfterParty}
+                onClick={() => setValue('has_after_party', !hasAfterParty)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  hasAfterParty ? 'bg-purple-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    hasAfterParty ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <Label className="cursor-pointer" onClick={() => setValue('has_after_party', !hasAfterParty)}>
+                この例会に懇親会あり
+              </Label>
+            </div>
+
+            {/* 懇親会詳細（懇親会ありの場合のみ表示） */}
+            {hasAfterParty && (
+              <div className="space-y-4 pl-4 border-l-2 border-purple-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <Label>懇親会場所</Label>
+                    <Input
+                      {...register('after_party_venue')}
+                      placeholder="〇〇レストラン"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label>懇親会開始時間</Label>
+                    <Input
+                      {...register('after_party_start_time')}
+                      type="time"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">懇親会参加費（区分別）</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { key: 'after_party_fee_rac', label: 'RAC' },
+                      { key: 'after_party_fee_rc', label: 'RC' },
+                      { key: 'after_party_fee_obog', label: 'OB・OG' },
+                      { key: 'after_party_fee_guest', label: 'ゲスト' },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="form-group">
+                        <Label>{label}</Label>
+                        <div className="relative mt-1">
+                          <Input
+                            {...register(key as keyof MeetingFormData)}
+                            type="number"
+                            min="0"
+                            step="100"
+                            className="pr-6"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group max-w-xs">
+                  <Label className="flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    懇親会定員（空欄=無制限）
+                  </Label>
+                  <div className="relative mt-1">
+                    <Input
+                      {...register('after_party_capacity')}
+                      type="number"
+                      min="1"
+                      placeholder="例: 20"
+                      className="pr-6"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">名</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 例会内容 */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">例会内容</CardTitle>

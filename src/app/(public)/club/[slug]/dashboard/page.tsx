@@ -17,7 +17,7 @@ export default async function MemberDashboardPage({
   const session = await auth();
   if (!session?.user) redirect(`/club/${slug}/login`);
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // プロフィール取得
   const profileResult = await db

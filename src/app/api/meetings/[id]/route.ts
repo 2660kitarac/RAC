@@ -29,7 +29,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const allowed = ['title','meetingNumber','theme','date','startTime','endTime',
       'venueName','venueAddress','committee','managerUserId','description',
       'programDetail','registrationDeadline','feeRac','feeRc','feeObog','feeGuest',
-      'mealFee','muRegistrationSlug','status','isDistrictEvent'];
+      'mealFee','muRegistrationSlug','muRegistrationUrl','status','isDistrictEvent',
+      // 定員
+      'capacity',
+      // 懇親会
+      'hasAfterParty','afterPartyVenue','afterPartyStartTime',
+      'afterPartyFeeRac','afterPartyFeeRc','afterPartyFeeObog','afterPartyFeeGuest',
+      'afterPartyCapacity'
+    ];
     const updateData: any = { updatedAt: new Date().toISOString() };
     for (const key of allowed) {
       if (key in body) updateData[key] = body[key];

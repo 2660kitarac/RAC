@@ -8,7 +8,7 @@ import MuRegistrationForm from '@/components/attendances/MuRegistrationForm';
 export default async function MuRegistrationPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // 例会情報取得（公開情報のみ）
   const meeting = await db

@@ -104,6 +104,17 @@ export const meetings = sqliteTable('meetings', {
   location: text('location'),
   note: text('note'),
   createdBy: text('created_by'),
+  // 懇親会情報（0007_attendance_party.sql で追加）
+  hasAfterParty: integer('has_after_party', { mode: 'boolean' }).notNull().default(false),
+  afterPartyVenue: text('after_party_venue'),
+  afterPartyStartTime: text('after_party_start_time'),
+  afterPartyFeeRac: integer('after_party_fee_rac').notNull().default(0),
+  afterPartyFeeRc: integer('after_party_fee_rc').notNull().default(0),
+  afterPartyFeeObog: integer('after_party_fee_obog').notNull().default(0),
+  afterPartyFeeGuest: integer('after_party_fee_guest').notNull().default(0),
+  // 定員管理
+  capacity: integer('capacity'),
+  afterPartyCapacity: integer('after_party_capacity'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
   deletedAt: text('deleted_at'),
@@ -133,6 +144,10 @@ export const attendances = sqliteTable('attendances', {
   receiptNameType: text('receipt_name_type'),
   receiptName: text('receipt_name'),
   note: text('note'),
+  // 参加形態（0007_attendance_party.sql で追加）
+  // 'meeting_only' | 'meeting_and_party' | 'absent' | 'waitlist'
+  participationType: text('participation_type').notNull().default('meeting_only'),
+  afterPartyFeeAmount: integer('after_party_fee_amount').notNull().default(0),
   registeredAt: text('registered_at').notNull().default(sql`(datetime('now'))`),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),

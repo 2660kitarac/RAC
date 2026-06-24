@@ -12,7 +12,7 @@ export default async function DistrictReportsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const profile = await db
     .select({ id: users.id, role: users.role, clubId: users.clubId, districtId: users.districtId })

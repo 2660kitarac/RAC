@@ -50,9 +50,8 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
       label: '例会管理',
       icon: Calendar,
       children: [
-        { label: '例会一覧', href: '/meetings', icon: Calendar },
+        { label: '例会一覧・出席管理', href: '/meetings', icon: Calendar },
         { label: '例会作成', href: '/meetings/new', icon: Calendar },
-        { label: '出席管理', href: '/meetings', icon: UserCheck },
         { label: '当日受付', href: '/meetings/reception', icon: UserCheck },
       ],
     },

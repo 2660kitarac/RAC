@@ -46,7 +46,13 @@ export async function POST(request: NextRequest) {
       venueName, venueAddress, committee, managerUserId,
       description, programDetail, registrationDeadline,
       feeRac = 0, feeRc = 0, feeObog = 0, feeGuest = 0, mealFee = 0,
-      muRegistrationSlug, status = 'draft', isDistrictEvent = false,
+      muRegistrationSlug, muRegistrationUrl, status = 'draft', isDistrictEvent = false,
+      // 定員
+      capacity = null,
+      // 懇親会
+      hasAfterParty = false, afterPartyVenue = null, afterPartyStartTime = null,
+      afterPartyFeeRac = 0, afterPartyFeeRc = 0, afterPartyFeeObog = 0, afterPartyFeeGuest = 0,
+      afterPartyCapacity = null,
     } = body;
 
     if (!title || !date) return NextResponse.json({ error: 'タイトルと日付は必須です' }, { status: 400 });
@@ -60,8 +66,16 @@ export async function POST(request: NextRequest) {
       description, programDetail, registrationDeadline,
       feeRac, feeRc, feeObog, feeGuest, mealFee,
       muRegistrationSlug: muRegistrationSlug || null,
+      muRegistrationUrl: muRegistrationUrl || null,
       status, isDistrictEvent,
-    });
+      createdBy: session.user.id,
+      // 定員
+      capacity,
+      // 懇親会
+      hasAfterParty, afterPartyVenue, afterPartyStartTime,
+      afterPartyFeeRac, afterPartyFeeRc, afterPartyFeeObog, afterPartyFeeGuest,
+      afterPartyCapacity,
+    } as any);
 
     return NextResponse.json({ meeting: { id, title, date, status } });
   } catch (e: any) {

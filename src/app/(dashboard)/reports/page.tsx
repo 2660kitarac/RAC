@@ -12,7 +12,7 @@ export default async function ReportsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const clubId = session.user.clubId;
 

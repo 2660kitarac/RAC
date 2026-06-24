@@ -10,7 +10,7 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const [meetingResult, attendancesResult] = await Promise.all([
     db.select().from(meetings).where(and(eq(meetings.id, id), isNull(meetings.deletedAt))).limit(1),

@@ -21,7 +21,7 @@ export default async function MyReceiptsPage({
   const session = await auth();
   if (!session?.user) redirect(`/club/${slug}/login`);
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
   const userId = session.user.id!;
 
   // プロフィール取得

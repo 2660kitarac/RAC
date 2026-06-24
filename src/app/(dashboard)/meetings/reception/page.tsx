@@ -11,7 +11,7 @@ export default async function MeetingReceptionPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   const clubId = session.user.clubId;
   const today = new Date().toISOString().split('T')[0];
