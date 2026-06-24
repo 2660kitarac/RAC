@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   // pending ユーザーは承認待ちページへ
   if ((session.user as any).status === 'pending') redirect('/pending');
 
-  const db = getDbFromContext();
+  const db = await getDbFromContext();
 
   // プロフィール取得
   const profileResult = await db
@@ -39,8 +39,12 @@ export default async function DashboardPage() {
   const profile = profileResult[0] ?? null;
   const userRole = (session.user as any).role || '';
   const userStatus = (session.user as any).status || 'active';
+  const isAdminRole = ['system_owner', 'district_admin'].includes(userRole);
+  const isClubAccount = userRole === 'club_account';
+  const isMember = userRole === 'member';
 
-  if (!profile?.clubId) {
+  // system_owner / district_admin はクラブ未設定でもダッシュボードを表示
+  if (!profile?.clubId && !isAdminRole) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
@@ -52,10 +56,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const clubId = profile.clubId;
-  const isClubAccount = userRole === 'club_account';
-  const isMember = userRole === 'member';
-  const isAdminRole = ['system_owner', 'district_admin'].includes(userRole);
+  const clubId = profile?.clubId ?? null;
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -67,21 +68,26 @@ export default async function DashboardPage() {
   let myNextMeetingAttendance: { meetingId: string; meetingTitle: string; meetingDate: string; answered: boolean } | null = null;
 
   if (isClubAccount || isAdminRole) {
-    const pendingResult = await db
-      .select({ value: count() })
-      .from(users)
-      .where(and(eq(users.clubId, clubId), eq(users.status, 'pending'), isNull(users.deletedAt)));
+    const pendingResult = clubId
+      ? await db
+          .select({ value: count() })
+          .from(users)
+          .where(and(eq(users.clubId, clubId), eq(users.status, 'pending'), isNull(users.deletedAt)))
+      : await db
+          .select({ value: count() })
+          .from(users)
+          .where(and(eq(users.status, 'pending'), isNull(users.deletedAt)));
     pendingMembersCount = pendingResult[0]?.value || 0;
   }
 
   if (isMember) {
     const currentYear = now.getFullYear();
     const feeResult = await db
-      .select({ paymentStatus: annualFees.paymentStatus, year: annualFees.year })
+      .select({ paymentStatus: annualFees.paymentStatus, year: annualFees.fiscalYear })
       .from(annualFees)
       .where(and(
         eq(annualFees.userId, session.user.id),
-        eq(annualFees.year, currentYear),
+        eq(annualFees.fiscalYear, currentYear),
         isNull(annualFees.deletedAt),
       ))
       .limit(1);
@@ -90,7 +96,7 @@ export default async function DashboardPage() {
     }
   }
 
-  // 並列クエリ実行
+  // 並列クエリ実行（clubId が null の場合は全クラブ集計）
   const [
     nextMeetingResult,
     upcomingMeetingsResult,
@@ -102,47 +108,83 @@ export default async function DashboardPage() {
     recentEmailsResult,
   ] = await Promise.all([
     // 次回例会
-    db.select({
-      id: meetings.id, title: meetings.title, date: meetings.date,
-      status: meetings.status, theme: meetings.theme,
-      startTime: meetings.startTime, venueName: meetings.venueName, clubId: meetings.clubId,
-    })
-      .from(meetings)
-      .where(and(
-        eq(meetings.clubId, clubId),
-        isNull(meetings.deletedAt),
-        gte(meetings.date, todayStr),
-        inArray(meetings.status, ['open', 'closed']),
-      ))
-      .orderBy(asc(meetings.date))
-      .limit(1),
+    clubId
+      ? db.select({
+          id: meetings.id, title: meetings.title, date: meetings.date,
+          status: meetings.status, theme: meetings.theme,
+          startTime: meetings.startTime, venueName: meetings.venueName, clubId: meetings.clubId,
+        })
+          .from(meetings)
+          .where(and(
+            eq(meetings.clubId, clubId),
+            isNull(meetings.deletedAt),
+            gte(meetings.date, todayStr),
+            inArray(meetings.status, ['open', 'closed']),
+          ))
+          .orderBy(asc(meetings.date))
+          .limit(1)
+      : db.select({
+          id: meetings.id, title: meetings.title, date: meetings.date,
+          status: meetings.status, theme: meetings.theme,
+          startTime: meetings.startTime, venueName: meetings.venueName, clubId: meetings.clubId,
+        })
+          .from(meetings)
+          .where(and(
+            isNull(meetings.deletedAt),
+            gte(meetings.date, todayStr),
+            inArray(meetings.status, ['open', 'closed']),
+          ))
+          .orderBy(asc(meetings.date))
+          .limit(1),
 
     // 直近5件
-    db.select({ id: meetings.id, title: meetings.title, date: meetings.date, status: meetings.status })
-      .from(meetings)
-      .where(and(eq(meetings.clubId, clubId), isNull(meetings.deletedAt)))
-      .orderBy(desc(meetings.date))
-      .limit(5),
+    clubId
+      ? db.select({ id: meetings.id, title: meetings.title, date: meetings.date, status: meetings.status })
+          .from(meetings)
+          .where(and(eq(meetings.clubId, clubId), isNull(meetings.deletedAt)))
+          .orderBy(desc(meetings.date))
+          .limit(5)
+      : db.select({ id: meetings.id, title: meetings.title, date: meetings.date, status: meetings.status })
+          .from(meetings)
+          .where(isNull(meetings.deletedAt))
+          .orderBy(desc(meetings.date))
+          .limit(5),
 
     // メンバー数
-    db.select({ value: count() })
-      .from(users)
-      .where(and(eq(users.clubId, clubId), eq(users.isActive, true), isNull(users.deletedAt))),
+    clubId
+      ? db.select({ value: count() })
+          .from(users)
+          .where(and(eq(users.clubId, clubId), eq(users.isActive, true), isNull(users.deletedAt)))
+      : db.select({ value: count() })
+          .from(users)
+          .where(and(eq(users.isActive, true), isNull(users.deletedAt))),
 
     // 年会費未納数
-    db.select({ value: count() })
-      .from(annualFees)
-      .where(and(eq(annualFees.clubId, clubId), eq(annualFees.paymentStatus, 'unpaid'), isNull(annualFees.deletedAt))),
+    clubId
+      ? db.select({ value: count() })
+          .from(annualFees)
+          .where(and(eq(annualFees.clubId, clubId), eq(annualFees.paymentStatus, 'unpaid'), isNull(annualFees.deletedAt)))
+      : db.select({ value: count() })
+          .from(annualFees)
+          .where(and(eq(annualFees.paymentStatus, 'unpaid'), isNull(annualFees.deletedAt))),
 
     // 今月収支
-    db.select({ transactionType: transactions.transactionType, amount: transactions.amount })
-      .from(transactions)
-      .where(and(
-        eq(transactions.clubId, clubId),
-        isNull(transactions.deletedAt),
-        gte(transactions.transactionDate, firstDayOfMonth),
-        lte(transactions.transactionDate, lastDayOfMonth),
-      )),
+    clubId
+      ? db.select({ transactionType: transactions.transactionType, amount: transactions.amount })
+          .from(transactions)
+          .where(and(
+            eq(transactions.clubId, clubId),
+            isNull(transactions.deletedAt),
+            gte(transactions.transactionDate, firstDayOfMonth),
+            lte(transactions.transactionDate, lastDayOfMonth),
+          ))
+      : db.select({ transactionType: transactions.transactionType, amount: transactions.amount })
+          .from(transactions)
+          .where(and(
+            isNull(transactions.deletedAt),
+            gte(transactions.transactionDate, firstDayOfMonth),
+            lte(transactions.transactionDate, lastDayOfMonth),
+          )),
 
     // 領収書未発行数
     db.select({ value: count() })
@@ -167,11 +209,17 @@ export default async function DashboardPage() {
       .limit(5),
 
     // 最近のメール
-    db.select({ id: emails.id, subject: emails.subject, status: emails.status, sentAt: emails.sentAt, targetType: emails.targetType })
-      .from(emails)
-      .where(and(eq(emails.clubId, clubId), eq(emails.status, 'sent'), isNull(emails.deletedAt)))
-      .orderBy(desc(emails.sentAt))
-      .limit(5),
+    clubId
+      ? db.select({ id: emails.id, subject: emails.subject, status: emails.status, sentAt: emails.sentAt, targetType: emails.targetType })
+          .from(emails)
+          .where(and(eq(emails.clubId, clubId), eq(emails.status, 'sent'), isNull(emails.deletedAt)))
+          .orderBy(desc(emails.sentAt))
+          .limit(5)
+      : db.select({ id: emails.id, subject: emails.subject, status: emails.status, sentAt: emails.sentAt, targetType: emails.targetType })
+          .from(emails)
+          .where(and(eq(emails.status, 'sent'), isNull(emails.deletedAt)))
+          .orderBy(desc(emails.sentAt))
+          .limit(5),
   ]);
 
   const monthlyIncome = transactionsResult
