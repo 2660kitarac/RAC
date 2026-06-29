@@ -10,10 +10,14 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -53,23 +57,73 @@ jobs:
           PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
           echo "trustHost=!0 件数: $PATCHED"
 
+      - name: Commit build artifacts for gsk deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f .open-next/
+          git commit -m "ci: add build artifacts for gsk deploy [skip ci]" || echo "No changes to commit"
+
       - name: Install gsk CLI
         run: npm install -g @genspark/cli@1.0.23
 
       - name: Deploy via gsk hosted deploy
+        id: gsk_deploy
         run: |
-          gsk hosted deploy \
+          OUTPUT=$(gsk hosted deploy \
             --project-id ${{ secrets.GSK_PROJECT_ID }} \
             --api-key ${{ secrets.GSK_API_KEY }} \
-            --output text
+            --output text 2>&1)
+          echo "$OUTPUT"
+          PENDING_ID=$(echo "$OUTPUT" | grep -oP 'pending_action_id:\s*\K[0-9a-f-]+' | head -1)
+          if [ -n "$PENDING_ID" ]; then
+            echo "pending_action_id=$PENDING_ID" >> $GITHUB_OUTPUT
+            echo "::notice::pending_action_id=$PENDING_ID"
+          fi
         env:
           GSK_API_KEY: ${{ secrets.GSK_API_KEY }}
           GSK_PROJECT_ID: ${{ secrets.GSK_PROJECT_ID }}
 
+      - name: Wait for deployment approval (action_wait x3)
+        if: steps.gsk_deploy.outputs.pending_action_id != ''
+        run: |
+          PENDING_ID="${{ steps.gsk_deploy.outputs.pending_action_id }}"
+          for attempt in 1 2 3; do
+            echo "=== action_wait attempt $attempt/3 ==="
+            RESULT=$(gsk hosted action_wait \
+              --id "$PENDING_ID" \
+              --project-id ${{ secrets.GSK_PROJECT_ID }} \
+              --api-key ${{ secrets.GSK_API_KEY }} \
+              --output text 2>&1)
+            echo "$RESULT"
+            if echo "$RESULT" | grep -q "code: ok"; then
+              echo "✅ デプロイ成功"
+              break
+            elif echo "$RESULT" | grep -qE "code: still_pending|still_pending"; then
+              echo "⏳ 承認待ち中..."
+              sleep 5
+            else
+              echo "❌ デプロイ失敗"
+              exit 1
+            fi
+          done
+        env:
+          GSK_API_KEY: ${{ secrets.GSK_API_KEY }}
+          GSK_PROJECT_ID: ${{ secrets.GSK_PROJECT_ID }}
+
+      - name: Cleanup build artifacts from git
+        if: always()
+        run: |
+          git rm -r --cached .open-next/ 2>/dev/null || true
+          git commit -m "ci: remove build artifacts [skip ci]" || echo "nothing to clean"
+          git push origin main || echo "push skipped"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Verify deployment
         run: |
           BASE_URL="https://fd8844cf-cba3-4f18-9986-e52d20b548d5.vip.gensparksite.com"
-          sleep 10
+          sleep 15
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/clubs")
           echo "/api/clubs → HTTP $STATUS (期待: 401)"
-          echo "🚀 デプロイ完了: $BASE_URL"
+          echo "🚀 Deploy URL: $BASE_URL"
