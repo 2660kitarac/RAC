@@ -1,4 +1,5 @@
 node_modules/
+.open-next/server-functions/default/node_modules/
 .next/
 .wrangler/
 *.tsbuildinfo
