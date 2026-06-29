@@ -43,58 +43,28 @@ jobs:
 
       - name: Apply trustHost patch
         run: |
-          WORKER=".open-next/bundled-worker.js"
+          WORKER=".open-next/worker.js"
           sed -i 's/L\.trustHost??(L\.trustHost=!1)/L.trustHost??(L.trustHost=!0)/g' $WORKER
           PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
-          echo "trustHost=!0 適用件数: $PATCHED"
+          echo "trustHost=!0 件数: $PATCHED"
 
-      - name: Update wrangler config for dispatch namespace
-        run: |
-          cat > wrangler.jsonc << 'EOF'
-          {
-            "name": "fd8844cf-cba3-4f18-9986-e52d20b548d5",
-            "main": ".open-next/bundled-worker.js",
-            "no_bundle": true,
-            "assets": {
-              "directory": ".open-next/assets",
-              "binding": "ASSETS"
-            },
-            "compatibility_date": "2025-06-01",
-            "compatibility_flags": ["nodejs_compat"],
-            "d1_databases": [
-              {
-                "binding": "DB",
-                "database_name": "fd8844cf-cba3-4f18-9986-e52d20b548d5-db",
-                "database_id": "ccae0cce-0ed8-4fc0-88f4-51c7bb99f0d7"
-              }
-            ]
-          }
-          EOF
+      - name: Install gsk CLI
+        run: npm install -g @genspark/cli@1.0.23
 
-      - name: Deploy to Cloudflare Workers for Platform
+      - name: Deploy via gsk hosted deploy
         run: |
-          npx wrangler deploy \
-            --dispatch-namespace user_website
+          gsk hosted deploy \
+            --project-id ${{ secrets.GSK_PROJECT_ID }} \
+            --api-key ${{ secrets.GSK_API_KEY }} \
+            --output text
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Set Worker secrets
-        run: |
-          echo "${{ secrets.AUTH_SECRET }}" | npx wrangler secret put AUTH_SECRET \
-            --name fd8844cf-cba3-4f18-9986-e52d20b548d5 \
-            --dispatch-namespace user_website
-          echo "true" | npx wrangler secret put AUTH_TRUST_HOST \
-            --name fd8844cf-cba3-4f18-9986-e52d20b548d5 \
-            --dispatch-namespace user_website
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GSK_API_KEY: ${{ secrets.GSK_API_KEY }}
+          GSK_PROJECT_ID: ${{ secrets.GSK_PROJECT_ID }}
 
       - name: Verify deployment
         run: |
           BASE_URL="https://fd8844cf-cba3-4f18-9986-e52d20b548d5.vip.gensparksite.com"
-          sleep 5
+          sleep 10
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/clubs")
           echo "/api/clubs → HTTP $STATUS (期待: 401)"
           echo "🚀 デプロイ完了: $BASE_URL"
