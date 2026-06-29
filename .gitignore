@@ -50,4 +50,3 @@ drizzle/
 *.tsbuildinfo
 next-env.d.ts
 core
-.github/workflows/deploy.yml
