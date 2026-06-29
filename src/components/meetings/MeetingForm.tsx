@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, PartyPopper, Users, Link2, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 import type { Meeting } from '@/types';
 
 const meetingSchema = z.object({
