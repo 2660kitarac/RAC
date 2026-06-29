@@ -14,8 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save, PartyPopper, Users } from 'lucide-react';
+import { ArrowLeft, Save, PartyPopper, Users, Link2, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import type { Meeting } from '@/types';
 
 const meetingSchema = z.object({
@@ -64,6 +65,19 @@ interface MeetingFormProps {
 export default function MeetingForm({ mode, clubId, meeting, members }: MeetingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // 編集モード時のMU登録URL（作成済みのslugから生成）
+  const existingMuUrl = mode === 'edit' && (meeting as any)?.mu_registration_slug
+    ? (typeof window !== 'undefined'
+        ? `${window.location.origin}/mu/${(meeting as any).mu_registration_slug}`
+        : (meeting as any)?.mu_registration_url || null)
+    : null;
+
+  const copyMuUrl = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('MU登録URLをコピーしました');
+    });
+  };
 
   const {
     register,
@@ -525,6 +539,53 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
             </div>
           </CardContent>
         </Card>
+
+        {/* MU登録URL（編集モードのみ・slug生成済みの場合） */}
+        {mode === 'edit' && (meeting as any)?.mu_registration_slug && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-blue-700">
+                <Link2 className="h-4 w-4" />
+                MU登録URL（外部参加者向け登録リンク）
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <code className="flex-1 text-sm bg-white px-3 py-2 rounded border border-blue-200 text-blue-800 break-all">
+                  {existingMuUrl || (meeting as any)?.mu_registration_url}
+                </code>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyMuUrl(existingMuUrl || (meeting as any)?.mu_registration_url || '')}
+                  className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                  コピー
+                </Button>
+                <a
+                  href={existingMuUrl || (meeting as any)?.mu_registration_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    開く
+                  </Button>
+                </a>
+              </div>
+              <p className="text-xs text-blue-600">
+                ※ このURLを外部参加者（他クラブ・ゲスト等）に共有してください
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 送信ボタン */}
         <div className="flex justify-end gap-3">

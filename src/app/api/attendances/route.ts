@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { attendances, users, meetings } from '@/lib/db/schema';
+import { attendances, users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -60,13 +60,19 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/attendances - 出席登録
+// MU登録（外部フォーム）からの呼び出しは未認証でも許可
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // registrationType が 'mu' の場合は未認証でも許可（外部参加者登録）
+    const body = await request.json();
+    const isMuRegistration = body.registrationType === 'mu';
+
+    if (!isMuRegistration) {
+      const session = await auth();
+      if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    }
 
     const db = await getDbFromContext();
-    const body = await request.json();
     const {
       meetingId, userId, externalName, externalEmail, externalPhone,
       clubId, clubName, memberType, attendanceStatus, registrationType,
@@ -77,6 +83,11 @@ export async function POST(request: NextRequest) {
 
     if (!meetingId) {
       return NextResponse.json({ error: 'meetingId は必須です' }, { status: 400 });
+    }
+
+    // MU登録は外部名前+メールが必須
+    if (isMuRegistration && !externalName && !userId) {
+      return NextResponse.json({ error: 'お名前は必須です' }, { status: 400 });
     }
 
     const id = randomUUID();

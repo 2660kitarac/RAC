@@ -30,6 +30,16 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
       status: meetings.status,
       description: meetings.description,
       clubId: meetings.clubId,
+      capacity: meetings.capacity,
+      // 懇親会フィールド
+      hasAfterParty: meetings.hasAfterParty,
+      afterPartyVenue: meetings.afterPartyVenue,
+      afterPartyStartTime: meetings.afterPartyStartTime,
+      afterPartyFeeRac: meetings.afterPartyFeeRac,
+      afterPartyFeeRc: meetings.afterPartyFeeRc,
+      afterPartyFeeObog: meetings.afterPartyFeeObog,
+      afterPartyFeeGuest: meetings.afterPartyFeeGuest,
+      afterPartyCapacity: meetings.afterPartyCapacity,
     })
     .from(meetings)
     .where(and(eq(meetings.muRegistrationSlug, slug), isNull(meetings.deletedAt)))

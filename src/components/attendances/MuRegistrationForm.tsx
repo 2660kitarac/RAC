@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
 
 const muSchema = z.object({
@@ -25,6 +25,8 @@ const muSchema = z.object({
   email: z.string().email('正しいメールアドレスを入力してください'),
   phone: z.string().optional(),
   meal_required: z.boolean().default(false),
+  // 参加形態: 例会のみ / 例会+懇親会 / 懇親会のみ
+  participation_type: z.enum(['meeting_only', 'meeting_and_party', 'party_only']).default('meeting_only'),
   receipt_required: z.boolean().default(false),
   receipt_name_type: z.enum(['club', 'personal', 'custom']).optional(),
   receipt_name: z.string().optional(),
@@ -41,10 +43,34 @@ interface LoggedInUser {
   clubName: string | null;
 }
 
+// Meeting型を拡張して懇親会フィールドを含める
+type MeetingWithParty = Meeting & {
+  club?: { name: string; short_name?: string };
+  has_after_party?: boolean;
+  after_party_venue?: string | null;
+  after_party_start_time?: string | null;
+  after_party_fee_rac?: number;
+  after_party_fee_rc?: number;
+  after_party_fee_obog?: number;
+  after_party_fee_guest?: number;
+  after_party_capacity?: number | null;
+  capacity?: number | null;
+};
+
 interface MuRegistrationFormProps {
-  meeting: Meeting & { club?: { name: string; short_name?: string } };
+  meeting: MeetingWithParty;
   clubs: Club[];
   loggedInUser?: LoggedInUser | null;
+}
+
+/** 懇親会参加費を区分から算出 */
+function calcAfterPartyFee(memberType: string, meeting: MeetingWithParty): number {
+  switch (memberType) {
+    case 'RAC':   return meeting.after_party_fee_rac  ?? 0;
+    case 'RC':    return meeting.after_party_fee_rc   ?? 0;
+    case 'OB_OG': return meeting.after_party_fee_obog ?? 0;
+    default:      return meeting.after_party_fee_guest ?? 0;
+  }
 }
 
 export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuRegistrationFormProps) {
@@ -53,8 +79,12 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   const [registrationData, setRegistrationData] = useState<{
     name: string;
     feeAmount: number;
+    afterPartyFeeAmount: number;
+    participationType: string;
     email: string;
   } | null>(null);
+
+  const hasAfterParty = !!(meeting.has_after_party);
 
   const {
     register,
@@ -68,7 +98,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
       member_type: 'RAC',
       meal_required: false,
       receipt_required: false,
-      // ログイン済みなら自動入力
+      participation_type: 'meeting_only',
       name: loggedInUser?.name ?? '',
       email: loggedInUser?.email ?? '',
       club_id: loggedInUser?.clubId ?? '',
@@ -80,8 +110,25 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   const mealRequired = watch('meal_required');
   const receiptRequired = watch('receipt_required');
   const receiptNameType = watch('receipt_name_type');
+  const participationType = watch('participation_type');
 
-  const feeAmount = calculateFee(memberType, meeting, mealRequired, meeting.meal_fee);
+  // 例会登録料（meeting_only / meeting_and_party の場合）
+  const meetingFee = participationType === 'party_only'
+    ? 0
+    : calculateFee(memberType, meeting, mealRequired, meeting.meal_fee);
+
+  // 懇親会登録料
+  const afterPartyFee = (hasAfterParty && (participationType === 'meeting_and_party' || participationType === 'party_only'))
+    ? calcAfterPartyFee(memberType, meeting)
+    : 0;
+
+  const totalFee = meetingFee + afterPartyFee;
+
+  const participationLabel: Record<string, string> = {
+    meeting_only: '例会のみ',
+    meeting_and_party: '例会＋懇親会',
+    party_only: '懇親会のみ',
+  };
 
   const onSubmit = async (data: MuFormData) => {
     setLoading(true);
@@ -92,7 +139,6 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meetingId: meeting.id,
-          // ログイン済みなら userId を紐づけ
           userId: loggedInUser?.id ?? null,
           clubId: data.club_id || null,
           clubName: data.club_name,
@@ -103,8 +149,11 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           attendanceStatus: 'undecided',
           registrationType: 'mu',
           mealRequired: data.meal_required,
-          feeAmount,
+          feeAmount: meetingFee,
           paymentStatus: 'unpaid',
+          // 参加形態
+          participationType: data.participation_type,
+          afterPartyFeeAmount: afterPartyFee,
           receiptRequired: data.receipt_required,
           receiptNameType: data.receipt_required ? (data.receipt_name_type || null) : null,
           receiptName: data.receipt_required ? (data.receipt_name || data.name) : null,
@@ -121,7 +170,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
         throw new Error(resData.error);
       }
 
-      // 登録完了メール送信
+      // 登録完了メール送信（失敗しても続行）
       await fetch('/api/emails/send-registration-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,12 +178,19 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           meetingId: meeting.id,
           name: data.name,
           email: data.email,
-          feeAmount,
+          feeAmount: totalFee,
           mealRequired: data.meal_required,
+          participationType: data.participation_type,
         }),
       }).catch(() => {});
 
-      setRegistrationData({ name: data.name, feeAmount, email: data.email });
+      setRegistrationData({
+        name: data.name,
+        feeAmount: meetingFee,
+        afterPartyFeeAmount: afterPartyFee,
+        participationType: data.participation_type,
+        email: data.email,
+      });
       setSubmitted(true);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '登録に失敗しました';
@@ -144,6 +200,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
     }
   };
 
+  // 登録完了画面
   if (submitted && registrationData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -167,9 +224,29 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                 <span className="font-medium">{formatDate(meeting.date)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">登録料</span>
-                <span className="font-bold text-blue-600">{formatCurrency(registrationData.feeAmount)}</span>
+                <span className="text-gray-500">参加形態</span>
+                <span className="font-medium">{participationLabel[registrationData.participationType] ?? registrationData.participationType}</span>
               </div>
+              {registrationData.feeAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">例会登録料</span>
+                  <span className="font-bold text-blue-600">{formatCurrency(registrationData.feeAmount)}</span>
+                </div>
+              )}
+              {registrationData.afterPartyFeeAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">懇親会参加費</span>
+                  <span className="font-bold text-purple-600">{formatCurrency(registrationData.afterPartyFeeAmount)}</span>
+                </div>
+              )}
+              {(registrationData.feeAmount + registrationData.afterPartyFeeAmount) > 0 && (
+                <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-2">
+                  <span className="text-gray-700 font-medium">合計</span>
+                  <span className="font-bold text-gray-900">
+                    {formatCurrency(registrationData.feeAmount + registrationData.afterPartyFeeAmount)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-gray-500">
@@ -215,13 +292,29 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
               </div>
             )}
           </div>
+
+          {/* 懇親会情報ヘッダー */}
+          {hasAfterParty && (
+            <div className="mt-4 bg-purple-700 bg-opacity-50 rounded-lg px-4 py-3 flex items-start gap-2">
+              <PartyPopper className="h-4 w-4 text-purple-200 mt-0.5 shrink-0" />
+              <div className="text-sm text-purple-100">
+                <span className="font-semibold text-white">懇親会あり</span>
+                {meeting.after_party_venue && (
+                  <span className="ml-2">{meeting.after_party_venue}</span>
+                )}
+                {meeting.after_party_start_time && (
+                  <span className="ml-2">{meeting.after_party_start_time.substring(0, 5)} 〜</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 登録料表示 */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">登録料</p>
+          <p className="text-sm font-medium text-gray-700 mb-2">例会登録料</p>
           <div className="flex flex-wrap gap-3">
             {meeting.fee_rac > 0 && <FeeChip label="RAC" amount={meeting.fee_rac} />}
             {meeting.fee_rc > 0 && <FeeChip label="RC" amount={meeting.fee_rc} />}
@@ -229,6 +322,17 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             {meeting.fee_guest > 0 && <FeeChip label="ゲスト" amount={meeting.fee_guest} />}
             {meeting.meal_fee > 0 && <FeeChip label="お弁当代" amount={meeting.meal_fee} suffix="（別途）" />}
           </div>
+          {hasAfterParty && (
+            <>
+              <p className="text-sm font-medium text-gray-700 mb-2 mt-3">懇親会参加費</p>
+              <div className="flex flex-wrap gap-3">
+                {(meeting.after_party_fee_rac ?? 0) > 0 && <FeeChip label="RAC" amount={meeting.after_party_fee_rac!} color="purple" />}
+                {(meeting.after_party_fee_rc ?? 0) > 0 && <FeeChip label="RC" amount={meeting.after_party_fee_rc!} color="purple" />}
+                {(meeting.after_party_fee_obog ?? 0) > 0 && <FeeChip label="OB・OG" amount={meeting.after_party_fee_obog!} color="purple" />}
+                {(meeting.after_party_fee_guest ?? 0) > 0 && <FeeChip label="ゲスト" amount={meeting.after_party_fee_guest!} color="purple" />}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -264,6 +368,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
         )}
 
         <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
+
+          {/* 参加者情報 */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -318,7 +424,6 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
               <div className="form-group">
                 <Label htmlFor="club_name" required>所属クラブ</Label>
                 {loggedInUser?.clubName ? (
-                  /* ログイン済み＋クラブあり → 表示のみ */
                   <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
                     {loggedInUser.clubName}
                   </div>
@@ -352,6 +457,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             </CardContent>
           </Card>
 
+          {/* 連絡先情報 */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">連絡先情報</CardTitle>
@@ -383,12 +489,82 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             </CardContent>
           </Card>
 
+          {/* 参加形態（懇親会がある場合のみ表示） */}
+          {hasAfterParty && (
+            <Card className="border-purple-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <PartyPopper className="h-4 w-4 text-purple-500" />
+                  参加形態
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  {
+                    value: 'meeting_only',
+                    label: '例会のみ参加',
+                    desc: '例会にのみ参加します',
+                    fee: calculateFee(memberType, meeting, false, 0),
+                  },
+                  {
+                    value: 'meeting_and_party',
+                    label: '例会＋懇親会に参加',
+                    desc: `例会と懇親会の両方に参加します`,
+                    fee: calculateFee(memberType, meeting, false, 0) + calcAfterPartyFee(memberType, meeting),
+                  },
+                  {
+                    value: 'party_only',
+                    label: '懇親会のみ参加',
+                    desc: '懇親会にのみ参加します',
+                    fee: calcAfterPartyFee(memberType, meeting),
+                  },
+                ].map(option => (
+                  <label
+                    key={option.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                      participationType === option.value
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      value={option.value}
+                      checked={participationType === option.value}
+                      onChange={() => setValue('participation_type', option.value as any)}
+                      className="mt-0.5 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">{option.label}</span>
+                        {option.fee > 0 && (
+                          <span className="text-sm font-bold text-purple-700">{formatCurrency(option.fee)}</span>
+                        )}
+                        {option.fee === 0 && (
+                          <span className="text-sm text-gray-500">無料</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
+                      {option.value === 'meeting_and_party' && meeting.after_party_venue && (
+                        <p className="text-xs text-purple-600 mt-0.5">
+                          📍 {meeting.after_party_venue}
+                          {meeting.after_party_start_time && ` ${meeting.after_party_start_time.substring(0, 5)}〜`}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* オプション */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">オプション</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {meeting.meal_fee > 0 && (
+              {meeting.meal_fee > 0 && participationType !== 'party_only' && (
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <input
                     type="checkbox"
@@ -447,6 +623,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             </CardContent>
           </Card>
 
+          {/* 備考 */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">備考</CardTitle>
@@ -461,21 +638,39 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           </Card>
 
           {/* 登録料確認 */}
-          {feeAmount > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-700 font-medium mb-2">
-                <AlertTriangle className="h-4 w-4 inline mr-1" />
-                登録料のご確認
+          {totalFee > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-blue-700 font-medium flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                お支払い金額のご確認
               </p>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-blue-600">
-                  {memberType}登録料{mealRequired ? ' + お弁当代' : ''}
-                </span>
-                <span className="text-lg font-bold text-blue-700">{formatCurrency(feeAmount)}</span>
-              </div>
-              <p className="text-xs text-blue-500 mt-1">
-                ※当日、受付にてお支払いください
-              </p>
+              {meetingFee > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-blue-600">
+                    例会登録料{mealRequired ? '（お弁当含む）' : ''}
+                  </span>
+                  <span className="font-semibold text-blue-700">{formatCurrency(meetingFee)}</span>
+                </div>
+              )}
+              {afterPartyFee > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-purple-600">懇親会参加費</span>
+                  <span className="font-semibold text-purple-700">{formatCurrency(afterPartyFee)}</span>
+                </div>
+              )}
+              {meetingFee > 0 && afterPartyFee > 0 && (
+                <div className="flex justify-between items-center border-t border-blue-200 pt-2">
+                  <span className="text-blue-700 font-medium">合計</span>
+                  <span className="text-lg font-bold text-blue-700">{formatCurrency(totalFee)}</span>
+                </div>
+              )}
+              {!(meetingFee > 0 && afterPartyFee > 0) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-600 text-sm">合計</span>
+                  <span className="text-lg font-bold text-blue-700">{formatCurrency(totalFee)}</span>
+                </div>
+              )}
+              <p className="text-xs text-blue-500">※当日、受付にてお支払いください</p>
             </div>
           )}
 
@@ -497,11 +692,19 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   );
 }
 
-function FeeChip({ label, amount, suffix = '' }: { label: string; amount: number; suffix?: string }) {
+function FeeChip({
+  label, amount, suffix = '', color = 'gray'
+}: {
+  label: string; amount: number; suffix?: string; color?: 'gray' | 'purple';
+}) {
   return (
-    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-full px-3 py-1">
+    <div className={`flex items-center gap-1 bg-white border rounded-full px-3 py-1 ${
+      color === 'purple' ? 'border-purple-200' : 'border-gray-200'
+    }`}>
       <span className="text-xs text-gray-500">{label}:</span>
-      <span className="text-sm font-semibold text-gray-900">{formatCurrency(amount)}{suffix}</span>
+      <span className={`text-sm font-semibold ${
+        color === 'purple' ? 'text-purple-700' : 'text-gray-900'
+      }`}>{formatCurrency(amount)}{suffix}</span>
     </div>
   );
 }
