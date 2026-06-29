@@ -53,7 +53,7 @@ jobs:
           cat > wrangler.jsonc << 'EOF'
           {
             "name": "fd8844cf-cba3-4f18-9986-e52d20b548d5",
-            "main": ".open-next/bundled-worker.js",
+            "main": ".open-next/worker.js",
             "no_bundle": true,
             "assets": {
               "directory": ".open-next/assets",
