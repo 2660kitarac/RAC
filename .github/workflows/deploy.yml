@@ -45,14 +45,60 @@ jobs:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           AUTH_TRUST_HOST: "true"
 
-      - name: Normalize worker filename and apply trustHost patch
+      - name: Pre-bundle worker with wrangler (solve gsk sweeper timeout)
         run: |
+          # worker.js が存在する場合 bundled-worker.js にコピー（正規化）
           if [ -f ".open-next/worker.js" ] && [ ! -f ".open-next/bundled-worker.js" ]; then
             cp .open-next/worker.js .open-next/bundled-worker.js
             echo "Copied worker.js -> bundled-worker.js"
           fi
+          echo "Entry point size: $(wc -c < .open-next/bundled-worker.js) bytes"
+
+          # wrangler --dry-run でバンドル済み単一ファイルを生成
+          # no_bundle:true を一時的に外してバンドルさせる
+          mkdir -p .open-next/wrangler-dist
+          # no_bundle を除いた一時 wrangler config を作成
+          node -e "
+            const fs = require('fs');
+            const cfg = fs.readFileSync('wrangler.jsonc', 'utf8');
+            // コメントを除去してJSONパース
+            const json = JSON.parse(cfg.replace(/\/\/.*$/mg, '').replace(/\/\*[\s\S]*?\*\//g, ''));
+            delete json.no_bundle;
+            fs.writeFileSync('wrangler-bundle.json', JSON.stringify(json, null, 2));
+            console.log('Created wrangler-bundle.json (no_bundle removed)');
+          "
+          cat wrangler-bundle.json
+
+          # --dry-run でバンドル
+          CLOUDFLARE_ACCOUNT_ID=dummy npx wrangler deploy \
+            --config wrangler-bundle.json \
+            --dry-run \
+            --outdir .open-next/wrangler-dist \
+            2>&1 || true
+
+          # バンドル結果確認
+          echo "--- wrangler-dist contents ---"
+          ls -la .open-next/wrangler-dist/ 2>/dev/null || echo "(empty)"
+
+          # バンドル済みファイルが生成されたか確認
+          BUNDLED=$(ls .open-next/wrangler-dist/*.js 2>/dev/null | head -1 || echo "")
+          if [ -n "$BUNDLED" ]; then
+            BUNDLED_SIZE=$(wc -c < "$BUNDLED")
+            echo "Bundled file: $BUNDLED ($BUNDLED_SIZE bytes)"
+            if [ "$BUNDLED_SIZE" -gt 50000 ]; then
+              cp "$BUNDLED" .open-next/bundled-worker.js
+              echo "✅ Replaced bundled-worker.js with pre-bundled version ($BUNDLED_SIZE bytes)"
+            else
+              echo "⚠️  Bundled file too small ($BUNDLED_SIZE bytes), keeping original"
+            fi
+          else
+            echo "⚠️  wrangler dry-run produced no .js output, keeping original entry point"
+          fi
+          rm -f wrangler-bundle.json
+
+          # trustHost パッチ
           WORKER=".open-next/bundled-worker.js"
-          echo "Worker size: $(wc -c < $WORKER) bytes"
+          echo "Final worker size: $(wc -c < $WORKER) bytes"
           sed -i 's/L\.trustHost??(L\.trustHost=!1)/L.trustHost??(L.trustHost=!0)/g' $WORKER
           PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
           echo "trustHost=!0 件数: $PATCHED"
