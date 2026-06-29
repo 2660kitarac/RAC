@@ -41,9 +41,14 @@ jobs:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           AUTH_TRUST_HOST: "true"
 
-      - name: Apply trustHost patch
+      - name: Normalize worker filename and apply trustHost patch
         run: |
-          WORKER=".open-next/worker.js"
+          if [ -f ".open-next/worker.js" ] && [ ! -f ".open-next/bundled-worker.js" ]; then
+            cp .open-next/worker.js .open-next/bundled-worker.js
+            echo "Copied worker.js -> bundled-worker.js"
+          fi
+          WORKER=".open-next/bundled-worker.js"
+          echo "Worker size: $(wc -c < $WORKER) bytes"
           sed -i 's/L\.trustHost??(L\.trustHost=!1)/L.trustHost??(L.trustHost=!0)/g' $WORKER
           PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
           echo "trustHost=!0 件数: $PATCHED"
