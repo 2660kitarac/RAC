@@ -43,7 +43,7 @@ jobs:
 
       - name: Apply trustHost patch
         run: |
-          WORKER=".open-next/bundled-worker.js"
+          WORKER=".open-next/worker.js"
           sed -i 's/L\.trustHost??(L\.trustHost=!1)/L.trustHost??(L.trustHost=!0)/g' $WORKER
           PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
           echo "trustHost=!0 適用件数: $PATCHED"
