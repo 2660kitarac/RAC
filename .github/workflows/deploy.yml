@@ -1,0 +1,149 @@
+name: Build & Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ──────────────────────────────
+      # 1. コードをチェックアウト
+      # ──────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ──────────────────────────────
+      # 2. Node.js セットアップ（キャッシュ付き）
+      # ──────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ──────────────────────────────
+      # 3. 依存パッケージインストール
+      # ──────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ──────────────────────────────
+      # 4. Next.js ビルド（GitHub Actions: 7GB RAM）
+      # ──────────────────────────────
+      - name: Build Next.js
+        run: |
+          NODE_OPTIONS='--max-old-space-size=6144' \
+          NEXT_TURBOPACK=0 \
+          NEXT_TELEMETRY_DISABLED=1 \
+          npx next build
+        env:
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_TRUST_HOST: "true"
+
+      # ──────────────────────────────
+      # 5. OpenNext for Cloudflare ビルド
+      #    (.next/ → .open-next/bundled-worker.js を生成)
+      # ──────────────────────────────
+      - name: Build OpenNext for Cloudflare
+        run: |
+          NEXT_TELEMETRY_DISABLED=1 npx @opennextjs/cloudflare build
+        env:
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_TRUST_HOST: "true"
+
+      # ──────────────────────────────
+      # 6. trustHostパッチ適用
+      #    AUTH_TRUST_HOST環境変数だけでは不足する場合の保険パッチ
+      #    bundled-worker.js内: L.trustHost??(L.trustHost=!1) → !0 に変換
+      # ──────────────────────────────
+      - name: Apply trustHost patch
+        run: |
+          WORKER=".open-next/bundled-worker.js"
+          echo "パッチ前サイズ: $(wc -c < $WORKER) bytes"
+          
+          # trustHost=false(=!1) → true(=!0) に変換
+          sed -i 's/L\.trustHost??(L\.trustHost=!1)/L.trustHost??(L.trustHost=!0)/g' $WORKER
+          
+          PATCHED=$(grep -c "trustHost=!0" $WORKER 2>/dev/null || echo "0")
+          echo "trustHost=!0 適用件数: $PATCHED"
+          echo "パッチ後サイズ: $(wc -c < $WORKER) bytes"
+
+      # ──────────────────────────────
+      # 7. wrangler.jsonc を dispatch namespace 用に書き換え
+      #    gsk環境: worker名 = fd8844cf-cba3-4f18-9986-e52d20b548d5
+      #             dispatch namespace = user_website
+      # ──────────────────────────────
+      - name: Update wrangler config for dispatch namespace
+        run: |
+          cat > wrangler.jsonc << 'EOF'
+          {
+            "name": "fd8844cf-cba3-4f18-9986-e52d20b548d5",
+            "main": ".open-next/bundled-worker.js",
+            "no_bundle": true,
+            "assets": {
+              "directory": ".open-next/assets",
+              "binding": "ASSETS"
+            },
+            "compatibility_date": "2025-06-01",
+            "compatibility_flags": ["nodejs_compat"],
+            "d1_databases": [
+              {
+                "binding": "DB",
+                "database_name": "fd8844cf-cba3-4f18-9986-e52d20b548d5-db",
+                "database_id": "ccae0cce-0ed8-4fc0-88f4-51c7bb99f0d7"
+              }
+            ]
+          }
+          EOF
+          echo "=== 更新後wrangler.jsonc ==="
+          cat wrangler.jsonc
+
+      # ──────────────────────────────
+      # 8. Cloudflare Workers (dispatch namespace) へデプロイ
+      # ──────────────────────────────
+      - name: Deploy to Cloudflare Workers for Platform
+        run: |
+          npx wrangler deploy \
+            --dispatch-namespace user_website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ──────────────────────────────
+      # 9. Workerのシークレット設定（デプロイ後に必要）
+      # ──────────────────────────────
+      - name: Set Worker secrets
+        run: |
+          echo "${{ secrets.AUTH_SECRET }}" | npx wrangler secret put AUTH_SECRET \
+            --name fd8844cf-cba3-4f18-9986-e52d20b548d5 \
+            --dispatch-namespace user_website
+          
+          echo "true" | npx wrangler secret put AUTH_TRUST_HOST \
+            --name fd8844cf-cba3-4f18-9986-e52d20b548d5 \
+            --dispatch-namespace user_website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ──────────────────────────────
+      # 10. デプロイ後の動作確認
+      # ──────────────────────────────
+      - name: Verify deployment
+        run: |
+          BASE_URL="https://fd8844cf-cba3-4f18-9986-e52d20b548d5.vip.gensparksite.com"
+          echo "待機中（5秒）..."
+          sleep 5
+          
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/clubs")
+          echo "/api/clubs → HTTP $STATUS (期待: 401)"
+          
+          MU_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/mu/nonexistent-slug-check")
+          echo "/mu/nonexistent → HTTP $MU_STATUS (期待: 404)"
+          
+          echo "🚀 デプロイ完了: $BASE_URL"
