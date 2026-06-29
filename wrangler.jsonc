@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rac-cloud",
-  "main": ".open-next/worker.js",
+  "main": ".open-next/bundled-worker.js",
   "no_bundle": true,
   "assets": {
     "directory": ".open-next/assets",
