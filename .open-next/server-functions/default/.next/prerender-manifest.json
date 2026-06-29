@@ -30,7 +30,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/register": {
+    "/": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -43,32 +43,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/register",
-      "dataRoute": "/register.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/reset-password": {
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "Next-Action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/reset-password",
-      "dataRoute": "/reset-password.rsc",
+      "srcRoute": "/",
+      "dataRoute": "/index.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -102,7 +78,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/": {
+    "/reset-password": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -115,8 +91,32 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/",
-      "dataRoute": "/index.rsc",
+      "srcRoute": "/reset-password",
+      "dataRoute": "/reset-password.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/register": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "Next-Action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/register",
+      "dataRoute": "/register.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -130,8 +130,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "33b4e3088566967848af972c34b0089e",
-    "previewModeSigningKey": "2b3f991bc9b24310d246363c5ce0aa171f4708227b08f509191b506f1b3e3773",
-    "previewModeEncryptionKey": "e67c6ceac365240b8a853b907a52a64621a153f9005a5285748fcd7bc43cfe07"
+    "previewModeId": "a90f834413054e14cb2f0f22b795d63e",
+    "previewModeSigningKey": "8db0e4110cb6a887b104eedec2b13d016a71987cec7333eaa6b0d9e0c96263ad",
+    "previewModeEncryptionKey": "e917ba232ac7910914b640893e58e8b83b3859321b89421d941f65e1780159fa"
   }
 }

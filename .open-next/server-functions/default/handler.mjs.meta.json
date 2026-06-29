@@ -3317,13 +3317,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js": {
-      "bytes": 14666,
+    ".open-next/server-functions/default/.next/server/app/api/receipts/[id]/route_client-reference-manifest.js": {
+      "bytes": 14724,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/api/receipts/[id]/route_client-reference-manifest.js": {
-      "bytes": 14724,
+    ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js": {
+      "bytes": 14666,
       "imports": [],
       "format": "cjs"
     },
@@ -3433,7 +3433,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.js": {
-      "bytes": 519718,
+      "bytes": 519720,
       "imports": [
         {
           "path": "fs",
@@ -3531,14 +3531,14 @@
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/api/club-accounts/route_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/api/receipts/[id]/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/api/receipts/[id]/route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/meetings/[id]/route_client-reference-manifest.js",
@@ -3853,11 +3853,6 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/chunks/4142.js": {
-      "bytes": 7588,
-      "imports": [],
-      "format": "cjs"
-    },
     ".open-next/server-functions/default/.next/server/chunks/4447.js": {
       "bytes": 106445,
       "imports": [],
@@ -3945,6 +3940,11 @@
     },
     ".open-next/server-functions/default/.next/server/chunks/7325.js": {
       "bytes": 169,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/chunks/7330.js": {
+      "bytes": 7588,
       "imports": [],
       "format": "cjs"
     },
@@ -4088,11 +4088,6 @@
           "original": "./chunks/4036.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/chunks/4142.js",
-          "kind": "require-call",
-          "original": "./chunks/4142.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/chunks/4447.js",
           "kind": "require-call",
           "original": "./chunks/4447.js"
@@ -4181,6 +4176,11 @@
           "path": ".open-next/server-functions/default/.next/server/chunks/7325.js",
           "kind": "require-call",
           "original": "./chunks/7325.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/chunks/7330.js",
+          "kind": "require-call",
+          "original": "./chunks/7330.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/7434.js",
@@ -5348,8 +5348,8 @@
       ],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js": {
-      "bytes": 20358,
+    ".open-next/server-functions/default/.next/server/app/(dashboard)/district/reports/page.js": {
+      "bytes": 7257,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/server/app-render/after-task-async-storage.external.js",
@@ -5399,8 +5399,8 @@
       ],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(dashboard)/district/reports/page.js": {
-      "bytes": 7257,
+    ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js": {
+      "bytes": 20358,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/server/app-render/after-task-async-storage.external.js",
@@ -6609,8 +6609,8 @@
       ],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js": {
-      "bytes": 15570,
+    ".open-next/server-functions/default/.next/server/app/(dashboard)/receipts/page.js": {
+      "bytes": 39027,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/server/app-render/after-task-async-storage.external.js",
@@ -6660,8 +6660,8 @@
       ],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/(dashboard)/receipts/page.js": {
-      "bytes": 39027,
+    ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js": {
+      "bytes": 15570,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/server/app-render/after-task-async-storage.external.js",
@@ -8847,14 +8847,14 @@
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/finance/donations/page.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js",
-          "kind": "require-call",
-          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/district/reports/page.js",
           "kind": "require-call",
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/district/reports/page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js",
+          "kind": "require-call",
+          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/finance/donations/[id]/route.js",
@@ -8977,14 +8977,14 @@
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/meetings/page.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js",
-          "kind": "require-call",
-          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/receipts/page.js",
           "kind": "require-call",
           "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/receipts/page.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js",
+          "kind": "require-call",
+          "original": "/home/runner/work/RAC/RAC/.open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/emails/history/route.js",
@@ -11968,11 +11968,11 @@
         ".open-next/server-functions/default/.next/server/app/api/club-accounts/route_client-reference-manifest.js": {
           "bytesInOutput": 12951
         },
-        ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js": {
-          "bytesInOutput": 12951
-        },
         ".open-next/server-functions/default/.next/server/app/api/receipts/[id]/route_client-reference-manifest.js": {
           "bytesInOutput": 13009
+        },
+        ".open-next/server-functions/default/.next/server/app/api/my/attendance/route_client-reference-manifest.js": {
+          "bytesInOutput": 12951
         },
         ".open-next/server-functions/default/.next/server/app/api/meetings/[id]/route_client-reference-manifest.js": {
           "bytesInOutput": 13009
@@ -12038,7 +12038,7 @@
           "bytesInOutput": 12927
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/load-manifest.js": {
-          "bytesInOutput": 461577
+          "bytesInOutput": 461579
         },
         ".open-next/server-functions/default/node_modules/next/dist/server/app-render/action-async-storage-instance.js": {
           "bytesInOutput": 501
@@ -12106,9 +12106,6 @@
         ".open-next/server-functions/default/.next/server/chunks/4036.js": {
           "bytesInOutput": 99645
         },
-        ".open-next/server-functions/default/.next/server/chunks/4142.js": {
-          "bytesInOutput": 8494
-        },
         ".open-next/server-functions/default/.next/server/chunks/4447.js": {
           "bytesInOutput": 110111
         },
@@ -12162,6 +12159,9 @@
         },
         ".open-next/server-functions/default/.next/server/chunks/7325.js": {
           "bytesInOutput": 275
+        },
+        ".open-next/server-functions/default/.next/server/chunks/7330.js": {
+          "bytesInOutput": 8494
         },
         ".open-next/server-functions/default/.next/server/chunks/7434.js": {
           "bytesInOutput": 8370
@@ -12262,11 +12262,11 @@
         ".open-next/server-functions/default/.next/server/app/(dashboard)/finance/donations/page.js": {
           "bytesInOutput": 36771
         },
-        ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js": {
-          "bytesInOutput": 22148
-        },
         ".open-next/server-functions/default/.next/server/app/(dashboard)/district/reports/page.js": {
           "bytesInOutput": 7618
+        },
+        ".open-next/server-functions/default/.next/server/app/(dashboard)/emails/templates/page.js": {
+          "bytesInOutput": 22148
         },
         ".open-next/server-functions/default/.next/server/app/api/finance/donations/[id]/route.js": {
           "bytesInOutput": 6073
@@ -12340,11 +12340,11 @@
         ".open-next/server-functions/default/.next/server/app/(dashboard)/meetings/page.js": {
           "bytesInOutput": 31992
         },
-        ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js": {
-          "bytesInOutput": 17123
-        },
         ".open-next/server-functions/default/.next/server/app/(dashboard)/receipts/page.js": {
           "bytesInOutput": 42166
+        },
+        ".open-next/server-functions/default/.next/server/app/(dashboard)/settings/page.js": {
+          "bytesInOutput": 17123
         },
         ".open-next/server-functions/default/.next/server/app/api/emails/history/route.js": {
           "bytesInOutput": 6991
@@ -12617,7 +12617,7 @@
           "bytesInOutput": 69310
         }
       },
-      "bytes": 5877900
+      "bytes": 5877902
     }
   }
 }
