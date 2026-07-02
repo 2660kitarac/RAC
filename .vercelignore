@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.wrangler
+.open-next
+core
+*.tar.gz
+*.log
+*.backup
+package-lock.json
+rac-cloud-manual.html

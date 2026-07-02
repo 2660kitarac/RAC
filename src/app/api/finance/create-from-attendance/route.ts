@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getDbFromContext } from '@/lib/db/get-db-from-context';
+import { db } from '@/lib/db';
 import { attendances, transactions, meetings } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -10,8 +10,6 @@ export async function POST(request: NextRequest) {
     const { attendanceId } = await request.json();
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-
-    const db = await getDbFromContext();
 
     const [attendance] = await db
       .select()
@@ -31,13 +29,21 @@ export async function POST(request: NextRequest) {
 
     if (!meeting) return NextResponse.json({ success: false, message: '例会が見つかりません' });
 
-    // 重複チェック（raw SQLで）
-    const { env } = (await import('@opennextjs/cloudflare')).getCloudflareContext();
-    const existing = await env.DB.prepare(
-      `SELECT id FROM transactions WHERE club_id=? AND meeting_id=? AND description LIKE ? AND deleted_at IS NULL LIMIT 1`
-    ).bind(meeting.clubId, attendance.meetingId, `%${attendanceId}%`).first();
+    // 重複チェック（Drizzle ORM で）
+    const existing = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.clubId, meeting.clubId),
+          eq(transactions.meetingId, attendance.meetingId),
+          like(transactions.description, `%${attendanceId}%`),
+          isNull(transactions.deletedAt)
+        )
+      )
+      .limit(1);
 
-    if (existing) {
+    if (existing.length > 0) {
       return NextResponse.json({ success: false, message: '既に取引が作成されています' });
     }
 

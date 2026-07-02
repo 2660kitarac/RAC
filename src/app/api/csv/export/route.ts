@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { db } from '@/lib/db';
+import { users, meetings, attendances, annualFees } from '@/lib/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 
 function toCSV(headers: string[], rows: Record<string, unknown>[]): string {
   const bom = '\uFEFF';
@@ -22,10 +24,6 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
 
-    const { env } = getCloudflareContext();
-    const d1 = env.DB;
-    if (!d1) return NextResponse.json({ error: 'DB接続エラー' }, { status: 500 });
-
     const url = new URL(request.url);
     const type = url.searchParams.get('type');
     const clubId = url.searchParams.get('clubId') || session.user.clubId;
@@ -35,36 +33,58 @@ export async function GET(request: NextRequest) {
 
     if (type === 'members') {
       filename = 'members';
-      const result = await d1.prepare(
-        `SELECT name, name_kana, email, phone, birth_date, address_zip, address, member_type, role, is_active, created_at
-         FROM users WHERE club_id=? AND deleted_at IS NULL ORDER BY name`
-      ).bind(clubId).all();
+      const result = await db
+        .select({
+          name: users.name,
+          name_kana: users.nameKana,
+          email: users.email,
+          phone: users.phone,
+          birth_date: users.birthDate,
+          address_zip: users.addressZip,
+          address: users.address,
+          member_type: users.memberType,
+          role: users.role,
+          is_active: users.isActive,
+          created_at: users.createdAt,
+        })
+        .from(users)
+        .where(and(eq(users.clubId, clubId!), isNull(users.deletedAt)));
       const headers = ['name','name_kana','email','phone','birth_date','address_zip','address','member_type','role','is_active','created_at'];
-      csvContent = toCSV(headers, (result.results ?? []) as Record<string, unknown>[]);
+      csvContent = toCSV(headers, result as Record<string, unknown>[]);
     } else if (type === 'attendances') {
       filename = 'attendances';
-      const result = await d1.prepare(
-        `SELECT a.id, m.title as meeting_title, m.date as meeting_date,
-                COALESCE(u.name, a.external_name) as name,
-                COALESCE(u.email, a.external_email) as email,
-                a.member_type, a.fee_amount, a.payment_status, a.registered_at
-         FROM attendances a
-         LEFT JOIN meetings m ON a.meeting_id = m.id
-         LEFT JOIN users u ON a.user_id = u.id
-         WHERE m.club_id=? AND a.deleted_at IS NULL ORDER BY m.date DESC, a.registered_at`
-      ).bind(clubId).all();
-      const headers = ['id','meeting_title','meeting_date','name','email','member_type','fee_amount','payment_status','registered_at'];
-      csvContent = toCSV(headers, (result.results ?? []) as Record<string, unknown>[]);
+      const result = await db
+        .select({
+          id: attendances.id,
+          meeting_title: meetings.title,
+          meeting_date: meetings.date,
+          member_type: attendances.memberType,
+          fee_amount: attendances.feeAmount,
+          payment_status: attendances.paymentStatus,
+          registered_at: attendances.registeredAt,
+        })
+        .from(attendances)
+        .leftJoin(meetings, eq(attendances.meetingId, meetings.id))
+        .where(and(eq(meetings.clubId, clubId!), isNull(attendances.deletedAt)));
+      const headers = ['id','meeting_title','meeting_date','member_type','fee_amount','payment_status','registered_at'];
+      csvContent = toCSV(headers, result as Record<string, unknown>[]);
     } else if (type === 'annual_fees') {
       filename = 'annual_fees';
-      const result = await d1.prepare(
-        `SELECT u.name, u.email, af.fiscal_year, af.amount, af.payment_status, af.payment_method, af.paid_at
-         FROM annual_fees af
-         LEFT JOIN users u ON af.user_id = u.id
-         WHERE af.club_id=? AND af.deleted_at IS NULL ORDER BY af.fiscal_year DESC, u.name`
-      ).bind(clubId).all();
+      const result = await db
+        .select({
+          name: users.name,
+          email: users.email,
+          fiscal_year: annualFees.fiscalYear,
+          amount: annualFees.amount,
+          payment_status: annualFees.paymentStatus,
+          payment_method: annualFees.paymentMethod,
+          paid_at: annualFees.paidAt,
+        })
+        .from(annualFees)
+        .leftJoin(users, eq(annualFees.userId, users.id))
+        .where(and(eq(annualFees.clubId, clubId!), isNull(annualFees.deletedAt)));
       const headers = ['name','email','fiscal_year','amount','payment_status','payment_method','paid_at'];
-      csvContent = toCSV(headers, (result.results ?? []) as Record<string, unknown>[]);
+      csvContent = toCSV(headers, result as Record<string, unknown>[]);
     } else {
       return NextResponse.json({ error: '不明なエクスポート種別' }, { status: 400 });
     }
