@@ -1,10 +1,10 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, real, boolean, timestamp } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
 // ============================================================
 // clubs テーブル
 // ============================================================
-export const clubs = sqliteTable('clubs', {
+export const clubs = pgTable('clubs', {
   id: text('id').primaryKey(),
   districtId: text('district_id'),
   zoneId: text('zone_id'),
@@ -19,17 +19,17 @@ export const clubs = sqliteTable('clubs', {
   address: text('address'),
   contactName: text('contact_name'),
   memo: text('memo'),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  isSystemClub: integer('is_system_club', { mode: 'boolean' }).notNull().default(false),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  isActive: boolean('is_active').notNull().default(true),
+  isSystemClub: boolean('is_system_club').notNull().default(false),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
-// users テーブル（Supabase auth_user_id → passwordHash に変更）
+// users テーブル
 // ============================================================
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
   id: text('id').primaryKey(),
   clubId: text('club_id').references(() => clubs.id),
   districtId: text('district_id'),
@@ -44,10 +44,8 @@ export const users = sqliteTable('users', {
   position: text('position'),
   joinedAt: text('joined_at'),
   resignedAt: text('resigned_at'),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  // 承認フロー: pending=承認待ち / active=承認済み / rejected=却下
+  isActive: boolean('is_active').notNull().default(true),
   status: text('status').notNull().default('active'),
-  // 拡張カラム（3ステップ登録フォーム対応）
   birthDate: text('birth_date'),
   addressZip: text('address_zip'),
   address: text('address'),
@@ -57,15 +55,15 @@ export const users = sqliteTable('users', {
   emergencyContactName: text('emergency_contact_name'),
   emergencyContactPhone: text('emergency_contact_phone'),
   memo: text('memo'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // Auth.js sessions テーブル
 // ============================================================
-export const sessions = sqliteTable('sessions', {
+export const sessions = pgTable('sessions', {
   sessionToken: text('session_token').notNull().primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expires: text('expires').notNull(),
@@ -74,7 +72,7 @@ export const sessions = sqliteTable('sessions', {
 // ============================================================
 // meetings テーブル
 // ============================================================
-export const meetings = sqliteTable('meetings', {
+export const meetings = pgTable('meetings', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   districtId: text('district_id'),
@@ -99,31 +97,29 @@ export const meetings = sqliteTable('meetings', {
   muRegistrationSlug: text('mu_registration_slug'),
   muRegistrationUrl: text('mu_registration_url'),
   status: text('status').notNull().default('draft'),
-  isDistrictEvent: integer('is_district_event', { mode: 'boolean' }).notNull().default(false),
-  isJointMeeting: integer('is_joint_meeting', { mode: 'boolean' }).notNull().default(false),
+  isDistrictEvent: boolean('is_district_event').notNull().default(false),
+  isJointMeeting: boolean('is_joint_meeting').notNull().default(false),
   location: text('location'),
   note: text('note'),
   createdBy: text('created_by'),
-  // 懇親会情報（0007_attendance_party.sql で追加）
-  hasAfterParty: integer('has_after_party', { mode: 'boolean' }).notNull().default(false),
+  hasAfterParty: boolean('has_after_party').notNull().default(false),
   afterPartyVenue: text('after_party_venue'),
   afterPartyStartTime: text('after_party_start_time'),
   afterPartyFeeRac: integer('after_party_fee_rac').notNull().default(0),
   afterPartyFeeRc: integer('after_party_fee_rc').notNull().default(0),
   afterPartyFeeObog: integer('after_party_fee_obog').notNull().default(0),
   afterPartyFeeGuest: integer('after_party_fee_guest').notNull().default(0),
-  // 定員管理
   capacity: integer('capacity'),
   afterPartyCapacity: integer('after_party_capacity'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // attendances テーブル
 // ============================================================
-export const attendances = sqliteTable('attendances', {
+export const attendances = pgTable('attendances', {
   id: text('id').primaryKey(),
   meetingId: text('meeting_id').notNull().references(() => meetings.id),
   userId: text('user_id').references(() => users.id),
@@ -135,29 +131,27 @@ export const attendances = sqliteTable('attendances', {
   memberType: text('member_type').notNull().default('RAC'),
   attendanceStatus: text('attendance_status').notNull().default('undecided'),
   registrationType: text('registration_type').notNull().default('member'),
-  mealRequired: integer('meal_required', { mode: 'boolean' }).notNull().default(false),
+  mealRequired: boolean('meal_required').notNull().default(false),
   feeAmount: integer('fee_amount').notNull().default(0),
   paymentStatus: text('payment_status').notNull().default('unpaid'),
   paymentMethod: text('payment_method'),
   paidAt: text('paid_at'),
-  receiptRequired: integer('receipt_required', { mode: 'boolean' }).notNull().default(false),
+  receiptRequired: boolean('receipt_required').notNull().default(false),
   receiptNameType: text('receipt_name_type'),
   receiptName: text('receipt_name'),
   note: text('note'),
-  // 参加形態（0007_attendance_party.sql で追加）
-  // 'meeting_only' | 'meeting_and_party' | 'absent' | 'waitlist'
   participationType: text('participation_type').notNull().default('meeting_only'),
   afterPartyFeeAmount: integer('after_party_fee_amount').notNull().default(0),
-  registeredAt: text('registered_at').notNull().default(sql`(datetime('now'))`),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  registeredAt: text('registered_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // annual_fees テーブル
 // ============================================================
-export const annualFees = sqliteTable('annual_fees', {
+export const annualFees = pgTable('annual_fees', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   userId: text('user_id').notNull().references(() => users.id),
@@ -167,15 +161,15 @@ export const annualFees = sqliteTable('annual_fees', {
   paymentMethod: text('payment_method'),
   paidAt: text('paid_at'),
   note: text('note'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // transactions テーブル
 // ============================================================
-export const transactions = sqliteTable('transactions', {
+export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   districtId: text('district_id'),
@@ -190,15 +184,15 @@ export const transactions = sqliteTable('transactions', {
   description: text('description'),
   receiptId: text('receipt_id'),
   createdBy: text('created_by'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // receipts テーブル
 // ============================================================
-export const receipts = sqliteTable('receipts', {
+export const receipts = pgTable('receipts', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   meetingId: text('meeting_id').references(() => meetings.id),
@@ -213,15 +207,15 @@ export const receipts = sqliteTable('receipts', {
   status: text('status').notNull().default('issued'),
   issuedBy: text('issued_by'),
   cancelReason: text('cancel_reason'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // emails テーブル
 // ============================================================
-export const emails = sqliteTable('emails', {
+export const emails = pgTable('emails', {
   id: text('id').primaryKey(),
   clubId: text('club_id').references(() => clubs.id),
   districtId: text('district_id'),
@@ -230,21 +224,21 @@ export const emails = sqliteTable('emails', {
   subject: text('subject').notNull(),
   body: text('body').notNull().default(''),
   targetType: text('target_type'),
-  ccEmails: text('cc_emails'),    // JSON配列文字列 e.g. '["a@example.com","b@example.com"]'
-  bccEmails: text('bcc_emails'),  // JSON配列文字列
+  ccEmails: text('cc_emails'),
+  bccEmails: text('bcc_emails'),
   replyTo: text('reply_to'),
   status: text('status').notNull().default('draft'),
   sentAt: text('sent_at'),
   createdBy: text('created_by'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // email_recipients テーブル
 // ============================================================
-export const emailRecipients = sqliteTable('email_recipients', {
+export const emailRecipients = pgTable('email_recipients', {
   id: text('id').primaryKey(),
   emailId: text('email_id').notNull().references(() => emails.id),
   userId: text('user_id').references(() => users.id),
@@ -253,13 +247,13 @@ export const emailRecipients = sqliteTable('email_recipients', {
   status: text('status').notNull().default('pending'),
   errorMessage: text('error_message'),
   sentAt: text('sent_at'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
 });
 
 // ============================================================
 // email_templates テーブル
 // ============================================================
-export const emailTemplates = sqliteTable('email_templates', {
+export const emailTemplates = pgTable('email_templates', {
   id: text('id').primaryKey(),
   clubId: text('club_id').references(() => clubs.id),
   districtId: text('district_id'),
@@ -267,16 +261,16 @@ export const emailTemplates = sqliteTable('email_templates', {
   templateType: text('template_type').notNull().default('custom'),
   subjectTemplate: text('subject_template').notNull(),
   bodyTemplate: text('body_template').notNull(),
-  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  isDefault: boolean('is_default').notNull().default(false),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // donations テーブル
 // ============================================================
-export const donations = sqliteTable('donations', {
+export const donations = pgTable('donations', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   meetingId: text('meeting_id').references(() => meetings.id),
@@ -287,15 +281,15 @@ export const donations = sqliteTable('donations', {
   message: text('message'),
   paymentMethod: text('payment_method'),
   receivedAt: text('received_at').notNull(),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // meeting_reports テーブル
 // ============================================================
-export const meetingReports = sqliteTable('meeting_reports', {
+export const meetingReports = pgTable('meeting_reports', {
   id: text('id').primaryKey(),
   clubId: text('club_id').notNull().references(() => clubs.id),
   districtId: text('district_id'),
@@ -314,29 +308,28 @@ export const meetingReports = sqliteTable('meeting_reports', {
   aiPrompt: text('ai_prompt'),
   aiResponse: text('ai_response'),
   createdBy: text('created_by'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
 // districts テーブル
 // ============================================================
-export const districts = sqliteTable('districts', {
+export const districts = pgTable('districts', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   districtNumber: text('district_number'),
   areaName: text('area_name'),
   fiscalYearStart: text('fiscal_year_start'),
   fiscalYearEnd: text('fiscal_year_end'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
 });
 
 // ============================================================
-// ============================================================
-// Relations（Drizzle ORM の with クエリ用）
+// Relations
 // ============================================================
 export const clubsRelations = relations(clubs, ({ many }) => ({
   users: many(users),
@@ -395,7 +388,8 @@ export const emailRecipientsRelations = relations(emailRecipients, ({ one }) => 
   user: one(users, { fields: [emailRecipients.userId], references: [users.id] }),
 }));
 
-// 型エクスポート（Drizzle推論型）
+// ============================================================
+// 型エクスポート
 // ============================================================
 export type Club = typeof clubs.$inferSelect;
 export type NewClub = typeof clubs.$inferInsert;

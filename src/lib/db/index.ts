@@ -1,26 +1,28 @@
 /**
- * Cloudflare D1 用 Drizzle ORM クライアント
- *
- * 使い方:
- *   import { getDb } from '@/lib/db';
- *   const db = getDb(c.env.DB);  // Route Handler / Server Action の中で
- *
- * Next.js App Router では process.env ではなく Cloudflare Bindings 経由で
- * DB を受け取るため、関数形式にしています。
+ * Supabase (PostgreSQL) 用 Drizzle ORM クライアント
+ * 環境変数 DATABASE_URL から接続する
  */
 
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from './schema';
 
-export type DrizzleDb = ReturnType<typeof getDb>;
-
-/**
- * Cloudflare D1 バインディングから Drizzle インスタンスを生成する
- * @param d1 - Cloudflare D1Database バインディング（env.DB）
- */
-export function getDb(d1: D1Database) {
-  return drizzle(d1, { schema });
+// 環境変数チェック
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL 環境変数が設定されていません');
 }
 
-// スキーマ再エクスポート（インポートパスを一箇所に集約）
+// Vercel Serverless / Supabase Pooler 向け設定
+const client = postgres(connectionString, {
+  max: 1,           // Serverless では接続数を絞る
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+
+export const db = drizzle(client, { schema });
+
+export type DrizzleDb = typeof db;
+
+// スキーマ再エクスポート
 export * from './schema';
