@@ -18,7 +18,7 @@ export default async function AwardsDistrictDashboardPage() {
     .select({ id: users.id, role: users.role, clubId: users.clubId, districtId: users.districtId })
     .from(users)
     .where(and(eq(users.id, session.user.id!), isNull(users.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   const role = profile?.role || 'system_owner';
   if (!isDistrictStaff(role as any)) redirect('/dashboard');
@@ -26,11 +26,11 @@ export default async function AwardsDistrictDashboardPage() {
   // districtId の解決
   let districtId = profile?.districtId;
   if (!districtId && profile?.clubId) {
-    const club = await db.select({ districtId: clubs.districtId }).from(clubs).where(eq(clubs.id, profile.clubId)).get();
+    const club = await db.select({ districtId: clubs.districtId }).from(clubs).where(eq(clubs.id, profile.clubId)).then((r:any[])=>r[0]);
     districtId = club?.districtId ?? undefined;
   }
   if (!districtId) {
-    const first = await db.select({ id: districts.id }).from(districts).where(isNull(districts.deletedAt)).get();
+    const first = await db.select({ id: districts.id }).from(districts).where(isNull(districts.deletedAt)).then((r:any[])=>r[0]);
     districtId = first?.id;
   }
 

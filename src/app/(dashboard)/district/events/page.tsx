@@ -19,18 +19,18 @@ export default async function DistrictEventsPage() {
     .select({ id: users.id, role: users.role, clubId: users.clubId, districtId: users.districtId })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   const role = (profile?.role || 'member') as any;
   if (!isDistrictStaff(role)) redirect('/dashboard');
 
   let districtId = profile?.districtId;
   if (!districtId && profile?.clubId) {
-    const club = await db.select({ districtId: clubs.districtId }).from(clubs).where(eq(clubs.id, profile.clubId)).get();
+    const club = await db.select({ districtId: clubs.districtId }).from(clubs).where(eq(clubs.id, profile.clubId)).then((r:any[])=>r[0]);
     districtId = club?.districtId ?? null;
   }
   if (!districtId) {
-    const first = await db.select({ id: districts.id }).from(districts).where(isNull(districts.deletedAt)).limit(1).get();
+    const first = await db.select({ id: districts.id }).from(districts).where(isNull(districts.deletedAt)).limit(1).then((r:any[])=>r[0]);
     districtId = first?.id ?? null;
   }
 

@@ -43,7 +43,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     })
     .from(meetings)
     .where(and(eq(meetings.muRegistrationSlug, slug), isNull(meetings.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   if (!meeting) notFound();
 
@@ -52,7 +52,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName })
     .from(clubs)
     .where(eq(clubs.id, meeting.clubId))
-    .get();
+    .then((r:any[])=>r[0]);
 
   if (meeting.status === 'cancelled') {
     return (
@@ -106,7 +106,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
         })
         .from(users)
         .where(eq(users.id, session.user.id))
-        .get();
+        .then((r:any[])=>r[0]);
 
       if (userRow) {
         // 所属クラブ名を取得
@@ -116,7 +116,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
             .select({ name: clubs.name })
             .from(clubs)
             .where(eq(clubs.id, userRow.clubId))
-            .get();
+            .then((r:any[])=>r[0]);
           clubName = userClub?.name ?? null;
         }
         loggedInUser = { ...userRow, clubName };

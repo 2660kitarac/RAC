@@ -58,6 +58,13 @@ export default async function MeetingsPage({
       location: meetings.location,
       status: meetings.status,
       clubId: meetings.clubId,
+      theme: meetings.theme,
+      meetingNumber: meetings.meetingNumber,
+      startTime: meetings.startTime,
+      endTime: meetings.endTime,
+      venueName: meetings.venueName,
+      muRegistrationSlug: meetings.muRegistrationSlug,
+      muRegistrationUrl: meetings.muRegistrationUrl,
     })
       .from(meetings)
       .where(and(...baseWhere))

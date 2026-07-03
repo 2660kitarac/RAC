@@ -21,7 +21,7 @@ export default async function EmailComposePage({ searchParams }: { searchParams:
     .select({ id: users.id })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   // テンプレート取得（自クラブ or グローバル）
   const templatesResult = clubId

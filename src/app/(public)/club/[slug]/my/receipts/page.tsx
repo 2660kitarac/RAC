@@ -29,7 +29,7 @@ export default async function MyReceiptsPage({
     .select({ id: users.id, name: users.name, clubId: users.clubId })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   if (!profile?.clubId) redirect(`/club/${slug}/dashboard`);
 

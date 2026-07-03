@@ -24,7 +24,7 @@ export default async function MyAnnualFeePage({
     .select({ id: users.id, clubId: users.clubId })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   if (!profile?.clubId) redirect(`/club/${slug}/dashboard`);
 

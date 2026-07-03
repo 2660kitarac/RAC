@@ -24,7 +24,7 @@ export default async function SchedulePage({
     .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName, districtId: clubs.districtId })
     .from(clubs)
     .where(and(eq(clubs.slug, slug), eq(clubs.isActive, true), isNull(clubs.deletedAt)))
-    .get();
+    .then((r:any[])=>r[0]);
 
   if (!club) notFound();
 

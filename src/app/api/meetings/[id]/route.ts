@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     const { id } = await params;
     const db = await getDbFromContext();
-    const meeting = await db.select().from(meetings).where(eq(meetings.id, id)).get();
+    const meeting = await db.select().from(meetings).where(eq(meetings.id, id)).then((r:any[])=>r[0]);
     if (!meeting) return NextResponse.json({ error: '見つかりません' }, { status: 404 });
     return NextResponse.json({ meeting });
   } catch (e: any) {
