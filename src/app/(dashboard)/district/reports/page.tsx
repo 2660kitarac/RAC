@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, districts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, districts, clubReports } from '@/lib/db/schema';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/hooks/useAuth';
 import { formatDate } from '@/lib/utils';
@@ -32,22 +32,38 @@ export default async function DistrictReportsPage() {
     effectiveDistrictId = first?.id;
   }
 
-  // club_reports は D1 未定義テーブル（将来実装）→ D1 raw SQL で取得
-  // TODO: スキーマ定義後に Drizzle クエリへ置き換える
+  // club_reports を Drizzle ORM で取得（clubs テーブルと JOIN）
   let reports: any[] = [];
-  if (effectiveDistrictId && d1) {
-    const result = await d1
-      .prepare(`
-        SELECT cr.*, c.name as club_name, c.short_name as club_short_name
-        FROM club_reports cr
-        LEFT JOIN clubs c ON cr.club_id = c.id
-        WHERE cr.district_id=? AND cr.deleted_at IS NULL
-        ORDER BY cr.created_at DESC
-      `)
-      .bind(effectiveDistrictId)
-      .all()
-      .catch(() => ({ results: [] }));
-    reports = (result as any).results ?? [];
+  if (effectiveDistrictId) {
+    const rows = await db
+      .select({
+        id: clubReports.id,
+        clubId: clubReports.clubId,
+        title: clubReports.title,
+        reportType: clubReports.reportType,
+        status: clubReports.status,
+        deadline: clubReports.deadline,
+        submittedAt: clubReports.submittedAt,
+        createdAt: clubReports.createdAt,
+        clubName: clubs.name,
+        clubShortName: clubs.shortName,
+      })
+      .from(clubReports)
+      .leftJoin(clubs, eq(clubReports.clubId, clubs.id))
+      .where(and(
+        eq(clubReports.districtId, effectiveDistrictId),
+        isNull(clubReports.deletedAt),
+      ))
+      .orderBy(desc(clubReports.createdAt))
+      .catch(() => []);
+    // テンプレート変数名に合わせてスネークケースに変換
+    reports = rows.map((r: any) => ({
+      ...r,
+      club_name: r.clubName,
+      club_short_name: r.clubShortName,
+      report_type: r.reportType,
+      submitted_at: r.submittedAt,
+    }));
   }
 
   const STATUS_LABELS: Record<string, string> = {

@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, districts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, districts, districtEvents } from '@/lib/db/schema';
+import { eq, and, isNull, asc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/hooks/useAuth';
 import { formatTime } from '@/lib/utils';
@@ -32,16 +32,29 @@ export default async function DistrictCalendarPage() {
     effectiveDistrictId = first?.id;
   }
 
-  // district_events は D1 未定義テーブル（将来実装）→ D1 raw SQL で取得
-  // TODO: スキーマ定義後に Drizzle クエリへ置き換える
+  // district_events を Drizzle ORM で取得
   let events: any[] = [];
-  if (effectiveDistrictId && d1) {
-    const result = await d1
-      .prepare(`SELECT * FROM district_events WHERE district_id=? AND deleted_at IS NULL ORDER BY date`)
-      .bind(effectiveDistrictId)
-      .all()
-      .catch(() => ({ results: [] }));
-    events = (result as any).results ?? [];
+  if (effectiveDistrictId) {
+    const rows = await db
+      .select()
+      .from(districtEvents)
+      .where(and(
+        eq(districtEvents.districtId, effectiveDistrictId),
+        isNull(districtEvents.deletedAt),
+      ))
+      .orderBy(asc(districtEvents.date))
+      .catch(() => []);
+    // テンプレート変数名に合わせてスネークケースに変換
+    events = rows.map((e: any) => ({
+      ...e,
+      event_type: e.eventType,
+      start_time: e.startTime,
+      end_time: e.endTime,
+      venue_name: e.venueName,
+      venue_address: e.venueAddress,
+      is_award_target: e.isAwardTarget,
+      is_joint_meeting: e.isJointMeeting,
+    }));
   }
 
   // 月別グルーピング

@@ -329,6 +329,79 @@ export const districts = pgTable('districts', {
 });
 
 // ============================================================
+// district_events テーブル（地区行事）
+// ============================================================
+export const districtEvents = pgTable('district_events', {
+  id: text('id').primaryKey(),
+  districtId: text('district_id').notNull().references(() => districts.id),
+  hostClubId: text('host_club_id').references(() => clubs.id),
+  title: text('title').notNull(),
+  eventType: text('event_type').notNull().default('その他'),
+  date: text('date').notNull(),
+  startTime: text('start_time'),
+  endTime: text('end_time'),
+  venueName: text('venue_name'),
+  venueAddress: text('venue_address'),
+  registrationFee: integer('registration_fee').notNull().default(0),
+  registrationDeadline: text('registration_deadline'),
+  description: text('description'),
+  isAwardTarget: boolean('is_award_target').notNull().default(false),
+  isJointMeeting: boolean('is_joint_meeting').notNull().default(false),
+  createdBy: text('created_by'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+// ============================================================
+// club_reports テーブル（クラブ報告書）
+// ============================================================
+export const clubReports = pgTable('club_reports', {
+  id: text('id').primaryKey(),
+  districtId: text('district_id').references(() => districts.id),
+  clubId: text('club_id').notNull().references(() => clubs.id),
+  meetingId: text('meeting_id').references(() => meetings.id),
+  title: text('title').notNull(),
+  reportType: text('report_type').notNull().default('meeting'),
+  status: text('status').notNull().default('draft'),
+  deadline: text('deadline'),
+  submittedAt: text('submitted_at'),
+  approvedAt: text('approved_at'),
+  rejectedAt: text('rejected_at'),
+  rejectionReason: text('rejection_reason'),
+  content: text('content'),
+  submittedBy: text('submitted_by').references(() => users.id),
+  reviewedBy: text('reviewed_by').references(() => users.id),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+// ============================================================
+// instagram_posts テーブル（Instagram投稿管理）
+// ============================================================
+export const instagramPosts = pgTable('instagram_posts', {
+  id: text('id').primaryKey(),
+  districtId: text('district_id').references(() => districts.id),
+  clubId: text('club_id').notNull().references(() => clubs.id),
+  meetingId: text('meeting_id').references(() => meetings.id),
+  postType: text('post_type').notNull().default('after'),
+  postUrl: text('post_url'),
+  caption: text('caption'),
+  imageUrl: text('image_url'),
+  status: text('status').notNull().default('pending'),
+  score: integer('score').notNull().default(0),
+  reviewedBy: text('reviewed_by').references(() => users.id),
+  reviewedAt: text('reviewed_at'),
+  rejectionReason: text('rejection_reason'),
+  submittedBy: text('submitted_by').references(() => users.id),
+  submittedAt: text('submitted_at'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+// ============================================================
 // Relations
 // ============================================================
 export const clubsRelations = relations(clubs, ({ many }) => ({
@@ -409,3 +482,9 @@ export type NewReceipt = typeof receipts.$inferInsert;
 export type Email = typeof emails.$inferSelect;
 export type NewEmail = typeof emails.$inferInsert;
 export type Donation = typeof donations.$inferSelect;
+export type DistrictEvent = typeof districtEvents.$inferSelect;
+export type NewDistrictEvent = typeof districtEvents.$inferInsert;
+export type ClubReport = typeof clubReports.$inferSelect;
+export type NewClubReport = typeof clubReports.$inferInsert;
+export type InstagramPost = typeof instagramPosts.$inferSelect;
+export type NewInstagramPost = typeof instagramPosts.$inferInsert;

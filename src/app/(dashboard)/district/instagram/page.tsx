@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, districts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, districts, instagramPosts, meetings } from '@/lib/db/schema';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/hooks/useAuth';
 
@@ -31,23 +31,44 @@ export default async function DistrictInstagramPage() {
     effectiveDistrictId = first?.id;
   }
 
-  // instagram_posts は D1 未定義テーブル（将来実装）→ D1 raw SQL で取得
-  // TODO: スキーマ定義後に Drizzle クエリへ置き換える
+  // instagram_posts を Drizzle ORM で取得（clubs・meetings と JOIN）
   let posts: any[] = [];
-  if (effectiveDistrictId && d1) {
-    const result = await d1
-      .prepare(`
-        SELECT ip.*, c.name as club_name, c.short_name as club_short_name, m.title as meeting_title, m.date as meeting_date
-        FROM instagram_posts ip
-        LEFT JOIN clubs c ON ip.club_id = c.id
-        LEFT JOIN meetings m ON ip.meeting_id = m.id
-        WHERE ip.district_id=? AND ip.deleted_at IS NULL
-        ORDER BY ip.created_at DESC
-      `)
-      .bind(effectiveDistrictId)
-      .all()
-      .catch(() => ({ results: [] }));
-    posts = (result as any).results ?? [];
+  if (effectiveDistrictId) {
+    const rows = await db
+      .select({
+        id: instagramPosts.id,
+        clubId: instagramPosts.clubId,
+        meetingId: instagramPosts.meetingId,
+        postType: instagramPosts.postType,
+        postUrl: instagramPosts.postUrl,
+        caption: instagramPosts.caption,
+        status: instagramPosts.status,
+        score: instagramPosts.score,
+        createdAt: instagramPosts.createdAt,
+        clubName: clubs.name,
+        clubShortName: clubs.shortName,
+        meetingTitle: meetings.title,
+        meetingDate: meetings.date,
+      })
+      .from(instagramPosts)
+      .leftJoin(clubs, eq(instagramPosts.clubId, clubs.id))
+      .leftJoin(meetings, eq(instagramPosts.meetingId, meetings.id))
+      .where(and(
+        eq(instagramPosts.districtId, effectiveDistrictId),
+        isNull(instagramPosts.deletedAt),
+      ))
+      .orderBy(desc(instagramPosts.createdAt))
+      .catch(() => []);
+    // テンプレート変数名に合わせてスネークケースに変換
+    posts = rows.map((p: any) => ({
+      ...p,
+      club_name: p.clubName,
+      club_short_name: p.clubShortName,
+      meeting_title: p.meetingTitle,
+      meeting_date: p.meetingDate,
+      post_type: p.postType,
+      post_url: p.postUrl,
+    }));
   }
 
   const STATUS_LABELS: Record<string, string> = {

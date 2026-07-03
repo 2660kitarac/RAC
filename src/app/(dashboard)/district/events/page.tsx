@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, districts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, districts, districtEvents } from '@/lib/db/schema';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/hooks/useAuth';
 import DistrictEventsList from '@/components/district/DistrictEventsList';
@@ -44,8 +44,14 @@ export default async function DistrictEventsPage() {
   }
 
   const [eventsResult, clubsResult] = await Promise.all([
-    d1.prepare(`SELECT * FROM district_events WHERE district_id=? AND deleted_at IS NULL ORDER BY date DESC`).bind(districtId).all().catch(() => ({ results: [] })),
-    d1.prepare(`SELECT id, name FROM clubs WHERE district_id=? AND deleted_at IS NULL ORDER BY name`).bind(districtId).all(),
+    db.select().from(districtEvents)
+      .where(and(eq(districtEvents.districtId, districtId), isNull(districtEvents.deletedAt)))
+      .orderBy(desc(districtEvents.date))
+      .catch(() => []),
+    db.select({ id: clubs.id, name: clubs.name }).from(clubs)
+      .where(and(eq(clubs.districtId, districtId), isNull(clubs.deletedAt)))
+      .orderBy(clubs.name)
+      .catch(() => []),
   ]);
 
   return (
@@ -55,8 +61,8 @@ export default async function DistrictEventsPage() {
         <p className="text-sm text-gray-500 mt-1">地区・ゾーン主催の行事を管理します</p>
       </div>
       <DistrictEventsList
-        events={((eventsResult as any).results ?? []) as any}
-        clubs={((clubsResult as any).results ?? []) as any}
+        events={eventsResult as any}
+        clubs={clubsResult as any}
         districtId={districtId}
         userRole={role}
       />

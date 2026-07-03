@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, districts } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, districts, districtEvents, clubReports } from '@/lib/db/schema';
+import { eq, and, isNull, gte, asc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/hooks/useAuth';
 import DistrictDashboardContent from '@/components/district/DistrictDashboardContent';
@@ -47,18 +47,37 @@ export default async function DistrictDashboardPage() {
   const currentYear = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
   const today = new Date().toISOString().split('T')[0];
 
-  const [clubsResult, upcomingEventsResult, awardScoresResult, pendingReportsResult] = await Promise.all([
-    d1.prepare(`SELECT id, name, short_name, type, zone_id, is_active FROM clubs WHERE district_id=? AND type='RAC' AND deleted_at IS NULL ORDER BY name`).bind(effectiveDistrictId).all(),
-    d1.prepare(`SELECT * FROM district_events WHERE district_id=? AND date>=? AND deleted_at IS NULL ORDER BY date LIMIT 5`).bind(effectiveDistrictId, today).all().catch(() => ({ results: [] })),
-    d1.prepare(`SELECT club_id, score_item_code, score FROM award_scores WHERE district_id=? AND fiscal_year=? AND deleted_at IS NULL`).bind(effectiveDistrictId, currentYear).all().catch(() => ({ results: [] })),
-    d1.prepare(`SELECT id, club_id, title, status, deadline FROM club_reports WHERE district_id=? AND status='submitted' AND deleted_at IS NULL LIMIT 10`).bind(effectiveDistrictId).all().catch(() => ({ results: [] })),
+  const [clubsResult, upcomingEventsResult, pendingReportsResult] = await Promise.all([
+    db.select({
+      id: clubs.id, name: clubs.name, shortName: clubs.shortName,
+      type: clubs.type, zoneId: clubs.zoneId, isActive: clubs.isActive,
+    }).from(clubs)
+      .where(and(eq(clubs.districtId, effectiveDistrictId), eq(clubs.type, 'RAC'), isNull(clubs.deletedAt)))
+      .orderBy(clubs.name),
+    db.select().from(districtEvents)
+      .where(and(
+        eq(districtEvents.districtId, effectiveDistrictId),
+        gte(districtEvents.date, today),
+        isNull(districtEvents.deletedAt),
+      ))
+      .orderBy(asc(districtEvents.date))
+      .limit(5)
+      .catch(() => []),
+    db.select({
+      id: clubReports.id, clubId: clubReports.clubId,
+      title: clubReports.title, status: clubReports.status, deadline: clubReports.deadline,
+    }).from(clubReports)
+      .where(and(
+        eq(clubReports.districtId, effectiveDistrictId),
+        eq(clubReports.status, 'submitted'),
+        isNull(clubReports.deletedAt),
+      ))
+      .limit(10)
+      .catch(() => []),
   ]);
 
-  // クラブ別スコア集計
+  // award_scores は Priority 2 実装予定 → 空配列で代替
   const clubScoreMap: Record<string, number> = {};
-  ((awardScoresResult as any).results ?? []).forEach((s: any) => {
-    clubScoreMap[s.club_id] = (clubScoreMap[s.club_id] ?? 0) + s.score;
-  });
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -67,9 +86,9 @@ export default async function DistrictDashboardPage() {
         <p className="text-sm text-gray-500 mt-1">{currentYear}年度 地区全体の状況</p>
       </div>
       <DistrictDashboardContent
-        clubs={((clubsResult as any).results ?? []) as any}
-        upcomingEvents={((upcomingEventsResult as any).results ?? []) as any}
-        pendingReports={((pendingReportsResult as any).results ?? []) as any}
+        clubs={clubsResult as any}
+        upcomingEvents={upcomingEventsResult as any}
+        pendingReports={pendingReportsResult as any}
         clubScoreMap={clubScoreMap}
         currentYear={currentYear}
       />
