@@ -55,15 +55,18 @@ export default async function MembersPage({
       email: users.email,
       role: users.role,
       position: users.position,
-      memberType: users.memberType,
-      isActive: users.isActive,
+      // MembersList コンポーネントが参照する snake_case フィールド名に合わせる
+      member_type: users.memberType,
+      is_active: users.isActive,
       phone: users.phone,
-      joinedAt: users.joinedAt,
-      clubId: users.clubId,
+      joined_date: users.joinedAt,
+      name_kana: users.nameKana,
+      club_id: users.clubId,
+      memo: users.memo,
       club: {
         id: clubs.id,
         name: clubs.name,
-        shortName: clubs.shortName,
+        short_name: clubs.shortName,
       },
     })
       .from(users)
@@ -73,7 +76,7 @@ export default async function MembersPage({
       .limit(PAGE_SIZE)
       .offset(offset),
 
-    db.select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName })
+    db.select({ id: clubs.id, name: clubs.name, short_name: clubs.shortName })
       .from(clubs)
       .where(isNull(clubs.deletedAt))
       .orderBy(asc(clubs.name)),
@@ -85,7 +88,7 @@ export default async function MembersPage({
   return (
     <MembersList
       members={membersResult as any}
-      clubs={clubsResult}
+      clubs={clubsResult as any}
       currentUserClubId={clubId || null}
       userRole={session.user.role || 'system_owner'}
       pagination={{ page, totalPages, totalCount, pageSize: PAGE_SIZE }}
