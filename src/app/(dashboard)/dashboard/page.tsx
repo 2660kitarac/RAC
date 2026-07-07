@@ -5,7 +5,7 @@ import { users, clubs, meetings, annualFees, transactions, attendances, emails, 
 import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc } from 'drizzle-orm';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
-import MemberAttendanceCard from '@/components/dashboard/MemberAttendanceCard';
+import MemberDashboard from '@/components/dashboard/MemberDashboard';
 
 export const metadata = { title: 'ダッシュボード' };
 
@@ -57,6 +57,52 @@ export default async function DashboardPage() {
     );
   }
 
+  // ── 個人会員（member）は専用ダッシュボードを表示 ──────────
+  if (isMember) {
+    // memberType 取得
+    const typeResult = await db
+      .select({ memberType: users.memberType })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    const memberType = typeResult[0]?.memberType || 'RAC';
+
+    // 年会費ステータス（アナウンスバナー用）
+    const currentYear = new Date().getFullYear();
+    const feeResult = await db
+      .select({ paymentStatus: annualFees.paymentStatus, year: annualFees.fiscalYear })
+      .from(annualFees)
+      .where(and(
+        eq(annualFees.userId, session.user.id),
+        eq(annualFees.fiscalYear, currentYear),
+        isNull(annualFees.deletedAt),
+      ))
+      .limit(1);
+    const memberAnnualFeeStatus = feeResult[0]
+      ? { paid: feeResult[0].paymentStatus === 'paid', year: currentYear }
+      : null;
+
+    return (
+      <div className="space-y-4 max-w-2xl mx-auto px-4 pb-10">
+        {/* 年会費未納バナーのみ表示 */}
+        <AnnouncementBanner
+          userRole={userRole}
+          pendingMembersCount={0}
+          unpaidAnnualFees={0}
+          unissuedReceipts={0}
+          nextMeeting={null}
+          memberAnnualFeeStatus={memberAnnualFeeStatus}
+        />
+        <MemberDashboard
+          userName={profile?.name || 'メンバー'}
+          clubName={profile?.club?.name || ''}
+          memberType={memberType}
+        />
+      </div>
+    );
+  }
+  // ────────────────────────────────────────────────────────
+
   const clubId = profile?.clubId ?? null;
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
@@ -65,8 +111,6 @@ export default async function DashboardPage() {
 
   // アナウンス用データ（クラブアカウント / 管理者向け）
   let pendingMembersCount = 0;
-  let memberAnnualFeeStatus: { paid: boolean; year: number } | null = null;
-  let myNextMeetingAttendance: { meetingId: string; meetingTitle: string; meetingDate: string; answered: boolean } | null = null;
 
   if (isClubAccount || isAdminRole) {
     const pendingResult = clubId
@@ -81,21 +125,6 @@ export default async function DashboardPage() {
     pendingMembersCount = pendingResult[0]?.value || 0;
   }
 
-  if (isMember) {
-    const currentYear = now.getFullYear();
-    const feeResult = await db
-      .select({ paymentStatus: annualFees.paymentStatus, year: annualFees.fiscalYear })
-      .from(annualFees)
-      .where(and(
-        eq(annualFees.userId, session.user.id),
-        eq(annualFees.fiscalYear, currentYear),
-        isNull(annualFees.deletedAt),
-      ))
-      .limit(1);
-    if (feeResult[0]) {
-      memberAnnualFeeStatus = { paid: feeResult[0].paymentStatus === 'paid', year: currentYear };
-    }
-  }
 
   // 並列クエリ実行（clubId が null の場合は全クラブ集計）
   const [
@@ -232,17 +261,6 @@ export default async function DashboardPage() {
 
   const nextMeeting = nextMeetingResult[0] || null;
 
-  // memberの場合はmemberType取得
-  let memberType = 'RAC';
-  if (isMember) {
-    const typeResult = await db
-      .select({ memberType: users.memberType })
-      .from(users)
-      .where(eq(users.id, session.user.id))
-      .limit(1);
-    memberType = typeResult[0]?.memberType || 'RAC';
-  }
-
   return (
     <div className="space-y-4">
       {/* アナウンスバナー */}
@@ -252,13 +270,8 @@ export default async function DashboardPage() {
         unpaidAnnualFees={annualFeesCountResult[0]?.value || 0}
         unissuedReceipts={unissuedReceiptsResult[0]?.value || 0}
         nextMeeting={nextMeeting as any}
-        memberAnnualFeeStatus={memberAnnualFeeStatus}
+        memberAnnualFeeStatus={null}
       />
-
-      {/* member向け：出席登録カード */}
-      {isMember && (
-        <MemberAttendanceCard memberType={memberType} />
-      )}
 
       <DashboardContent
         user={profile as any}
