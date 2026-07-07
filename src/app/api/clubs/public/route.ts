@@ -4,6 +4,7 @@ import { clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 
 // GET /api/clubs/public - 認証不要のクラブ一覧（登録フォーム・MU登録で使用）
+// is_active=true かつ is_system_club=false のクラブのみ返す
 export async function GET() {
   try {
     const db = await getDbFromContext();
@@ -16,7 +17,11 @@ export async function GET() {
         type: clubs.type,
       })
       .from(clubs)
-      .where(and(eq(clubs.isActive, true), isNull(clubs.deletedAt)))
+      .where(and(
+        eq(clubs.isActive, true),
+        eq(clubs.isSystemClub, false),
+        isNull(clubs.deletedAt),
+      ))
       .orderBy(clubs.name);
 
     return NextResponse.json(results);
