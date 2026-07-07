@@ -86,6 +86,32 @@ export default function MeetingDetail({
         <StatCard title="収支" value={formatCurrency(stats.incomeTotal - stats.expenseTotal)} color="blue" />
       </div>
 
+      {/* MU登録URL（タブ外・常時表示） */}
+      {meeting.mu_registration_url && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50">
+          <ExternalLink className="h-4 w-4 text-blue-500 flex-shrink-0" />
+          <span className="text-sm font-medium text-blue-700 flex-shrink-0">MU登録URL</span>
+          <code className="flex-1 text-sm bg-white px-3 py-1.5 rounded border border-blue-200 text-blue-800 truncate min-w-0">
+            {meeting.mu_registration_url}
+          </code>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copyUrl(meeting.mu_registration_url!)}
+            className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+          >
+            <Copy className="h-4 w-4" />
+            コピー
+          </Button>
+          <a href={meeting.mu_registration_url} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">
+              <ExternalLink className="h-4 w-4" />
+              開く
+            </Button>
+          </a>
+        </div>
+      )}
+
       <Tabs defaultValue="info">
         <TabsList className="w-full md:w-auto">
           <TabsTrigger value="info">基本情報</TabsTrigger>
@@ -167,43 +193,6 @@ export default function MeetingDetail({
               </Card>
             )}
           </div>
-
-          {/* MU登録URL */}
-          {meeting.mu_registration_url && (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-blue-700">
-                  <ExternalLink className="h-4 w-4" />
-                  MU登録URL
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <code className="flex-1 text-sm bg-white px-3 py-2 rounded border border-blue-200 text-blue-800 truncate">
-                    {meeting.mu_registration_url}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyUrl(meeting.mu_registration_url!)}
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
-                  >
-                    <Copy className="h-4 w-4" />
-                    コピー
-                  </Button>
-                  <a href={meeting.mu_registration_url} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                      <ExternalLink className="h-4 w-4" />
-                      開く
-                    </Button>
-                  </a>
-                </div>
-                <p className="text-xs text-blue-600 mt-2">
-                  ※このURLを外部参加者に共有してください
-                </p>
-              </CardContent>
-            </Card>
-          )}
 
           {/* アクションボタン */}
           <div className="flex flex-wrap gap-3">

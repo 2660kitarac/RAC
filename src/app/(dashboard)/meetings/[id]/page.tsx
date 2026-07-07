@@ -19,8 +19,36 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     db.select().from(meetingReports).where(and(eq(meetingReports.meetingId, id), isNull(meetingReports.deletedAt))).limit(1),
   ]);
 
-  const meeting = meetingResult[0];
-  if (!meeting) notFound();
+  const meetingRaw = meetingResult[0];
+  if (!meetingRaw) notFound();
+
+  // Drizzle ORM は camelCase でSELECT結果を返すが、
+  // MeetingDetail / Meeting型 は snake_case を期待するためマッピング
+  const meeting = {
+    ...meetingRaw,
+    fee_rac:               meetingRaw.feeRac,
+    fee_rc:                meetingRaw.feeRc,
+    fee_obog:              meetingRaw.feeObog,
+    fee_guest:             meetingRaw.feeGuest,
+    meal_fee:              meetingRaw.mealFee,
+    mu_registration_url:   meetingRaw.muRegistrationUrl,
+    mu_registration_slug:  meetingRaw.muRegistrationSlug,
+    meeting_number:        meetingRaw.meetingNumber,
+    start_time:            meetingRaw.startTime,
+    end_time:              meetingRaw.endTime,
+    venue_name:            meetingRaw.venueName,
+    venue_address:         meetingRaw.venueAddress,
+    registration_deadline: meetingRaw.registrationDeadline,
+    is_district_event:     meetingRaw.isDistrictEvent,
+    is_joint_meeting:      meetingRaw.isJointMeeting,
+    program_detail:        meetingRaw.programDetail,
+    created_by:            meetingRaw.createdBy,
+    created_at:            meetingRaw.createdAt,
+    updated_at:            meetingRaw.updatedAt,
+    deleted_at:            meetingRaw.deletedAt,
+    club_id:               meetingRaw.clubId,
+    manager_user_id:       meetingRaw.managerUserId,
+  };
 
   const attendanceList = attendancesResult;
   const stats = {
@@ -37,7 +65,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       meeting={meeting as any}
       attendances={attendanceList as any}
       stats={stats}
-      report={reportResult[0] as any ?? null}
+      report={(reportResult[0] as any) ?? null}
       userRole={session.user.role || 'member'}
     />
   );
