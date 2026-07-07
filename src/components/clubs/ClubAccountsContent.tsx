@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Building2, Key, Eye, EyeOff, CheckCircle, Trash2, RefreshCw, X } from 'lucide-react';
+import { Plus, Building2, Key, Eye, EyeOff, CheckCircle, Trash2, X, Copy, LogIn, ExternalLink, List } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ interface Club {
   id: string;
   name: string;
   shortName: string | null;
+  slug: string | null;
 }
 
 interface ClubAccount {
@@ -256,6 +257,19 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
   };
 
   const getClubName = (cId: string | null) => clubs.find(c => c.id === cId)?.name || '-';
+  const getClub = (cId: string | null) => clubs.find(c => c.id === cId);
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label}をコピーしました`);
+  };
+
+  // ログインURL生成
+  const getLoginUrl = (club: Club) => {
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    if (club.slug) return `${base}/club/${club.slug}/login`;
+    return `${base}/login`;
+  };
 
   return (
     <div className="space-y-6">
@@ -391,6 +405,103 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
           </CardContent>
         </Card>
       )}
+
+      {/* ログイン情報一覧 */}
+      <Card className="border-gray-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <List className="h-4 w-4 text-gray-500" />
+            <CardTitle className="text-base">
+              ログイン情報一覧
+              <span className="text-gray-400 font-normal text-sm ml-2">（{accounts.length}件）</span>
+            </CardTitle>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">各クラブに共有するログイン情報です。コピーボタンで素早くコピーできます。</p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {accounts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400 text-sm">アカウントがまだ作成されていません</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">クラブ名</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">メールアドレス</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">ログインURL</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">状態</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {accounts.map(account => {
+                    const club = getClub(account.clubId);
+                    const loginUrl = club ? getLoginUrl(club) : '';
+                    return (
+                      <tr key={account.id} className="hover:bg-gray-50 transition-colors">
+                        {/* クラブ名 */}
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-900">{getClubName(account.clubId)}</span>
+                        </td>
+                        {/* メールアドレス */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <code className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                              {account.email}
+                            </code>
+                            <button
+                              onClick={() => copyText(account.email, 'メールアドレス')}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="コピー"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                        {/* ログインURL */}
+                        <td className="px-4 py-3">
+                          {loginUrl ? (
+                            <div className="flex items-center gap-1.5">
+                              <code className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded max-w-[200px] truncate block">
+                                {loginUrl}
+                              </code>
+                              <button
+                                onClick={() => copyText(loginUrl, 'ログインURL')}
+                                className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors flex-shrink-0"
+                                title="URLをコピー"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              <a
+                                href={loginUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors flex-shrink-0"
+                                title="URLを開く"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">slug未設定</span>
+                          )}
+                        </td>
+                        {/* 状態 */}
+                        <td className="px-4 py-3">
+                          <Badge className={account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>
+                            {account.isActive ? '有効' : '無効'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 既存アカウント一覧 */}
       <Card>

@@ -17,9 +17,9 @@ export default async function ClubAccountsPage() {
 
   const db = await getDbFromContext();
 
-  // クラブ一覧取得
+  // クラブ一覧取得（slug も含める）
   const clubList = await db
-    .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName })
+    .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName, slug: clubs.slug })
     .from(clubs)
     .where(isNull(clubs.deletedAt))
     .orderBy(clubs.name);
