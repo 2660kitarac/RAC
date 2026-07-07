@@ -248,13 +248,14 @@ export default function TransactionsList({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">種別</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">カテゴリ</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">金額</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">支払者/支払先</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">内容・備考</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     データがありません
                   </td>
                 </tr>
@@ -269,6 +270,12 @@ export default function TransactionsList({
                   <td className="px-4 py-3 text-gray-700">{t.category}</td>
                   <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${t.transaction_type === 'income' ? 'text-green-700' : 'text-red-700'}`}>
                     {t.transaction_type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 text-sm">
+                    {t.transaction_type === 'income'
+                      ? (t.payer_name || <span className="text-gray-300">—</span>)
+                      : (t.payee_name || <span className="text-gray-300">—</span>)
+                    }
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {(t as any).meeting?.title && (
@@ -292,7 +299,7 @@ export default function TransactionsList({
                     transactions.filter(t => t.transaction_type === 'expense').reduce((s, t) => s + t.amount, 0)
                   )}
                 </td>
-                <td />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>
@@ -349,6 +356,18 @@ export default function TransactionsList({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="form-group">
+              <Label>{formType === 'income' ? '支払者名（誰から受け取ったか）' : '支払先名'}</Label>
+              <Input
+                placeholder={formType === 'income' ? '例：山田 太郎、〇〇クラブ' : '例：〇〇印刷、△△商店'}
+                value={formType === 'income' ? form.payer_name : form.payee_name}
+                onChange={e => setForm({ ...form,
+                  payer_name: formType === 'income' ? e.target.value : form.payer_name,
+                  payee_name: formType === 'expense' ? e.target.value : form.payee_name,
+                })}
+                className="mt-1"
+              />
             </div>
             <div className="form-group">
               <Label>支払方法</Label>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-import { Plus, Download, X, AlertCircle } from 'lucide-react';
+import { Plus, Download, X, AlertCircle, Layers, Printer, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,15 @@ import { formatDate, formatCurrency, exportToCSV } from '@/lib/utils';
 import type { Receipt, UserRole } from '@/types';
 import { RECEIPT_STATUS_LABELS } from '@/types';
 import { canManageReceipts } from '@/lib/hooks/useAuth';
+
+interface BulkTarget {
+  id: string;
+  name: string;
+  amount: number;
+  isClubMember?: boolean;
+  alreadyIssued?: boolean;
+  paidAt?: string | null;
+}
 
 interface ReceiptsListProps {
   receipts: Receipt[];
@@ -36,6 +46,108 @@ export default function ReceiptsList({
   const [loading, setLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const canManage = canManageReceipts(userRole);
+  const router = useRouter();
+
+  // ── 一括発行ダイアログ ──
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'external' | 'annual_fee'>('external');
+  const [bulkMeetingId, setBulkMeetingId] = useState('');
+  const [bulkFiscalYear, setBulkFiscalYear] = useState<string>(String(new Date().getFullYear()));
+  const [bulkIssuedDate, setBulkIssuedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkDescription, setBulkDescription] = useState('');
+  const [bulkTargets, setBulkTargets] = useState<BulkTarget[]>([]);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [bulkStep, setBulkStep] = useState<'config' | 'preview' | 'done'>('config');
+  const [bulkCreatedIds, setBulkCreatedIds] = useState<string[]>([]);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+
+  // プレビュー取得
+  const handleBulkPreview = async () => {
+    if (bulkMode === 'external' && !bulkMeetingId) {
+      toast.error('例会を選択してください'); return;
+    }
+    setBulkPreviewLoading(true);
+    try {
+      const params = new URLSearchParams({ mode: bulkMode, clubId });
+      if (bulkMode === 'external') params.set('meetingId', bulkMeetingId);
+      else params.set('fiscalYear', bulkFiscalYear);
+
+      const res = await fetch(`/api/receipts/bulk?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const targets: BulkTarget[] = data.targets || [];
+      setBulkTargets(targets);
+      // 初期選択：未発行のものを全選択
+      setBulkSelected(new Set(targets.filter(t => !t.alreadyIssued).map(t => t.id)));
+      setBulkStep('preview');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'プレビューの取得に失敗しました');
+    } finally {
+      setBulkPreviewLoading(false);
+    }
+  };
+
+  // 一括発行実行
+  const handleBulkCreate = async () => {
+    const selectedIds = Array.from(bulkSelected);
+    if (selectedIds.length === 0) {
+      toast.error('発行する対象を選択してください'); return;
+    }
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/receipts/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: bulkMode,
+          clubId,
+          meetingId: bulkMode === 'external' ? bulkMeetingId : undefined,
+          fiscalYear: bulkMode === 'annual_fee' ? Number(bulkFiscalYear) : undefined,
+          issuedDate: bulkIssuedDate,
+          description: bulkDescription || undefined,
+          targetIds: selectedIds,
+          skipExisting: false, // 選択制なのでAPIでのスキップは無効化
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const createdIds = (data.created || []).map((r: any) => r.id);
+      setBulkCreatedIds(createdIds);
+      setBulkResult({ created: data.created?.length ?? 0, skipped: data.skipped?.length ?? 0 });
+      setBulkStep('done');
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '一括発行に失敗しました');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const toggleBulkSelect = (id: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAllBulk = () => setBulkSelected(new Set(bulkTargets.filter(t => !t.alreadyIssued).map(t => t.id)));
+  const clearAllBulk = () => setBulkSelected(new Set());
+
+  const resetBulkDialog = () => {
+    setBulkStep('config');
+    setBulkTargets([]);
+    setBulkSelected(new Set());
+    setBulkResult(null);
+    setBulkCreatedIds([]);
+    setBulkMeetingId('');
+    setBulkDescription('');
+  };
 
   const [form, setForm] = useState({
     receipt_name: '',
@@ -161,12 +273,21 @@ export default function ReceiptsList({
           <h1 className="page-title">領収書管理</h1>
           <p className="text-gray-500 text-sm mt-1">{totalCount ?? receipts.length}件</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={exportCSV}><Download className="h-4 w-4" />CSV</Button>
           {canManage && (
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" />領収書を発行
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => { resetBulkDialog(); setShowBulkDialog(true); }}
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              >
+                <Layers className="h-4 w-4" />一括発行
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" />領収書を発行
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -228,7 +349,7 @@ export default function ReceiptsList({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">但し書き</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">発行日</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状態</th>
-                  {canManage && <th className="px-4 py-3" />}
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -242,23 +363,32 @@ export default function ReceiptsList({
                     <td className="px-4 py-3">
                       <Badge className={statusColors[receipt.status]}>{RECEIPT_STATUS_LABELS[receipt.status]}</Badge>
                     </td>
-                    {canManage && (
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {receipt.status === 'issued' && (
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-red-500 hover:text-red-700"
-                              onClick={() => setShowCancelDialog(receipt.id)}
-                              title="取消"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    )}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {receipt.status === 'issued' && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-blue-500 hover:text-blue-700"
+                            onClick={() => window.open(`/receipts/${receipt.id}/print`, '_blank')}
+                            title="印刷"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canManage && receipt.status === 'issued' && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-red-500 hover:text-red-700"
+                            onClick={() => setShowCancelDialog(receipt.id)}
+                            title="取消"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -343,6 +473,216 @@ export default function ReceiptsList({
               取り消す
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 一括発行ダイアログ ── */}
+      <Dialog open={showBulkDialog} onOpenChange={open => { if (!open) resetBulkDialog(); setShowBulkDialog(open); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-blue-600" />
+              領収書の一括発行
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Step 1: 設定 */}
+          {bulkStep === 'config' && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label required>発行対象</Label>
+                <Select value={bulkMode} onValueChange={v => setBulkMode(v as typeof bulkMode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="external">例会の外部参加者（クラブメンバー以外）</SelectItem>
+                    <SelectItem value="annual_fee">年会費（支払済みメンバー全員）</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  {bulkMode === 'external'
+                    ? '選択した例会で「領収書必要」かつ「支払済み」の外部参加者が対象です。クラブメンバーは含まれません。'
+                    : '指定年度の年会費が「支払済み」のメンバー全員が対象です。'}
+                </p>
+              </div>
+
+              {bulkMode === 'external' && (
+                <div className="space-y-1.5">
+                  <Label required>対象例会</Label>
+                  <Select value={bulkMeetingId} onValueChange={setBulkMeetingId}>
+                    <SelectTrigger><SelectValue placeholder="例会を選択..." /></SelectTrigger>
+                    <SelectContent>
+                      {meetings.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {bulkMode === 'annual_fee' && (
+                <div className="space-y-1.5">
+                  <Label required>対象年度</Label>
+                  <Select value={bulkFiscalYear} onValueChange={setBulkFiscalYear}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}年度</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label required>発行日</Label>
+                <Input
+                  type="date"
+                  value={bulkIssuedDate}
+                  onChange={e => setBulkIssuedDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>但し書き（空欄で自動設定）</Label>
+                <Input
+                  placeholder={bulkMode === 'external' ? '例：○○例会 参加費として' : '例：2025年度 年会費として'}
+                  value={bulkDescription}
+                  onChange={e => setBulkDescription(e.target.value)}
+                />
+              </div>
+
+              <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                ⚠️ 次のステップで対象者を確認・選択できます。発行後は取消が必要です。
+              </p>
+            </div>
+          )}
+
+          {/* Step 2: プレビュー・選択 */}
+          {bulkStep === 'preview' && (
+            <div className="space-y-3 py-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-700">
+                  発行対象：{bulkTargets.length}件
+                  <span className="ml-2 text-blue-600">（選択中：{bulkSelected.size}件）</span>
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAllBulk}>全選択</Button>
+                  <Button variant="outline" size="sm" onClick={clearAllBulk}>全解除</Button>
+                </div>
+              </div>
+
+              {bulkTargets.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>対象者が見つかりません</p>
+                  <p className="text-xs mt-1">条件を変更してやり直してください</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                  {bulkTargets.map(t => (
+                    <label
+                      key={t.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${t.alreadyIssued ? 'opacity-50' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={bulkSelected.has(t.id)}
+                        disabled={t.alreadyIssued}
+                        onChange={() => !t.alreadyIssued && toggleBulkSelect(t.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                        {t.alreadyIssued && (
+                          <p className="text-xs text-amber-600">発行済み</p>
+                        )}
+                      </div>
+                      <span className="text-sm font-mono text-gray-700 shrink-0">
+                        {formatCurrency(t.amount)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">発行件数</span>
+                  <span className="font-bold">{bulkSelected.size}件</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-gray-600">合計金額</span>
+                  <span className="font-bold text-blue-700">
+                    {formatCurrency(
+                      bulkTargets
+                        .filter(t => bulkSelected.has(t.id))
+                        .reduce((s, t) => s + t.amount, 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: 完了 */}
+          {bulkStep === 'done' && bulkResult && (
+            <div className="py-6 text-center space-y-4">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+              <p className="text-lg font-bold text-gray-800">
+                {bulkResult.created}件の領収書を発行しました
+              </p>
+              {bulkResult.skipped > 0 && (
+                <p className="text-sm text-amber-600">{bulkResult.skipped}件はスキップされました</p>
+              )}
+              <div className="flex flex-col gap-2 pt-2">
+                {bulkCreatedIds.length > 0 && (
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      const url = `/receipts/bulk-print?ids=${bulkCreatedIds.join(',')}`;
+                      window.open(url, '_blank');
+                    }}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    発行した{bulkResult.created}件を一括印刷
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowBulkDialog(false);
+                    resetBulkDialog();
+                  }}
+                >
+                  閉じる
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {bulkStep !== 'done' && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                if (bulkStep === 'preview') setBulkStep('config');
+                else { setShowBulkDialog(false); resetBulkDialog(); }
+              }}>
+                {bulkStep === 'preview' ? '← 戻る' : 'キャンセル'}
+              </Button>
+              {bulkStep === 'config' && (
+                <Button onClick={handleBulkPreview} disabled={bulkPreviewLoading}>
+                  {bulkPreviewLoading ? '確認中...' : '対象者を確認 →'}
+                </Button>
+              )}
+              {bulkStep === 'preview' && (
+                <Button
+                  onClick={handleBulkCreate}
+                  disabled={bulkLoading || bulkSelected.size === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {bulkLoading ? '発行中...' : `${bulkSelected.size}件を一括発行`}
+                </Button>
+              )}
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
