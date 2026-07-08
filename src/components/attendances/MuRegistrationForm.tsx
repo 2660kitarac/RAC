@@ -16,6 +16,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
 
+// 役職の選択肢
+const POSITION_OPTIONS = [
+  { value: '', label: '（役職なし）' },
+  { value: '会長', label: '会長' },
+  { value: '副会長', label: '副会長' },
+  { value: '幹事', label: '幹事' },
+  { value: '会計', label: '会計' },
+  { value: 'custom', label: 'その他（記述）' },
+] as const;
+
 const muSchema = z.object({
   name: z.string().min(1, 'お名前は必須です'),
   name_kana: z.string().optional(),
@@ -27,6 +37,9 @@ const muSchema = z.object({
   meal_required: z.boolean().default(false),
   // 参加形態: 例会のみ / 例会+懇親会 / 懇親会のみ
   participation_type: z.enum(['meeting_only', 'meeting_and_party', 'party_only']).default('meeting_only'),
+  // 役職
+  position_select: z.string().optional(),
+  position_custom: z.string().optional(),
   receipt_required: z.boolean().default(false),
   receipt_name_type: z.enum(['club', 'personal', 'custom']).optional(),
   receipt_name: z.string().optional(),
@@ -111,6 +124,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   const receiptRequired = watch('receipt_required');
   const receiptNameType = watch('receipt_name_type');
   const participationType = watch('participation_type');
+  const positionSelect = watch('position_select');
+  const positionCustom = watch('position_custom');
 
   // 例会登録料（meeting_only / meeting_and_party の場合）
   const meetingFee = participationType === 'party_only'
@@ -132,6 +147,18 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
   const onSubmit = async (data: MuFormData) => {
     setLoading(true);
+
+    // 役職の解決（selected + custom）
+    const resolvedPosition =
+      data.position_select === 'custom'
+        ? (data.position_custom?.trim() || '')
+        : (data.position_select || '');
+
+    // note に役職を付加
+    const noteWithPosition = [
+      resolvedPosition ? `【役職】${resolvedPosition}` : '',
+      data.note?.trim() || '',
+    ].filter(Boolean).join('\n');
 
     try {
       const res = await fetch('/api/attendances', {
@@ -157,7 +184,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           receiptRequired: data.receipt_required,
           receiptNameType: data.receipt_required ? (data.receipt_name_type || null) : null,
           receiptName: data.receipt_required ? (data.receipt_name || data.name) : null,
-          note: data.note || null,
+          note: noteWithPosition || null,
         }),
       });
       const resData = await res.json();
@@ -419,6 +446,37 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                     <SelectItem value="OTHER">その他</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* 役職 */}
+              <div className="form-group">
+                <Label htmlFor="position_select">役職</Label>
+                <Select
+                  onValueChange={v => {
+                    setValue('position_select', v);
+                    if (v !== 'custom') setValue('position_custom', '');
+                  }}
+                  defaultValue=""
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="役職を選択（任意）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POSITION_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {positionSelect === 'custom' && (
+                  <input
+                    type="text"
+                    {...register('position_custom')}
+                    placeholder="役職名を入力してください"
+                    className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                )}
               </div>
 
               <div className="form-group">
