@@ -458,14 +458,13 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                   )}
                 </div>
                 {/* 懇親会参加費チップ */}
-                {(
-                  (meeting.after_party_fee_rac ?? 0) > 0 ||
-                  (meeting.after_party_fee_rc ?? 0) > 0 ||
-                  (meeting.after_party_fee_obog ?? 0) > 0 ||
-                  (meeting.after_party_fee_guest ?? 0) > 0
-                ) && (
-                  <div className="mt-3">
-                    <p className="text-xs text-purple-600 font-medium mb-1.5">参加費</p>
+                <div className="mt-3">
+                  <p className="text-xs text-purple-600 font-medium mb-1.5">参加費</p>
+                  {afterPartyFeeType === 'actual_cost' ? (
+                    <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-medium">
+                      💡 実費精算（当日・後日精算）
+                    </span>
+                  ) : (
                     <div className="flex flex-wrap gap-2">
                       {(meeting.after_party_fee_rac ?? 0) > 0 && (
                         <FeeChip label="RAC" amount={meeting.after_party_fee_rac!} color="purple" />
@@ -479,9 +478,13 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                       {(meeting.after_party_fee_guest ?? 0) > 0 && (
                         <FeeChip label="ゲスト" amount={meeting.after_party_fee_guest!} color="purple" />
                       )}
+                      {(meeting.after_party_fee_rac ?? 0) === 0 && (meeting.after_party_fee_rc ?? 0) === 0 &&
+                       (meeting.after_party_fee_obog ?? 0) === 0 && (meeting.after_party_fee_guest ?? 0) === 0 && (
+                        <span className="text-xs text-purple-600">無料</span>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -701,21 +704,27 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                     value: 'meeting_only',
                     label: '例会のみ参加',
                     desc: '例会にのみ参加します',
-                    fee: calculateFee(memberType, meeting, false, 0),
+                    meetingFeeVal: calculateFee(memberType, meeting, false, 0),
+                    partyFeeVal: null as number | null,
+                    show: true,
                   },
                   {
                     value: 'meeting_and_party',
                     label: '例会＋懇親会に参加',
-                    desc: `例会と懇親会の両方に参加します`,
-                    fee: calculateFee(memberType, meeting, false, 0) + calcAfterPartyFee(memberType, meeting),
+                    desc: '例会と懇親会の両方に参加します',
+                    meetingFeeVal: calculateFee(memberType, meeting, false, 0),
+                    partyFeeVal: afterPartyFeeType === 'fixed' ? calcAfterPartyFee(memberType, meeting) : null,
+                    show: true,
                   },
                   {
                     value: 'party_only',
                     label: '懇親会のみ参加',
-                    desc: '懇親会にのみ参加します',
-                    fee: calcAfterPartyFee(memberType, meeting),
+                    desc: '懇親会にのみ参加します（例会は不参加）',
+                    meetingFeeVal: 0,
+                    partyFeeVal: afterPartyFeeType === 'fixed' ? calcAfterPartyFee(memberType, meeting) : null,
+                    show: allowPartyOnly,
                   },
-                ].map(option => (
+                ].filter(o => o.show).map(option => (
                   <label
                     key={option.value}
                     className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
@@ -732,17 +741,23 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                       className="mt-0.5 text-purple-600 focus:ring-purple-500"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                        {option.fee > 0 && (
-                          <span className="text-sm font-bold text-purple-700">{formatCurrency(option.fee)}</span>
-                        )}
-                        {option.fee === 0 && (
-                          <span className="text-sm text-gray-500">無料</span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                          {option.meetingFeeVal > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">例会 {formatCurrency(option.meetingFeeVal)}</span>
+                          )}
+                          {option.value !== 'meeting_only' && (
+                            option.partyFeeVal === null
+                              ? <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">懇親会 実費精算</span>
+                              : option.partyFeeVal > 0
+                                ? <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">懇親会 {formatCurrency(option.partyFeeVal)}</span>
+                                : <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">懇親会 無料</span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">{option.desc}</p>
-                      {option.value === 'meeting_and_party' && meeting.after_party_venue && (
+                      {option.value !== 'meeting_only' && meeting.after_party_venue && (
                         <p className="text-xs text-purple-600 mt-0.5">
                           📍 {meeting.after_party_venue}
                           {meeting.after_party_start_time && ` ${meeting.after_party_start_time.substring(0, 5)}〜`}

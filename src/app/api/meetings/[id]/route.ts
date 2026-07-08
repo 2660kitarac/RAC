@@ -34,8 +34,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'capacity',
       // 懇親会
       'hasAfterParty','afterPartyVenue','afterPartyStartTime',
-      'afterPartyFeeRac','afterPartyFeeRc','afterPartyFeeObog','afterPartyFeeGuest',
-      'afterPartyCapacity'
+      'afterPartyFeeType','afterPartyFeeRac','afterPartyFeeRc','afterPartyFeeObog','afterPartyFeeGuest',
+      'afterPartyAllowPartyOnly','afterPartyCapacity'
     ];
     const updateData: any = { updatedAt: new Date().toISOString() };
     for (const key of allowed) {

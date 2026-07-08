@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
       capacity = null,
       // 懇親会
       hasAfterParty = false, afterPartyVenue = null, afterPartyStartTime = null,
+      afterPartyFeeType = 'fixed',
       afterPartyFeeRac = 0, afterPartyFeeRc = 0, afterPartyFeeObog = 0, afterPartyFeeGuest = 0,
+      afterPartyAllowPartyOnly = false,
       afterPartyCapacity = null,
     } = body;
 
@@ -73,8 +75,8 @@ export async function POST(request: NextRequest) {
       capacity,
       // 懇親会
       hasAfterParty, afterPartyVenue, afterPartyStartTime,
-      afterPartyFeeRac, afterPartyFeeRc, afterPartyFeeObog, afterPartyFeeGuest,
-      afterPartyCapacity,
+      afterPartyFeeType, afterPartyFeeRac, afterPartyFeeRc, afterPartyFeeObog, afterPartyFeeGuest,
+      afterPartyAllowPartyOnly, afterPartyCapacity,
     } as any);
 
     return NextResponse.json({ meeting: { id, title, date, status } });

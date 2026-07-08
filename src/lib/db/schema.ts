@@ -105,10 +105,12 @@ export const meetings = pgTable('meetings', {
   hasAfterParty: boolean('has_after_party').notNull().default(false),
   afterPartyVenue: text('after_party_venue'),
   afterPartyStartTime: text('after_party_start_time'),
+  afterPartyFeeType: text('after_party_fee_type').notNull().default('fixed'), // 'fixed' | 'actual_cost'
   afterPartyFeeRac: integer('after_party_fee_rac').notNull().default(0),
   afterPartyFeeRc: integer('after_party_fee_rc').notNull().default(0),
   afterPartyFeeObog: integer('after_party_fee_obog').notNull().default(0),
   afterPartyFeeGuest: integer('after_party_fee_guest').notNull().default(0),
+  afterPartyAllowPartyOnly: boolean('after_party_allow_party_only').notNull().default(false),
   capacity: integer('capacity'),
   afterPartyCapacity: integer('after_party_capacity'),
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),

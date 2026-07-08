@@ -37,10 +37,12 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
       hasAfterParty: meetings.hasAfterParty,
       afterPartyVenue: meetings.afterPartyVenue,
       afterPartyStartTime: meetings.afterPartyStartTime,
+      afterPartyFeeType: meetings.afterPartyFeeType,
       afterPartyFeeRac: meetings.afterPartyFeeRac,
       afterPartyFeeRc: meetings.afterPartyFeeRc,
       afterPartyFeeObog: meetings.afterPartyFeeObog,
       afterPartyFeeGuest: meetings.afterPartyFeeGuest,
+      afterPartyAllowPartyOnly: meetings.afterPartyAllowPartyOnly,
       afterPartyCapacity: meetings.afterPartyCapacity,
     })
     .from(meetings)
@@ -64,13 +66,15 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     club_id:                 meetingRaw.clubId,
     // 懇親会（snake_case — MuRegistrationForm が has_after_party 等で参照）
     has_after_party:         meetingRaw.hasAfterParty,
-    after_party_venue:       meetingRaw.afterPartyVenue,
-    after_party_start_time:  meetingRaw.afterPartyStartTime,
-    after_party_fee_rac:     meetingRaw.afterPartyFeeRac,
-    after_party_fee_rc:      meetingRaw.afterPartyFeeRc,
-    after_party_fee_obog:    meetingRaw.afterPartyFeeObog,
-    after_party_fee_guest:   meetingRaw.afterPartyFeeGuest,
-    after_party_capacity:    meetingRaw.afterPartyCapacity,
+    after_party_venue:         meetingRaw.afterPartyVenue,
+    after_party_start_time:    meetingRaw.afterPartyStartTime,
+    after_party_fee_type:      (meetingRaw.afterPartyFeeType ?? 'fixed') as 'fixed' | 'actual_cost',
+    after_party_fee_rac:       meetingRaw.afterPartyFeeRac,
+    after_party_fee_rc:        meetingRaw.afterPartyFeeRc,
+    after_party_fee_obog:      meetingRaw.afterPartyFeeObog,
+    after_party_fee_guest:     meetingRaw.afterPartyFeeGuest,
+    after_party_allow_party_only: meetingRaw.afterPartyAllowPartyOnly ?? false,
+    after_party_capacity:      meetingRaw.afterPartyCapacity,
   } : null;
 
   if (!meeting) notFound();

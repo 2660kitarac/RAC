@@ -45,10 +45,12 @@ const meetingSchema = z.object({
   has_after_party: z.boolean().default(false),
   after_party_venue: z.string().optional(),
   after_party_start_time: z.string().optional(),
+  after_party_fee_type: z.enum(['fixed', 'actual_cost']).default('fixed'),
   after_party_fee_rac: z.string().default('0'),
   after_party_fee_rc: z.string().default('0'),
   after_party_fee_obog: z.string().default('0'),
   after_party_fee_guest: z.string().default('0'),
+  after_party_allow_party_only: z.boolean().default(false),
   after_party_capacity: z.string().optional(),
 });
 
@@ -111,15 +113,19 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
       has_after_party: (meeting as any)?.has_after_party || false,
       after_party_venue: (meeting as any)?.after_party_venue || '',
       after_party_start_time: (meeting as any)?.after_party_start_time?.substring(0, 5) || '',
+      after_party_fee_type: ((meeting as any)?.after_party_fee_type as 'fixed' | 'actual_cost') || 'fixed',
       after_party_fee_rac: (meeting as any)?.after_party_fee_rac?.toString() || '0',
       after_party_fee_rc: (meeting as any)?.after_party_fee_rc?.toString() || '0',
       after_party_fee_obog: (meeting as any)?.after_party_fee_obog?.toString() || '0',
       after_party_fee_guest: (meeting as any)?.after_party_fee_guest?.toString() || '0',
+      after_party_allow_party_only: (meeting as any)?.after_party_allow_party_only || false,
       after_party_capacity: (meeting as any)?.after_party_capacity?.toString() || '',
     },
   });
 
   const hasAfterParty = watch('has_after_party');
+  const afterPartyFeeType = watch('after_party_fee_type');
+  const afterPartyAllowPartyOnly = watch('after_party_allow_party_only');
 
   const onSubmit = async (data: MeetingFormData) => {
     setLoading(true);
@@ -156,10 +162,12 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
         hasAfterParty: data.has_after_party,
         afterPartyVenue: data.has_after_party ? (data.after_party_venue || null) : null,
         afterPartyStartTime: data.has_after_party ? (data.after_party_start_time || null) : null,
-        afterPartyFeeRac: data.has_after_party ? (parseInt(data.after_party_fee_rac) || 0) : 0,
-        afterPartyFeeRc: data.has_after_party ? (parseInt(data.after_party_fee_rc) || 0) : 0,
-        afterPartyFeeObog: data.has_after_party ? (parseInt(data.after_party_fee_obog) || 0) : 0,
-        afterPartyFeeGuest: data.has_after_party ? (parseInt(data.after_party_fee_guest) || 0) : 0,
+        afterPartyFeeType: data.has_after_party ? data.after_party_fee_type : 'fixed',
+        afterPartyFeeRac: (data.has_after_party && data.after_party_fee_type === 'fixed') ? (parseInt(data.after_party_fee_rac) || 0) : 0,
+        afterPartyFeeRc: (data.has_after_party && data.after_party_fee_type === 'fixed') ? (parseInt(data.after_party_fee_rc) || 0) : 0,
+        afterPartyFeeObog: (data.has_after_party && data.after_party_fee_type === 'fixed') ? (parseInt(data.after_party_fee_obog) || 0) : 0,
+        afterPartyFeeGuest: (data.has_after_party && data.after_party_fee_type === 'fixed') ? (parseInt(data.after_party_fee_guest) || 0) : 0,
+        afterPartyAllowPartyOnly: data.has_after_party ? data.after_party_allow_party_only : false,
         afterPartyCapacity: data.has_after_party && data.after_party_capacity ? parseInt(data.after_party_capacity) : null,
       };
 
@@ -454,30 +462,83 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">懇親会参加費（区分別）</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { key: 'after_party_fee_rac', label: 'RAC' },
-                      { key: 'after_party_fee_rc', label: 'RC' },
-                      { key: 'after_party_fee_obog', label: 'OB・OG' },
-                      { key: 'after_party_fee_guest', label: 'ゲスト' },
-                    ].map(({ key, label }) => (
-                      <div key={key} className="form-group">
-                        <Label>{label}</Label>
-                        <div className="relative mt-1">
-                          <Input
-                            {...register(key as keyof MeetingFormData)}
-                            type="number"
-                            min="0"
-                            step="100"
-                            className="pr-6"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
-                        </div>
-                      </div>
-                    ))}
+                {/* 懇親会のみ参加を許可 */}
+                <div className="flex items-center gap-3 py-2 border-t border-purple-100">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={afterPartyAllowPartyOnly}
+                    onClick={() => setValue('after_party_allow_party_only', !afterPartyAllowPartyOnly)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                      afterPartyAllowPartyOnly ? 'bg-purple-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${afterPartyAllowPartyOnly ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                  <div>
+                    <Label className="cursor-pointer" onClick={() => setValue('after_party_allow_party_only', !afterPartyAllowPartyOnly)}>
+                      懇親会のみ参加を許可する
+                    </Label>
+                    <p className="text-xs text-gray-500 mt-0.5">ONにすると、例会に参加せず懇親会だけ参加する選択肢が表示されます</p>
                   </div>
+                </div>
+
+                {/* 参加費タイプ */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">懇親会参加費の設定方法</p>
+                  <div className="flex gap-3 mb-3">
+                    <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-colors ${afterPartyFeeType === 'fixed' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <input type="radio" className="hidden" checked={afterPartyFeeType === 'fixed'} onChange={() => setValue('after_party_fee_type', 'fixed')} />
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${afterPartyFeeType === 'fixed' ? 'border-purple-500' : 'border-gray-400'}`}>
+                        {afterPartyFeeType === 'fixed' && <div className="w-2 h-2 rounded-full bg-purple-500" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${afterPartyFeeType === 'fixed' ? 'text-purple-800' : 'text-gray-700'}`}>固定金額</p>
+                        <p className="text-xs text-gray-500">区分ごとに金額を設定</p>
+                      </div>
+                    </label>
+                    <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-colors ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <input type="radio" className="hidden" checked={afterPartyFeeType === 'actual_cost'} onChange={() => setValue('after_party_fee_type', 'actual_cost')} />
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500' : 'border-gray-400'}`}>
+                        {afterPartyFeeType === 'actual_cost' && <div className="w-2 h-2 rounded-full bg-purple-500" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${afterPartyFeeType === 'actual_cost' ? 'text-purple-800' : 'text-gray-700'}`}>実費精算</p>
+                        <p className="text-xs text-gray-500">当日・後日に実費で精算</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {afterPartyFeeType === 'fixed' && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { key: 'after_party_fee_rac', label: 'RAC' },
+                        { key: 'after_party_fee_rc', label: 'RC' },
+                        { key: 'after_party_fee_obog', label: 'OB・OG' },
+                        { key: 'after_party_fee_guest', label: 'ゲスト' },
+                      ].map(({ key, label }) => (
+                        <div key={key} className="form-group">
+                          <Label>{label}</Label>
+                          <div className="relative mt-1">
+                            <Input
+                              {...register(key as keyof MeetingFormData)}
+                              type="number"
+                              min="0"
+                              step="100"
+                              className="pr-6"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {afterPartyFeeType === 'actual_cost' && (
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                      <span className="text-amber-600 text-sm">💡</span>
+                      <p className="text-sm text-amber-800">参加者の登録フォームに「実費精算」と表示されます。金額は登録時には確定しません。</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group max-w-xs">
