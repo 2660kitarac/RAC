@@ -16,6 +16,7 @@ import type { Meeting, Attendance, MeetingReport, UserRole } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS, MeetingStatus } from '@/types';
 import { canManageMeetings, canManageFinance } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
+import QrCodeModal from '@/components/ui/QrCodeModal';
 
 interface MeetingDetailProps {
   meeting: Meeting;
@@ -246,6 +247,7 @@ export default function MeetingDetail({
             <Copy className="h-4 w-4" />
             コピー
           </Button>
+          <QrCodeModal url={meeting.mu_registration_url} label="MU登録QRコード" />
           <a href={meeting.mu_registration_url} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">
               <ExternalLink className="h-4 w-4" />

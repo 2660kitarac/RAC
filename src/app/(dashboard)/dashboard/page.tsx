@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs, meetings, annualFees, transactions, attendances, emails, receipts } from '@/lib/db/schema';
-import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc, lt, sql } from 'drizzle-orm';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
 import MemberDashboard from '@/components/dashboard/MemberDashboard';
@@ -106,6 +106,7 @@ export default async function DashboardPage() {
   const clubId = profile?.clubId ?? null;
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
+  const threeDaysLaterStr = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
@@ -136,6 +137,9 @@ export default async function DashboardPage() {
     unissuedReceiptsResult,
     recentMuResult,
     recentEmailsResult,
+    deadlineAlertMeetings,
+    unpaidAlertMeetings,
+    capacityMeetings,
   ] = await Promise.all([
     // 次回例会
     clubId
@@ -250,6 +254,110 @@ export default async function DashboardPage() {
           .where(and(eq(emails.status, 'sent'), isNull(emails.deletedAt)))
           .orderBy(desc(emails.sentAt))
           .limit(5),
+
+    // アラート①: 登録締切が3日以内のopenな例会
+    clubId
+      ? db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
+          .from(meetings)
+          .where(and(
+            eq(meetings.clubId, clubId),
+            isNull(meetings.deletedAt),
+            eq(meetings.status, 'open'),
+            isNotNull(meetings.registrationDeadline),
+            gte(meetings.registrationDeadline, todayStr),
+            lte(meetings.registrationDeadline, threeDaysLaterStr),
+          ))
+          .orderBy(asc(meetings.registrationDeadline))
+          .limit(5)
+      : db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
+          .from(meetings)
+          .where(and(
+            isNull(meetings.deletedAt),
+            eq(meetings.status, 'open'),
+            isNotNull(meetings.registrationDeadline),
+            gte(meetings.registrationDeadline, todayStr),
+            lte(meetings.registrationDeadline, threeDaysLaterStr),
+          ))
+          .orderBy(asc(meetings.registrationDeadline))
+          .limit(5),
+
+    // アラート②: 未払い参加者が5人以上の例会（未来の例会のみ）
+    clubId
+      ? db.select({
+            meetingId: attendances.meetingId,
+            unpaidCount: count(),
+          })
+          .from(attendances)
+          .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
+          .where(and(
+            eq(meetings.clubId, clubId),
+            isNull(meetings.deletedAt),
+            isNull(attendances.deletedAt),
+            eq(attendances.paymentStatus, 'unpaid'),
+            gte(meetings.date, todayStr),
+          ))
+          .groupBy(attendances.meetingId)
+          .having(sql`count(*) >= 5`)
+          .limit(5)
+      : db.select({
+            meetingId: attendances.meetingId,
+            unpaidCount: count(),
+          })
+          .from(attendances)
+          .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
+          .where(and(
+            isNull(meetings.deletedAt),
+            isNull(attendances.deletedAt),
+            eq(attendances.paymentStatus, 'unpaid'),
+            gte(meetings.date, todayStr),
+          ))
+          .groupBy(attendances.meetingId)
+          .having(sql`count(*) >= 5`)
+          .limit(5),
+
+    // アラート③: 定員90%以上の例会（未来のopen例会）
+    clubId
+      ? db.select({
+            id: meetings.id,
+            title: meetings.title,
+            date: meetings.date,
+            capacity: meetings.capacity,
+            attendanceCount: count(attendances.id),
+          })
+          .from(meetings)
+          .leftJoin(attendances, and(
+            eq(attendances.meetingId, meetings.id),
+            isNull(attendances.deletedAt),
+          ))
+          .where(and(
+            eq(meetings.clubId, clubId),
+            isNull(meetings.deletedAt),
+            isNotNull(meetings.capacity),
+            inArray(meetings.status, ['open', 'closed']),
+            gte(meetings.date, todayStr),
+          ))
+          .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
+          .limit(10)
+      : db.select({
+            id: meetings.id,
+            title: meetings.title,
+            date: meetings.date,
+            capacity: meetings.capacity,
+            attendanceCount: count(attendances.id),
+          })
+          .from(meetings)
+          .leftJoin(attendances, and(
+            eq(attendances.meetingId, meetings.id),
+            isNull(attendances.deletedAt),
+          ))
+          .where(and(
+            isNull(meetings.deletedAt),
+            isNotNull(meetings.capacity),
+            inArray(meetings.status, ['open', 'closed']),
+            gte(meetings.date, todayStr),
+          ))
+          .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
+          .limit(10),
   ]);
 
   const monthlyIncome = transactionsResult
@@ -260,6 +368,31 @@ export default async function DashboardPage() {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const nextMeeting = nextMeetingResult[0] || null;
+
+  // アラートデータ加工
+  // 定員90%以上の例会を抽出
+  const nearCapacityMeetings = capacityMeetings
+    .filter(m => m.capacity && m.attendanceCount >= Math.ceil(m.capacity * 0.9))
+    .map(m => ({
+      id: m.id,
+      title: m.title,
+      date: m.date,
+      capacity: m.capacity!,
+      attendanceCount: Number(m.attendanceCount),
+      fillRate: Math.round((Number(m.attendanceCount) / m.capacity!) * 100),
+    }));
+
+  // 未払いアラート用に例会タイトルを取得（meetingIdから）
+  const unpaidMeetingIds = unpaidAlertMeetings.map(u => u.meetingId);
+  const unpaidMeetingDetails = unpaidMeetingIds.length > 0
+    ? upcomingMeetingsResult.filter(m => unpaidMeetingIds.includes(m.id))
+    : [];
+  const unpaidAlertsWithCount = unpaidAlertMeetings.map(u => ({
+    meetingId: u.meetingId,
+    unpaidCount: Number(u.unpaidCount),
+    title: upcomingMeetingsResult.find(m => m.id === u.meetingId)?.title || '例会',
+    date: upcomingMeetingsResult.find(m => m.id === u.meetingId)?.date || '',
+  }));
 
   return (
     <div className="space-y-4">
@@ -285,6 +418,9 @@ export default async function DashboardPage() {
         monthlyIncome={monthlyIncome}
         monthlyExpense={monthlyExpense}
         monthlyBalance={monthlyIncome - monthlyExpense}
+        deadlineAlerts={deadlineAlertMeetings as any}
+        unpaidAlerts={unpaidAlertsWithCount as any}
+        capacityAlerts={nearCapacityMeetings as any}
       />
     </div>
   );

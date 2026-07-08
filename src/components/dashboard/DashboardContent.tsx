@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {
   Calendar, Users, Receipt, Mail, TrendingUp, TrendingDown,
-  AlertCircle, CheckCircle, Clock, ArrowRight, Building2
+  AlertCircle, CheckCircle, Clock, ArrowRight, Building2, Bell
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,29 @@ import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils';
 import type { User, Meeting, Attendance, Email } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS } from '@/types';
+
+interface DeadlineAlert {
+  id: string;
+  title: string;
+  date: string;
+  registrationDeadline: string;
+}
+
+interface UnpaidAlert {
+  meetingId: string;
+  unpaidCount: number;
+  title: string;
+  date: string;
+}
+
+interface CapacityAlert {
+  id: string;
+  title: string;
+  date: string;
+  capacity: number;
+  attendanceCount: number;
+  fillRate: number;
+}
 
 interface DashboardContentProps {
   user: User;
@@ -24,6 +47,9 @@ interface DashboardContentProps {
   monthlyIncome: number;
   monthlyExpense: number;
   monthlyBalance: number;
+  deadlineAlerts?: DeadlineAlert[];
+  unpaidAlerts?: UnpaidAlert[];
+  capacityAlerts?: CapacityAlert[];
 }
 
 export default function DashboardContent({
@@ -38,7 +64,12 @@ export default function DashboardContent({
   monthlyIncome,
   monthlyExpense,
   monthlyBalance,
+  deadlineAlerts = [],
+  unpaidAlerts = [],
+  capacityAlerts = [],
 }: DashboardContentProps) {
+  const totalAlerts = (unpaidAnnualFees > 0 ? 1 : 0) + (unissuedReceipts > 0 ? 1 : 0)
+    + deadlineAlerts.length + unpaidAlerts.length + capacityAlerts.length;
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
@@ -88,24 +119,64 @@ export default function DashboardContent({
       </div>
 
       {/* アラートカード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {unpaidAnnualFees > 0 && (
-          <AlertCard
-            title="年会費未納"
-            description={`${unpaidAnnualFees}名の会員の年会費が未納です`}
-            href="/finance/annual-fees"
-            variant="warning"
-          />
-        )}
-        {unissuedReceipts > 0 && (
-          <AlertCard
-            title="領収書未発行"
-            description={`${unissuedReceipts}件の領収書が発行待ちです`}
-            href="/receipts"
-            variant="info"
-          />
-        )}
-      </div>
+      {totalAlerts > 0 && (
+        <Card className="border-orange-200 bg-orange-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4 text-orange-500" />
+              アラート
+              <Badge className="bg-orange-100 text-orange-700 border-0 text-xs">{totalAlerts}件</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {unpaidAnnualFees > 0 && (
+                <AlertCard
+                  title="年会費未納"
+                  description={`${unpaidAnnualFees}名の会員の年会費が未納です`}
+                  href="/finance/annual-fees"
+                  variant="warning"
+                />
+              )}
+              {unissuedReceipts > 0 && (
+                <AlertCard
+                  title="領収書未発行"
+                  description={`${unissuedReceipts}件の領収書が発行待ちです`}
+                  href="/receipts"
+                  variant="info"
+                />
+              )}
+              {deadlineAlerts.map(m => (
+                <AlertCard
+                  key={m.id}
+                  title="登録締切が近い例会"
+                  description={`「${m.title}」の締切は${m.registrationDeadline}です`}
+                  href={`/meetings/${m.id}`}
+                  variant="warning"
+                />
+              ))}
+              {unpaidAlerts.map(u => (
+                <AlertCard
+                  key={u.meetingId}
+                  title="未払い参加者が多い例会"
+                  description={`「${u.title}」に未払いが${u.unpaidCount}名います`}
+                  href={`/meetings/${u.meetingId}`}
+                  variant="error"
+                />
+              ))}
+              {capacityAlerts.map(m => (
+                <AlertCard
+                  key={m.id}
+                  title="定員に近い例会"
+                  description={`「${m.title}」は定員${m.capacity}名に対し${m.attendanceCount}名（${m.fillRate}%）です`}
+                  href={`/meetings/${m.id}`}
+                  variant="info"
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 次回例会 */}
