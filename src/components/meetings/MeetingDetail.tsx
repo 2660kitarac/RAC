@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
-  FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2
+  FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
+  Search, Download, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,16 +32,104 @@ interface MeetingDetailProps {
   userRole: UserRole;
 }
 
+const MEMBER_TYPE_LABELS: Record<string, string> = {
+  RAC: 'RAC',
+  RC: 'RC（ロータリアン）',
+  OBOG: 'OB・OG',
+  guest: 'ゲスト',
+  external: '外部',
+};
+
+const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
+  present: '出席',
+  absent:  '欠席',
+  undecided: '未回答',
+};
+
+const PARTICIPATION_TYPE_LABELS: Record<string, string> = {
+  meeting_only:        '例会のみ',
+  meeting_and_party:   '例会＋懇親会',
+  absent:              '欠席',
+  waitlist:            'キャンセル待ち',
+};
+
 export default function MeetingDetail({
   meeting, attendances, stats, report, userRole
 }: MeetingDetailProps) {
   const canManage = canManageMeetings(userRole);
   const canFinance = canManageFinance(userRole);
 
+  // 参加者名簿フィルター
+  const [nameSearch, setNameSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [sortKey, setSortKey] = useState<'name' | 'status' | 'payment' | 'fee'>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+
   const copyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success('URLをコピーしました');
   };
+
+  // CSV出力
+  const exportCSV = () => {
+    const rows = [
+      ['氏名', '所属', '区分', '参加形式', '出席状況', '支払状況', '登録料', '備考'],
+      ...attendances.map(a => [
+        (a as any).display_name || (a as any).user_name || (a as any).external_name || '',
+        (a as any).club_name || '',
+        MEMBER_TYPE_LABELS[(a as any).member_type] || (a as any).member_type || '',
+        PARTICIPATION_TYPE_LABELS[(a as any).participation_type || 'meeting_only'] || '',
+        ATTENDANCE_STATUS_LABELS[(a as any).attendance_status] || '',
+        (a as any).payment_status === 'paid' ? '支払済' : '未払い',
+        String((a as any).fee_amount ?? 0),
+        (a as any).note || '',
+      ])
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `参加者名簿_${meeting.title}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // フィルター & ソート
+  const filteredAttendances = attendances
+    .filter(a => {
+      const name = (a as any).display_name || (a as any).user_name || (a as any).external_name || '';
+      const club = (a as any).club_name || '';
+      const matchName = !nameSearch || name.includes(nameSearch) || club.includes(nameSearch);
+      const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter;
+      const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter;
+      return matchName && matchStatus && matchPayment;
+    })
+    .sort((a, b) => {
+      let va: string | number = '';
+      let vb: string | number = '';
+      if (sortKey === 'name') {
+        va = (a as any).display_name || ''; vb = (b as any).display_name || '';
+      } else if (sortKey === 'status') {
+        va = (a as any).attendance_status || ''; vb = (b as any).attendance_status || '';
+      } else if (sortKey === 'payment') {
+        va = (a as any).payment_status || ''; vb = (b as any).payment_status || '';
+      } else if (sortKey === 'fee') {
+        va = (a as any).fee_amount ?? 0; vb = (b as any).fee_amount ?? 0;
+      }
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) setSortAsc(v => !v);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+
+  const SortIcon = ({ k }: { k: typeof sortKey }) =>
+    sortKey === k
+      ? (sortAsc ? <ChevronUp className="h-3 w-3 inline ml-0.5" /> : <ChevronDown className="h-3 w-3 inline ml-0.5" />)
+      : null;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -219,83 +309,200 @@ export default function MeetingDetail({
           </div>
         </TabsContent>
 
-        {/* 出席管理タブ */}
-        <TabsContent value="attendances" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">出席者一覧</CardTitle>
+        {/* 出席管理タブ（参加者名簿） */}
+        <TabsContent value="attendances" className="mt-4 space-y-3">
+
+          {/* サマリーバー */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-center">
+              <p className="text-xs text-green-600">出席</p>
+              <p className="text-lg font-bold text-green-700">
+                {attendances.filter(a => (a as any).attendance_status === 'present').length}名
+              </p>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-center">
+              <p className="text-xs text-red-600">欠席</p>
+              <p className="text-lg font-bold text-red-700">
+                {attendances.filter(a => (a as any).attendance_status === 'absent').length}名
+              </p>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5 text-center">
+              <p className="text-xs text-orange-600">未払い</p>
+              <p className="text-lg font-bold text-orange-700">
+                {attendances.filter(a => (a as any).payment_status === 'unpaid').length}名
+              </p>
+            </div>
+          </div>
+
+          {/* 操作バー */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={nameSearch}
+                onChange={e => setNameSearch(e.target.value)}
+                placeholder="氏名・クラブで検索..."
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="all">出席：すべて</option>
+              <option value="present">出席のみ</option>
+              <option value="absent">欠席のみ</option>
+              <option value="undecided">未回答のみ</option>
+            </select>
+            <select
+              value={paymentFilter}
+              onChange={e => setPaymentFilter(e.target.value)}
+              className="text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="all">支払：すべて</option>
+              <option value="paid">支払済のみ</option>
+              <option value="unpaid">未払いのみ</option>
+            </select>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-gray-500">{filteredAttendances.length}名表示</span>
+              <Button size="sm" variant="outline" onClick={exportCSV}>
+                <Download className="h-4 w-4" />
+                CSV
+              </Button>
               <Link href={`/meetings/${meeting.id}/attendances`}>
                 <Button size="sm">
                   <Users className="h-4 w-4" />
-                  出席管理を開く
+                  出席管理
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent>
+            </div>
+          </div>
+
+          {/* 名簿テーブル */}
+          <Card>
+            <CardContent className="p-0">
               {attendances.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-6">
-                  まだ登録者はいません
-                </p>
+                <div className="text-center py-12 text-gray-400">
+                  <Users className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">まだ登録者はいません</p>
+                </div>
+              ) : filteredAttendances.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">条件に一致する参加者がいません</p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50">
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">氏名</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">所属</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">区分</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">出席</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">支払</th>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th
+                          className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none"
+                          onClick={() => toggleSort('name')}
+                        >
+                          氏名 <SortIcon k="name" />
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">所属</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">区分</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">参加形式</th>
+                        <th
+                          className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none"
+                          onClick={() => toggleSort('status')}
+                        >
+                          出席 <SortIcon k="status" />
+                        </th>
+                        <th
+                          className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none"
+                          onClick={() => toggleSort('payment')}
+                        >
+                          支払 <SortIcon k="payment" />
+                        </th>
+                        <th
+                          className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none"
+                          onClick={() => toggleSort('fee')}
+                        >
+                          登録料 <SortIcon k="fee" />
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {attendances.slice(0, 10).map(attendance => (
-                        <tr key={attendance.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 font-medium">
-                            {attendance.user?.name || attendance.external_name}
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredAttendances.map((attendance, idx) => {
+                        const a = attendance as any;
+                        const displayName = a.display_name || a.user_name || a.external_name || '（名前なし）';
+                        const isExternal = !a.user_id;
+                        const statusColor =
+                          a.attendance_status === 'present' ? 'bg-green-100 text-green-700' :
+                          a.attendance_status === 'absent'  ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-500';
+                        const payColor = a.payment_status === 'paid'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700';
+                        const participationColor: Record<string, string> = {
+                          meeting_only: 'bg-blue-100 text-blue-700',
+                          meeting_and_party: 'bg-purple-100 text-purple-700',
+                          absent: 'bg-gray-100 text-gray-500',
+                          waitlist: 'bg-yellow-100 text-yellow-700',
+                        };
+                        return (
+                          <tr key={a.id} className={`hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-gray-900">{displayName}</span>
+                                {isExternal && (
+                                  <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">外部</span>
+                                )}
+                              </div>
+                              {a.note && (
+                                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[160px]" title={a.note}>
+                                  {a.note}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-600 text-xs">
+                              {a.club_name || '-'}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Badge variant="secondary" className="text-xs">
+                                {MEMBER_TYPE_LABELS[a.member_type] || a.member_type || '-'}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Badge className={`text-xs ${participationColor[a.participation_type || 'meeting_only'] || 'bg-gray-100 text-gray-500'}`}>
+                                {PARTICIPATION_TYPE_LABELS[a.participation_type || 'meeting_only'] || '-'}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Badge className={`text-xs ${statusColor}`}>
+                                {ATTENDANCE_STATUS_LABELS[a.attendance_status] || a.attendance_status}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Badge className={`text-xs ${payColor}`}>
+                                {a.payment_status === 'paid' ? '支払済' : '未払い'}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums">
+                              {formatCurrency(a.fee_amount ?? 0)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {/* 合計行 */}
+                    {filteredAttendances.length > 0 && (
+                      <tfoot>
+                        <tr className="border-t-2 border-gray-200 bg-gray-50">
+                          <td colSpan={6} className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
+                            合計 {filteredAttendances.length}名
                           </td>
-                          <td className="px-3 py-2 text-gray-600 text-xs">
-                            {attendance.club_name || '-'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {attendance.member_type}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge
-                              className={
-                                attendance.attendance_status === 'present'
-                                  ? 'bg-green-100 text-green-700'
-                                  : attendance.attendance_status === 'absent'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-gray-100 text-gray-600'
-                              }
-                            >
-                              {attendance.attendance_status === 'present' ? '出席' :
-                               attendance.attendance_status === 'absent' ? '欠席' : '未回答'}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge
-                              className={
-                                attendance.payment_status === 'paid'
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-red-100 text-red-700'
-                              }
-                            >
-                              {attendance.payment_status === 'paid' ? '支払済' : '未払い'}
-                            </Badge>
+                          <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums">
+                            {formatCurrency(filteredAttendances.reduce((s, a) => s + ((a as any).fee_amount ?? 0), 0))}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
+                      </tfoot>
+                    )}
                   </table>
-                  {attendances.length > 10 && (
-                    <p className="text-center text-sm text-gray-500 py-2">
-                      他 {attendances.length - 10}件...
-                    </p>
-                  )}
                 </div>
               )}
             </CardContent>
