@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2 } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
 
 // 役職の選択肢
@@ -56,9 +56,16 @@ interface LoggedInUser {
   clubName: string | null;
 }
 
-// Meeting型を拡張して懇親会フィールドを含める
+// Meeting型を拡張して懇親会・詳細フィールドを含める
 type MeetingWithParty = Meeting & {
-  club?: { name: string; short_name?: string };
+  club?: { name: string; short_name?: string } | null;
+  // 詳細フィールド
+  venue_address?: string | null;
+  program_detail?: string | null;
+  committee?: string | null;
+  registration_deadline?: string | null;
+  capacity?: number | null;
+  // 懇親会
   has_after_party?: boolean;
   after_party_venue?: string | null;
   after_party_start_time?: string | null;
@@ -67,7 +74,6 @@ type MeetingWithParty = Meeting & {
   after_party_fee_obog?: number;
   after_party_fee_guest?: number;
   after_party_capacity?: number | null;
-  capacity?: number | null;
 };
 
 interface MuRegistrationFormProps {
@@ -89,6 +95,7 @@ function calcAfterPartyFee(memberType: string, meeting: MeetingWithParty): numbe
 export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuRegistrationFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [registrationData, setRegistrationData] = useState<{
     name: string;
     feeAmount: number;
@@ -288,6 +295,16 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
     );
   }
 
+  // 詳細セクションに表示する項目が1つ以上あるか判定
+  const hasDetails = !!(
+    meeting.venue_address ||
+    meeting.registration_deadline ||
+    meeting.capacity ||
+    meeting.committee ||
+    meeting.description ||
+    meeting.program_detail
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
@@ -298,14 +315,16 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           {meeting.theme && (
             <p className="text-blue-100 text-sm">テーマ: {meeting.theme}</p>
           )}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+          {/* 基本情報（常時表示） */}
+          <div className="mt-4 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-blue-100 text-sm">
-              <Calendar className="h-4 w-4" />
+              <Calendar className="h-4 w-4 shrink-0" />
               <span>{formatDate(meeting.date)}</span>
             </div>
             {meeting.start_time && (
               <div className="flex items-center gap-2 text-blue-100 text-sm">
-                <Clock className="h-4 w-4" />
+                <Clock className="h-4 w-4 shrink-0" />
                 <span>
                   {meeting.start_time.substring(0, 5)}
                   {meeting.end_time && ` 〜 ${meeting.end_time.substring(0, 5)}`}
@@ -314,29 +333,160 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             )}
             {meeting.venue_name && (
               <div className="flex items-center gap-2 text-blue-100 text-sm">
-                <MapPin className="h-4 w-4" />
+                <MapPin className="h-4 w-4 shrink-0" />
                 <span>{meeting.venue_name}</span>
               </div>
             )}
           </div>
 
-          {/* 懇親会情報ヘッダー */}
-          {hasAfterParty && (
-            <div className="mt-4 bg-purple-700 bg-opacity-50 rounded-lg px-4 py-3 flex items-start gap-2">
-              <PartyPopper className="h-4 w-4 text-purple-200 mt-0.5 shrink-0" />
-              <div className="text-sm text-purple-100">
-                <span className="font-semibold text-white">懇親会あり</span>
-                {meeting.after_party_venue && (
-                  <span className="ml-2">{meeting.after_party_venue}</span>
-                )}
-                {meeting.after_party_start_time && (
-                  <span className="ml-2">{meeting.after_party_start_time.substring(0, 5)} 〜</span>
-                )}
-              </div>
+          {/* 詳細アコーディオン トグルボタン */}
+          {hasDetails && (
+            <button
+              type="button"
+              onClick={() => setDetailOpen(v => !v)}
+              className="mt-4 flex items-center gap-1.5 text-sm text-blue-200 hover:text-white transition-colors"
+            >
+              {detailOpen
+                ? <><ChevronUp className="h-4 w-4" />詳細を閉じる</>
+                : <><ChevronDown className="h-4 w-4" />詳細を見る</>
+              }
+            </button>
+          )}
+
+          {/* アコーディオン展開パネル */}
+          {detailOpen && (
+            <div className="mt-3 bg-blue-700 bg-opacity-60 rounded-xl px-4 py-4 space-y-3 text-sm">
+              {/* 会場（住所含む） */}
+              {(meeting.venue_name || meeting.venue_address) && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-blue-300 shrink-0 mt-0.5" />
+                  <div>
+                    {meeting.venue_name && (
+                      <p className="text-white font-medium">{meeting.venue_name}</p>
+                    )}
+                    {meeting.venue_address && (
+                      <p className="text-blue-200 text-xs mt-0.5">{meeting.venue_address}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 登録締切 */}
+              {meeting.registration_deadline && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-blue-300 shrink-0" />
+                  <span className="text-blue-100">
+                    登録締切：<span className="text-white font-medium">{formatDate(meeting.registration_deadline)}</span>
+                  </span>
+                </div>
+              )}
+
+              {/* 定員 */}
+              {meeting.capacity && (
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-300 shrink-0" />
+                  <span className="text-blue-100">
+                    定員：<span className="text-white font-medium">{meeting.capacity}名</span>
+                  </span>
+                </div>
+              )}
+
+              {/* 担当委員会 */}
+              {meeting.committee && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-300 shrink-0" />
+                  <span className="text-blue-100">
+                    担当：<span className="text-white font-medium">{meeting.committee}</span>
+                  </span>
+                </div>
+              )}
+
+              {/* 例会内容 */}
+              {meeting.description && (
+                <div className="flex items-start gap-2">
+                  <FileText className="h-4 w-4 text-blue-300 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-blue-300 text-xs mb-1">例会内容</p>
+                    <p className="text-blue-100 whitespace-pre-wrap leading-relaxed">{meeting.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* プログラム詳細 */}
+              {meeting.program_detail && (
+                <div className="flex items-start gap-2">
+                  <Hash className="h-4 w-4 text-blue-300 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-blue-300 text-xs mb-1">プログラム詳細</p>
+                    <p className="text-blue-100 whitespace-pre-wrap leading-relaxed">{meeting.program_detail}</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* 懇親会カード（独立セクション） */}
+      {hasAfterParty && (
+        <div className="bg-purple-50 border-b border-purple-200">
+          <div className="max-w-2xl mx-auto px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center shrink-0">
+                <PartyPopper className="h-4 w-4 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-purple-800 text-sm">懇親会あり</p>
+                <div className="mt-2 space-y-1.5">
+                  {meeting.after_party_venue && (
+                    <div className="flex items-center gap-2 text-xs text-purple-700">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span>{meeting.after_party_venue}</span>
+                    </div>
+                  )}
+                  {meeting.after_party_start_time && (
+                    <div className="flex items-center gap-2 text-xs text-purple-700">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      <span>{meeting.after_party_start_time.substring(0, 5)} 〜</span>
+                    </div>
+                  )}
+                  {meeting.after_party_capacity && (
+                    <div className="flex items-center gap-2 text-xs text-purple-700">
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      <span>定員 {meeting.after_party_capacity}名</span>
+                    </div>
+                  )}
+                </div>
+                {/* 懇親会参加費チップ */}
+                {(
+                  (meeting.after_party_fee_rac ?? 0) > 0 ||
+                  (meeting.after_party_fee_rc ?? 0) > 0 ||
+                  (meeting.after_party_fee_obog ?? 0) > 0 ||
+                  (meeting.after_party_fee_guest ?? 0) > 0
+                ) && (
+                  <div className="mt-3">
+                    <p className="text-xs text-purple-600 font-medium mb-1.5">参加費</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(meeting.after_party_fee_rac ?? 0) > 0 && (
+                        <FeeChip label="RAC" amount={meeting.after_party_fee_rac!} color="purple" />
+                      )}
+                      {(meeting.after_party_fee_rc ?? 0) > 0 && (
+                        <FeeChip label="RC" amount={meeting.after_party_fee_rc!} color="purple" />
+                      )}
+                      {(meeting.after_party_fee_obog ?? 0) > 0 && (
+                        <FeeChip label="OB・OG" amount={meeting.after_party_fee_obog!} color="purple" />
+                      )}
+                      {(meeting.after_party_fee_guest ?? 0) > 0 && (
+                        <FeeChip label="ゲスト" amount={meeting.after_party_fee_guest!} color="purple" />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 登録料表示 */}
       <div className="bg-white border-b border-gray-200">
@@ -349,17 +499,6 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             {meeting.fee_guest > 0 && <FeeChip label="ゲスト" amount={meeting.fee_guest} />}
             {meeting.meal_fee > 0 && <FeeChip label="お弁当代" amount={meeting.meal_fee} suffix="（別途）" />}
           </div>
-          {hasAfterParty && (
-            <>
-              <p className="text-sm font-medium text-gray-700 mb-2 mt-3">懇親会参加費</p>
-              <div className="flex flex-wrap gap-3">
-                {(meeting.after_party_fee_rac ?? 0) > 0 && <FeeChip label="RAC" amount={meeting.after_party_fee_rac!} color="purple" />}
-                {(meeting.after_party_fee_rc ?? 0) > 0 && <FeeChip label="RC" amount={meeting.after_party_fee_rc!} color="purple" />}
-                {(meeting.after_party_fee_obog ?? 0) > 0 && <FeeChip label="OB・OG" amount={meeting.after_party_fee_obog!} color="purple" />}
-                {(meeting.after_party_fee_guest ?? 0) > 0 && <FeeChip label="ゲスト" amount={meeting.after_party_fee_guest!} color="purple" />}
-              </div>
-            </>
-          )}
         </div>
       </div>
 

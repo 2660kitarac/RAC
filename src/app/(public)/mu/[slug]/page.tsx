@@ -11,7 +11,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
   const db = await getDbFromContext();
 
   // 例会情報取得（公開情報のみ）
-  const meeting = await db
+  const meetingRaw = await db
     .select({
       id: meetings.id,
       title: meetings.title,
@@ -29,6 +29,8 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
       registrationDeadline: meetings.registrationDeadline,
       status: meetings.status,
       description: meetings.description,
+      programDetail: meetings.programDetail,
+      committee: meetings.committee,
       clubId: meetings.clubId,
       capacity: meetings.capacity,
       // 懇親会フィールド
@@ -45,7 +47,34 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     .where(and(eq(meetings.muRegistrationSlug, slug), isNull(meetings.deletedAt)))
     .then((r:any[])=>r[0]);
 
+  // camelCase → snake_case マッピング（MuRegistrationForm は snake_case を期待）
+  const meeting = meetingRaw ? {
+    ...meetingRaw,
+    start_time:              meetingRaw.startTime,
+    end_time:                meetingRaw.endTime,
+    venue_name:              meetingRaw.venueName,
+    venue_address:           meetingRaw.venueAddress,
+    fee_rac:                 meetingRaw.feeRac,
+    fee_rc:                  meetingRaw.feeRc,
+    fee_obog:                meetingRaw.feeObog,
+    fee_guest:               meetingRaw.feeGuest,
+    meal_fee:                meetingRaw.mealFee,
+    registration_deadline:   meetingRaw.registrationDeadline,
+    program_detail:          meetingRaw.programDetail,
+    club_id:                 meetingRaw.clubId,
+    // 懇親会（snake_case — MuRegistrationForm が has_after_party 等で参照）
+    has_after_party:         meetingRaw.hasAfterParty,
+    after_party_venue:       meetingRaw.afterPartyVenue,
+    after_party_start_time:  meetingRaw.afterPartyStartTime,
+    after_party_fee_rac:     meetingRaw.afterPartyFeeRac,
+    after_party_fee_rc:      meetingRaw.afterPartyFeeRc,
+    after_party_fee_obog:    meetingRaw.afterPartyFeeObog,
+    after_party_fee_guest:   meetingRaw.afterPartyFeeGuest,
+    after_party_capacity:    meetingRaw.afterPartyCapacity,
+  } : null;
+
   if (!meeting) notFound();
+  // 型アサーション用に meetingRaw の参照を meeting に統一済み
 
   // クラブ名取得
   const club = await db
