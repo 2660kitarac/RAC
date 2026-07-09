@@ -69,10 +69,12 @@ type MeetingWithParty = Meeting & {
   has_after_party?: boolean;
   after_party_venue?: string | null;
   after_party_start_time?: string | null;
+  after_party_fee_type?: 'fixed' | 'actual_cost';
   after_party_fee_rac?: number;
   after_party_fee_rc?: number;
   after_party_fee_obog?: number;
   after_party_fee_guest?: number;
+  after_party_allow_party_only?: boolean;
   after_party_capacity?: number | null;
 };
 
@@ -105,6 +107,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   } | null>(null);
 
   const hasAfterParty = !!(meeting.has_after_party);
+  const afterPartyFeeType = meeting.after_party_fee_type ?? 'fixed';
+  const allowPartyOnly = meeting.after_party_allow_party_only ?? false;
 
   const {
     register,
