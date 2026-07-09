@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest) {
       if (!targetClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
 
       const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-      const allowedClubFields = ['name', 'shortName', 'email', 'phone', 'address', 'contactName', 'memo'];
+      const allowedClubFields = ['name', 'shortName', 'email', 'phone', 'address', 'contactName', 'memo', 'muFeePersonalBurden'];
       for (const field of allowedClubFields) {
         if (field in clubData) updateData[field] = clubData[field];
       }

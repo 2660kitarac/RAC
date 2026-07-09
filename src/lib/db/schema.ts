@@ -21,6 +21,8 @@ export const clubs = pgTable('clubs', {
   memo: text('memo'),
   isActive: boolean('is_active').notNull().default(true),
   isSystemClub: boolean('is_system_club').notNull().default(false),
+  // MU費を個人負担にするか（true=個人負担→会計に計上しない、false=クラブ負担→会計に自動計上）
+  muFeePersonalBurden: boolean('mu_fee_personal_burden').notNull().default(false),
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
@@ -464,6 +466,36 @@ export const emailRecipientsRelations = relations(emailRecipients, ({ one }) => 
 }));
 
 // ============================================================
+// mu_visits テーブル（他クラブMU訪問報告）
+// ============================================================
+export const muVisits = pgTable('mu_visits', {
+  id: text('id').primaryKey(),
+  // 所属クラブ（会計計上先）
+  clubId: text('club_id').notNull().references(() => clubs.id),
+  // 報告した会員
+  userId: text('user_id').notNull().references(() => users.id),
+  // 訪問先クラブ名（自由入力）
+  visitedClubName: text('visited_club_name').notNull(),
+  // 例会日
+  visitDate: text('visit_date').notNull(),
+  // MU費（立替金額）
+  feeAmount: integer('fee_amount').notNull().default(0),
+  // メモ・備考
+  note: text('note'),
+  // 精算ステータス: pending=未精算 / settled=精算済み / personal=個人負担（会計不要）
+  settlementStatus: text('settlement_status').notNull().default('pending'),
+  // 精算日
+  settledAt: text('settled_at'),
+  // 精算処理した管理者
+  settledBy: text('settled_by').references(() => users.id),
+  // 会計トランザクションID（自動計上時に紐付け）
+  transactionId: text('transaction_id').references(() => transactions.id),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+// ============================================================
 // 型エクスポート
 // ============================================================
 export type Club = typeof clubs.$inferSelect;
@@ -490,3 +522,5 @@ export type ClubReport = typeof clubReports.$inferSelect;
 export type NewClubReport = typeof clubReports.$inferInsert;
 export type InstagramPost = typeof instagramPosts.$inferSelect;
 export type NewInstagramPost = typeof instagramPosts.$inferInsert;
+export type MuVisit = typeof muVisits.$inferSelect;
+export type NewMuVisit = typeof muVisits.$inferInsert;

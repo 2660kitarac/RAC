@@ -41,6 +41,7 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
     address: club?.address ?? '',
     contact_name: club?.contact_name ?? '',
     memo: club?.memo ?? '',
+    muFeePersonalBurden: (club as any)?.muFeePersonalBurden ?? false,
   });
   const [clubLoading, setClubLoading] = useState(false);
 
@@ -242,6 +243,30 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
                     rows={3} />
                 </div>
               </div>
+
+              {/* MU費負担方式 */}
+              <div className="border rounded-lg p-4 bg-orange-50">
+                <h3 className="text-sm font-semibold text-gray-800 mb-1">MU費負担方式</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  会員が他クラブにMU訪問した際のMU費の負担方式を設定します。
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={clubForm.muFeePersonalBurden}
+                    onChange={e => setClubForm(f => ({ ...f, muFeePersonalBurden: e.target.checked }))}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">MU費を個人負担にする</p>
+                    <p className="text-xs text-gray-500">
+                      OFFの場合: クラブ負担（会計に自動計上・後日精算）<br />
+                      ONの場合: 個人負担（会計不計上・訪問回数のみ管理）
+                    </p>
+                  </div>
+                </label>
+              </div>
+
               <div className="flex justify-end pt-2">
                 <Button onClick={handleClubSave} disabled={clubLoading}>
                   {clubLoading ? '保存中...' : 'クラブ設定を保存'}

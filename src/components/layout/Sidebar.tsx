@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users, Building2, Receipt,
   Mail, FileText, BarChart3, Settings, ChevronDown,
   ChevronRight, LogOut, Award, Globe, CreditCard, UserCheck,
-  Heart, TrendingUp, Bell, Key, ShieldCheck
+  Heart, TrendingUp, Bell, Key, ShieldCheck, MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
@@ -60,6 +60,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
       icon: Globe,
       children: [
         { label: 'MU登録者一覧', href: '/attendances', icon: Users },
+        { label: '他クラブMU訪問管理', href: '/members/mu-visits', icon: MapPin },
       ],
     },
     {

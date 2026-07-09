@@ -27,6 +27,7 @@ export default async function Settings() {
         name: clubs.name,
         shortName: clubs.shortName,
         slug: clubs.slug,
+        muFeePersonalBurden: clubs.muFeePersonalBurden,
       },
     })
     .from(users)
