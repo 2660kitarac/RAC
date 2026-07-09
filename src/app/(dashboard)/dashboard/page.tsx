@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs, meetings, annualFees, transactions, attendances, emails, receipts } from '@/lib/db/schema';
-import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc, lt, sql } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc, gt, sql } from 'drizzle-orm';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
 import MemberDashboard from '@/components/dashboard/MemberDashboard';
@@ -137,9 +137,6 @@ export default async function DashboardPage() {
     unissuedReceiptsResult,
     recentMuResult,
     recentEmailsResult,
-    deadlineAlertMeetings,
-    unpaidAlertMeetings,
-    capacityMeetings,
   ] = await Promise.all([
     // 次回例会
     clubId
@@ -254,111 +251,106 @@ export default async function DashboardPage() {
           .where(and(eq(emails.status, 'sent'), isNull(emails.deletedAt)))
           .orderBy(desc(emails.sentAt))
           .limit(5),
-
-    // アラート①: 登録締切が3日以内のopenな例会
-    clubId
-      ? db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
-          .from(meetings)
-          .where(and(
-            eq(meetings.clubId, clubId),
-            isNull(meetings.deletedAt),
-            eq(meetings.status, 'open'),
-            isNotNull(meetings.registrationDeadline),
-            gte(meetings.registrationDeadline, todayStr),
-            lte(meetings.registrationDeadline, threeDaysLaterStr),
-          ))
-          .orderBy(asc(meetings.registrationDeadline))
-          .limit(5)
-      : db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
-          .from(meetings)
-          .where(and(
-            isNull(meetings.deletedAt),
-            eq(meetings.status, 'open'),
-            isNotNull(meetings.registrationDeadline),
-            gte(meetings.registrationDeadline, todayStr),
-            lte(meetings.registrationDeadline, threeDaysLaterStr),
-          ))
-          .orderBy(asc(meetings.registrationDeadline))
-          .limit(5),
-
-    // アラート②: 未払い参加者が5人以上の例会（未来の例会のみ）
-    clubId
-      ? db.select({
-            meetingId: attendances.meetingId,
-            unpaidCount: count(),
-          })
-          .from(attendances)
-          .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
-          .where(and(
-            eq(meetings.clubId, clubId),
-            isNull(meetings.deletedAt),
-            isNull(attendances.deletedAt),
-            eq(attendances.paymentStatus, 'unpaid'),
-            gte(meetings.date, todayStr),
-          ))
-          .groupBy(attendances.meetingId)
-          .having(sql`count(*) >= 5`)
-          .limit(5)
-      : db.select({
-            meetingId: attendances.meetingId,
-            unpaidCount: count(),
-          })
-          .from(attendances)
-          .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
-          .where(and(
-            isNull(meetings.deletedAt),
-            isNull(attendances.deletedAt),
-            eq(attendances.paymentStatus, 'unpaid'),
-            gte(meetings.date, todayStr),
-          ))
-          .groupBy(attendances.meetingId)
-          .having(sql`count(*) >= 5`)
-          .limit(5),
-
-    // アラート③: 定員90%以上の例会（未来のopen例会）
-    clubId
-      ? db.select({
-            id: meetings.id,
-            title: meetings.title,
-            date: meetings.date,
-            capacity: meetings.capacity,
-            attendanceCount: count(attendances.id),
-          })
-          .from(meetings)
-          .leftJoin(attendances, and(
-            eq(attendances.meetingId, meetings.id),
-            isNull(attendances.deletedAt),
-          ))
-          .where(and(
-            eq(meetings.clubId, clubId),
-            isNull(meetings.deletedAt),
-            isNotNull(meetings.capacity),
-            inArray(meetings.status, ['open', 'closed']),
-            gte(meetings.date, todayStr),
-          ))
-          .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
-          .limit(10)
-      : db.select({
-            id: meetings.id,
-            title: meetings.title,
-            date: meetings.date,
-            capacity: meetings.capacity,
-            attendanceCount: count(attendances.id),
-          })
-          .from(meetings)
-          .leftJoin(attendances, and(
-            eq(attendances.meetingId, meetings.id),
-            isNull(attendances.deletedAt),
-          ))
-          .where(and(
-            isNull(meetings.deletedAt),
-            isNotNull(meetings.capacity),
-            inArray(meetings.status, ['open', 'closed']),
-            gte(meetings.date, todayStr),
-          ))
-          .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
-          .limit(10),
   ]);
+
+  // アラート用クエリ（DBカラム未追加時でもクラッシュしないようtry/catchで保護）
+  let deadlineAlertMeetings: any[] = [];
+  let unpaidAlertMeetings: any[] = [];
+  let capacityMeetings: any[] = [];
+  try {
+    [deadlineAlertMeetings, unpaidAlertMeetings, capacityMeetings] = await Promise.all([
+      // アラート①: 登録締切が3日以内のopenな例会
+      clubId
+        ? db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
+            .from(meetings)
+            .where(and(
+              eq(meetings.clubId, clubId),
+              isNull(meetings.deletedAt),
+              eq(meetings.status, 'open'),
+              isNotNull(meetings.registrationDeadline),
+              gte(meetings.registrationDeadline, todayStr),
+              lte(meetings.registrationDeadline, threeDaysLaterStr),
+            ))
+            .orderBy(asc(meetings.registrationDeadline))
+            .limit(5)
+        : db.select({ id: meetings.id, title: meetings.title, date: meetings.date, registrationDeadline: meetings.registrationDeadline })
+            .from(meetings)
+            .where(and(
+              isNull(meetings.deletedAt),
+              eq(meetings.status, 'open'),
+              isNotNull(meetings.registrationDeadline),
+              gte(meetings.registrationDeadline, todayStr),
+              lte(meetings.registrationDeadline, threeDaysLaterStr),
+            ))
+            .orderBy(asc(meetings.registrationDeadline))
+            .limit(5),
+
+      // アラート②: 未払い参加者が5人以上の例会（未来の例会のみ）
+      clubId
+        ? db.select({ meetingId: attendances.meetingId, unpaidCount: count() })
+            .from(attendances)
+            .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
+            .where(and(
+              eq(meetings.clubId, clubId),
+              isNull(meetings.deletedAt),
+              isNull(attendances.deletedAt),
+              eq(attendances.paymentStatus, 'unpaid'),
+              gte(meetings.date, todayStr),
+            ))
+            .groupBy(attendances.meetingId)
+            .having(gt(count(), 4))
+            .limit(5)
+        : db.select({ meetingId: attendances.meetingId, unpaidCount: count() })
+            .from(attendances)
+            .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
+            .where(and(
+              isNull(meetings.deletedAt),
+              isNull(attendances.deletedAt),
+              eq(attendances.paymentStatus, 'unpaid'),
+              gte(meetings.date, todayStr),
+            ))
+            .groupBy(attendances.meetingId)
+            .having(gt(count(), 4))
+            .limit(5),
+
+      // アラート③: 定員90%以上の例会（未来のopen例会）
+      clubId
+        ? db.select({
+              id: meetings.id, title: meetings.title, date: meetings.date,
+              capacity: meetings.capacity, attendanceCount: count(attendances.id),
+            })
+            .from(meetings)
+            .leftJoin(attendances, and(eq(attendances.meetingId, meetings.id), isNull(attendances.deletedAt)))
+            .where(and(
+              eq(meetings.clubId, clubId),
+              isNull(meetings.deletedAt),
+              isNotNull(meetings.capacity),
+              inArray(meetings.status, ['open', 'closed']),
+              gte(meetings.date, todayStr),
+            ))
+            .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
+            .limit(10)
+        : db.select({
+              id: meetings.id, title: meetings.title, date: meetings.date,
+              capacity: meetings.capacity, attendanceCount: count(attendances.id),
+            })
+            .from(meetings)
+            .leftJoin(attendances, and(eq(attendances.meetingId, meetings.id), isNull(attendances.deletedAt)))
+            .where(and(
+              isNull(meetings.deletedAt),
+              isNotNull(meetings.capacity),
+              inArray(meetings.status, ['open', 'closed']),
+              gte(meetings.date, todayStr),
+            ))
+            .groupBy(meetings.id, meetings.title, meetings.date, meetings.capacity)
+            .limit(10),
+    ]);
+  } catch {
+    // アラートクエリ失敗時は空配列で続行（DBカラム未追加でもクラッシュしない）
+    deadlineAlertMeetings = [];
+    unpaidAlertMeetings = [];
+    capacityMeetings = [];
+  }
 
   const monthlyIncome = transactionsResult
     .filter(t => t.transactionType === 'income')

@@ -33,6 +33,8 @@ export default function EmailCompose({
   const [body, setBody] = useState('');
   const [targetType, setTargetType] = useState('all');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [meetingAttendees, setMeetingAttendees] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [loading, setSending] = useState(false);
 
   // CC/BCC フィールド
@@ -73,6 +75,18 @@ export default function EmailCompose({
     }
   }, [selectedTemplateId, selectedMeetingId]);
 
+  // 例会参加者を自動取得（targetType === 'meeting_attendees' かつ例会が選択済み）
+  useEffect(() => {
+    if (targetType === 'meeting_attendees' && selectedMeetingId) {
+      setLoadingAttendees(true);
+      fetch(`/api/meetings/${selectedMeetingId}/attendees-emails`)
+        .then(r => r.json())
+        .then(data => setMeetingAttendees(data.attendees || []))
+        .catch(() => setMeetingAttendees([]))
+        .finally(() => setLoadingAttendees(false));
+    }
+  }, [targetType, selectedMeetingId]);
+
   const getRecipients = () => {
     switch (targetType) {
       case 'all': return members;
@@ -80,6 +94,7 @@ export default function EmailCompose({
       case 'rc': return members.filter(m => m.member_type === 'RC');
       case 'obog': return members.filter(m => m.member_type === 'OB_OG');
       case 'custom': return members.filter(m => selectedMembers.includes(m.id));
+      case 'meeting_attendees': return meetingAttendees;
       default: return members;
     }
   };
@@ -267,6 +282,11 @@ export default function EmailCompose({
                     <SelectItem value="obog">
                       OB・OG ({members.filter(m => m.member_type === 'OB_OG').length}名)
                     </SelectItem>
+                    {selectedMeetingId && (
+                      <SelectItem value="meeting_attendees">
+                        この例会の参加者{loadingAttendees ? '（取得中…）' : `（${meetingAttendees.length}名）`}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

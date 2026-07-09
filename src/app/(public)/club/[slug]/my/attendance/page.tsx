@@ -1,12 +1,13 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, attendances, meetings, clubs } from '@/lib/db/schema';
-import { eq, and, isNull, desc, count } from 'drizzle-orm';
+import { eq, and, isNull, desc, count, gte, asc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { ArrowLeft, History } from 'lucide-react';
+import { ArrowLeft, History, CalendarCheck } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
+import MyUpcomingAttendances from '@/components/public/MyUpcomingAttendances';
 
 const PAGE_SIZE = 20;
 
@@ -27,8 +28,33 @@ export default async function MyAttendancePage({
 
   const db = await getDbFromContext();
   const userEmail = session.user.email!;
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  // MU登録履歴（メールアドレスで紐付け・user_id が null のもの）
+  // 今後の参加予定（今日以降の例会）
+  const upcomingAttendances = await db
+    .select({
+      id: attendances.id,
+      meetingId: attendances.meetingId,
+      feeAmount: attendances.feeAmount,
+      paymentStatus: attendances.paymentStatus,
+      attendanceType: attendances.participationType,
+      meetingTitle: meetings.title,
+      meetingDate: meetings.date,
+      clubName: clubs.name,
+      clubShortName: clubs.shortName,
+    })
+    .from(attendances)
+    .leftJoin(meetings, eq(attendances.meetingId, meetings.id))
+    .leftJoin(clubs, eq(meetings.clubId, clubs.id))
+    .where(and(
+      isNull(attendances.userId),
+      eq(attendances.externalEmail, userEmail),
+      isNull(attendances.deletedAt),
+      isNull(meetings.deletedAt),
+      gte(meetings.date, todayStr),
+    ))
+    .orderBy(asc(meetings.date));
+
   const [muHistory, countResult] = await Promise.all([
     db
       .select({
@@ -88,6 +114,16 @@ export default async function MyAttendancePage({
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+
+        {/* 今後の参加予定 */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+            <CalendarCheck className="h-4 w-4 text-blue-500" />
+            今後の参加予定
+          </h2>
+          <MyUpcomingAttendances attendances={upcomingAttendances as any} slug={slug} />
+        </div>
+
         {/* サマリー */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-xl border p-3 text-center">
@@ -104,6 +140,12 @@ export default async function MyAttendancePage({
           </div>
         </div>
 
+        {/* MU登録・出席履歴 */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+            <History className="h-4 w-4 text-green-600" />
+            MU登録・出席履歴
+          </h2>
         {/* 一覧 */}
         {muHistory.length === 0 ? (
           <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
@@ -145,6 +187,7 @@ export default async function MyAttendancePage({
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   );

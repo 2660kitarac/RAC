@@ -37,6 +37,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -55,6 +56,22 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
     }).catch(() => {
       toast.error('コピーに失敗しました');
     });
+  };
+
+  // 例会コピー
+  const handleCopy = async (id: string, title: string) => {
+    setCopyingId(id);
+    try {
+      const res = await fetch(`/api/meetings/${id}/copy`, { method: 'POST' });
+      if (!res.ok) throw new Error('コピーに失敗しました');
+      const data = await res.json();
+      toast.success(`「${title}」をコピーしました。内容を編集してください。`);
+      router.push(`/meetings/${data.id}/edit`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setCopyingId(null);
+    }
   };
 
   // 例会削除
@@ -256,6 +273,18 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                               )}
                               {canManage && (
                                 <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="コピーして作成"
+                                  disabled={copyingId === meeting.id}
+                                  onClick={() => handleCopy(meeting.id, meeting.title)}
+                                  className="text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canManage && (
+                                <Button
                                   data-delete-btn="true"
                                   variant="ghost"
                                   size="icon-sm"
@@ -349,6 +378,18 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                         <Link href={`/meetings/${meeting.id}/edit`} className="flex-1">
                           <Button size="sm" className="w-full">編集</Button>
                         </Link>
+                      )}
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={copyingId === meeting.id}
+                          onClick={() => handleCopy(meeting.id, meeting.title)}
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                          title="コピーして作成"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
                       )}
                       {canManage && (
                         <Button
