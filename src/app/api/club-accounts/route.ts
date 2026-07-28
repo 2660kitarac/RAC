@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'このメールアドレスはすでに登録されています' }, { status: 409 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 10);
     const userId = nanoid();
 
     await db.insert(users).values({

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // パスワードハッシュ化
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     // ユーザー作成
     const userId = randomUUID();

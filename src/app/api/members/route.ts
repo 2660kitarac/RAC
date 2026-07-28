@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (!name || !email) return NextResponse.json({ error: '名前とメールは必須です' }, { status: 400 });
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 10);
     const id = randomUUID();
     const clubId = body.clubId || session.user.clubId;
 

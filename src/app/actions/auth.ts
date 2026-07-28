@@ -90,7 +90,7 @@ export async function registerUser(input: RegisterInput) {
     }
 
     // パスワードハッシュ化
-    const passwordHash = await bcrypt.hash(input.password, 12);
+    const passwordHash = await bcrypt.hash(input.password, 10);
 
     // ユーザー作成
     const userId = nanoid();

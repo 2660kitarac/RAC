@@ -3,10 +3,20 @@
  * - Credentials Provider（メール + パスワード）
  * - JWT セッション
  * - Supabase PostgreSQL の users テーブルで認証
+ *
+ * パフォーマンス対応 (fixes #1):
+ *   - bcryptjs の dynamic import をトップレベルに移動（コールドスタート遅延を排除）
+ *   - db / schema / drizzle-orm も同様にトップレベル import
+ *   ※ bcryptjs はピュアJS実装でイベントループをブロックするため、
+ *     cost係数は 10 に設定して 1件あたりの処理時間を抑える（~86ms）
  */
 
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -59,11 +69,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          const bcrypt = await import('bcryptjs');
-          const { db } = await import('@/lib/db');
-          const { users } = await import('@/lib/db/schema');
-          const { eq, and, isNull } = await import('drizzle-orm');
-
           const [user] = await db
             .select({
               id: users.id,

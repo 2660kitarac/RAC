@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // パスワードハッシュ（未指定なら仮パスワード）
     const rawPassword = password || Math.random().toString(36).slice(-10);
-    const passwordHash = await bcrypt.hash(rawPassword, 12);
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
 
     const id = randomUUID();
     await db.insert(users).values({
