@@ -123,6 +123,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     email: string;
     clubId: string | null;
     clubName: string | null;
+    role: string;
   } | null = null;
 
   try {
@@ -134,6 +135,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
           name: users.name,
           email: users.email,
           clubId: users.clubId,
+          role: users.role,
         })
         .from(users)
         .where(eq(users.id, session.user.id))
@@ -150,7 +152,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
             .then((r:any[])=>r[0]);
           clubName = userClub?.name ?? null;
         }
-        loggedInUser = { ...userRow, clubName };
+        loggedInUser = { ...userRow, clubName, role: userRow.role };
       }
     }
   } catch {
