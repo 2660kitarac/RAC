@@ -383,13 +383,13 @@ export default function AttendanceManagement({
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">区分</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">参加形態</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">出席確認</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">支払</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">合計金額</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">メモ</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">メモ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -405,6 +405,17 @@ export default function AttendanceManagement({
                             {a.receipt_required && (
                               <span className="text-xs text-blue-600">領収書希望</span>
                             )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(a)}
+                              title="参加者情報を編集"
+                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant="secondary" className="text-xs">
@@ -465,19 +476,8 @@ export default function AttendanceManagement({
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-500 max-w-32">
+                          <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-500 max-w-32">
                             {a.note && <span title={a.note}>{a.note.length > 20 ? a.note.substring(0, 20) + '…' : a.note}</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditModal(a)}
-                              title="参加者情報を編集"
-                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
                           </td>
                         </tr>
                       );
