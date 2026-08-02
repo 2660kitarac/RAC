@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 
 import {
   Search, ArrowLeft, Download, Users, DollarSign,
-  CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass, AlertCircle
+  CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass, AlertCircle,
+  Pencil, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,75 @@ export default function AttendanceManagement({
   const [participationFilter, setParticipationFilter] = useState<string>('all');
   const [loading, setLoading] = useState<string | null>(null);
   const [receptionMode, setReceptionMode] = useState(false);
+
+  // 参加者基本情報編集モーダル用
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    externalName: '',
+    externalEmail: '',
+    externalPhone: '',
+    clubName: '',
+    memberType: '',
+    note: '',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEditModal = (a: any) => {
+    setEditTarget(a);
+    setEditForm({
+      externalName: a.external_name || '',
+      externalEmail: a.external_email || '',
+      externalPhone: a.external_phone || '',
+      clubName: a.club_name || '',
+      memberType: a.member_type || 'RAC',
+      note: a.note || '',
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditTarget(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setEditSaving(true);
+    const payload: Record<string, string> = {};
+    // userId があるユーザー（会員登録済み）は名前変更不可
+    if (!editTarget.user_id) {
+      payload.externalName = editForm.externalName;
+      payload.externalEmail = editForm.externalEmail;
+      payload.externalPhone = editForm.externalPhone;
+    }
+    payload.clubName = editForm.clubName;
+    payload.memberType = editForm.memberType;
+    payload.note = editForm.note;
+
+    const res = await fetch(`/api/attendances/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      toast.error('更新に失敗しました');
+    } else {
+      setAttendances(prev => prev.map(a =>
+        (a as any).id === editTarget.id
+          ? {
+              ...a,
+              external_name: editForm.externalName || (a as any).external_name,
+              external_email: editForm.externalEmail || (a as any).external_email,
+              external_phone: editForm.externalPhone || (a as any).external_phone,
+              club_name: editForm.clubName,
+              member_type: editForm.memberType,
+              note: editForm.note,
+            }
+          : a
+      ));
+      toast.success('参加者情報を更新しました');
+      closeEditModal();
+    }
+    setEditSaving(false);
+  };
 
   const filtered = useMemo(() => {
     return attendances.filter(a => {
@@ -319,6 +389,7 @@ export default function AttendanceManagement({
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">支払</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">合計金額</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">メモ</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -397,13 +468,24 @@ export default function AttendanceManagement({
                           <td className="px-4 py-3 text-xs text-gray-500 max-w-32">
                             {a.note && <span title={a.note}>{a.note.length > 20 ? a.note.substring(0, 20) + '…' : a.note}</span>}
                           </td>
+                          <td className="px-4 py-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(a)}
+                              title="参加者情報を編集"
+                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot className="bg-gray-50 border-t border-gray-200">
                     <tr>
-                      <td colSpan={5} className="px-4 py-2 text-sm font-medium text-gray-700">
+                      <td colSpan={6} className="px-4 py-2 text-sm font-medium text-gray-700">
                         参加 {filtered.filter(a => {
                           const pt = (a as any).participation_type || (a as any).participationType;
                           return pt !== 'absent' && pt !== 'waitlist';
@@ -418,6 +500,7 @@ export default function AttendanceManagement({
                         }, 0))}
                       </td>
                       <td />
+                      <td />
                     </tr>
                   </tfoot>
                 </table>
@@ -425,6 +508,128 @@ export default function AttendanceManagement({
             </Card>
           )}
         </>
+      )}
+
+      {/* 参加者基本情報編集モーダル */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            {/* モーダルヘッダー */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div className="flex items-center gap-2">
+                <Pencil className="h-4 w-4 text-blue-600" />
+                <h2 className="font-bold text-gray-900 text-base">参加者情報の編集</h2>
+              </div>
+              <button
+                onClick={closeEditModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* モーダルボディ */}
+            <div className="px-5 py-4 space-y-4">
+              {/* お名前 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  お名前
+                  {editTarget.user_id && (
+                    <span className="ml-2 text-xs text-gray-400 font-normal">（会員登録済みのため変更不可）</span>
+                  )}
+                </label>
+                {editTarget.user_id ? (
+                  <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 border border-gray-200">
+                    {editTarget.user?.name || editTarget.external_name || '（未設定）'}
+                  </div>
+                ) : (
+                  <Input
+                    value={editForm.externalName}
+                    onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
+                    placeholder="例: 山田 太郎"
+                  />
+                )}
+              </div>
+
+              {/* メールアドレス */}
+              {!editTarget.user_id && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                  <Input
+                    type="email"
+                    value={editForm.externalEmail}
+                    onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
+                    placeholder="例: taro@example.com"
+                  />
+                </div>
+              )}
+
+              {/* 電話番号 */}
+              {!editTarget.user_id && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                  <Input
+                    type="tel"
+                    value={editForm.externalPhone}
+                    onChange={e => setEditForm(f => ({ ...f, externalPhone: e.target.value }))}
+                    placeholder="例: 090-1234-5678"
+                  />
+                </div>
+              )}
+
+              {/* 所属クラブ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">所属クラブ</label>
+                <Input
+                  value={editForm.clubName}
+                  onChange={e => setEditForm(f => ({ ...f, clubName: e.target.value }))}
+                  placeholder="例: ○○ローターアクトクラブ"
+                />
+              </div>
+
+              {/* 区分 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">区分</label>
+                <Select
+                  value={editForm.memberType}
+                  onValueChange={v => setEditForm(f => ({ ...f, memberType: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="区分を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RAC">RAC</SelectItem>
+                    <SelectItem value="RC">RC</SelectItem>
+                    <SelectItem value="OB_OG">OB・OG</SelectItem>
+                    <SelectItem value="GUEST">ゲスト</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* メモ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <textarea
+                  value={editForm.note}
+                  onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="備考など"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* モーダルフッター */}
+            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-xl">
+              <Button variant="outline" size="sm" onClick={closeEditModal} disabled={editSaving}>
+                キャンセル
+              </Button>
+              <Button size="sm" onClick={saveEdit} disabled={editSaving}>
+                {editSaving ? '保存中…' : '保存する'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -20,6 +20,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       'receiptName', 'note', 'memberType',
       // 参加形態（懇親会対応）
       'participationType', 'afterPartyFeeAmount',
+      // 参加者基本情報（管理者による修正用 Issue #2）
+      'externalName', 'externalEmail', 'externalPhone', 'clubName',
     ];
     for (const field of allowedFields) {
       if (field in body) updateData[field] = body[field];
