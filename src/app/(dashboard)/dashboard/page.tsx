@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, meetings, annualFees, transactions, attendances, emails, receipts } from '@/lib/db/schema';
+import { users, clubs, meetings, annualFees, transactions, attendances, emails, receipts, muVisits } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc, gt, sql } from 'drizzle-orm';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
@@ -112,6 +112,7 @@ export default async function DashboardPage() {
 
   // アナウンス用データ（クラブアカウント / 管理者向け）
   let pendingMembersCount = 0;
+  let pendingMuVisitsCount = 0;
 
   if (isClubAccount || isAdminRole) {
     const pendingResult = clubId
@@ -124,6 +125,34 @@ export default async function DashboardPage() {
           .from(users)
           .where(and(eq(users.status, 'pending'), isNull(users.deletedAt)));
     pendingMembersCount = pendingResult[0]?.value || 0;
+
+    // 未精算MU訪問件数（クラブ負担モードのみカウント）
+    if (clubId) {
+      try {
+        // クラブのmuFeePersonalBurdenを確認
+        const clubFlagResult = await db
+          .select({ muFeePersonalBurden: clubs.muFeePersonalBurden })
+          .from(clubs)
+          .where(eq(clubs.id, clubId))
+          .limit(1);
+        const isPersonalBurden = clubFlagResult[0]?.muFeePersonalBurden ?? false;
+
+        if (!isPersonalBurden) {
+          const muResult = await db
+            .select({ value: count() })
+            .from(muVisits)
+            .where(and(
+              eq(muVisits.clubId, clubId),
+              eq(muVisits.settlementStatus, 'pending'),
+              isNull(muVisits.deletedAt),
+            ));
+          pendingMuVisitsCount = muResult[0]?.value || 0;
+        }
+      } catch {
+        // テーブル未作成時でもクラッシュしない
+        pendingMuVisitsCount = 0;
+      }
+    }
   }
 
 
@@ -396,6 +425,7 @@ export default async function DashboardPage() {
         unissuedReceipts={unissuedReceiptsResult[0]?.value || 0}
         nextMeeting={nextMeeting as any}
         memberAnnualFeeStatus={null}
+        pendingMuVisits={pendingMuVisitsCount}
       />
 
       <DashboardContent

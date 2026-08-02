@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {
   UserCheck, AlertCircle, Receipt, Calendar, CreditCard,
-  Clock, Bell, ChevronRight, CheckCircle
+  Clock, Bell, ChevronRight, CheckCircle, MapPin
 } from 'lucide-react';
 
 interface Meeting {
@@ -21,6 +21,7 @@ interface AnnouncementBannerProps {
   unissuedReceipts: number;
   nextMeeting: Meeting | null;
   memberAnnualFeeStatus: { paid: boolean; year: number } | null;
+  pendingMuVisits?: number;
 }
 
 interface Announcement {
@@ -40,6 +41,7 @@ export default function AnnouncementBanner({
   unissuedReceipts,
   nextMeeting,
   memberAnnualFeeStatus,
+  pendingMuVisits = 0,
 }: AnnouncementBannerProps) {
   const announcements: Announcement[] = [];
 
@@ -105,6 +107,19 @@ export default function AnnouncementBanner({
         description: '支払い済みで領収書がまだ発行されていない件があります。',
         href: '/receipts',
         linkText: '領収書を発行する',
+      });
+    }
+
+    // 5. 未精算MU訪問
+    if (pendingMuVisits > 0) {
+      announcements.push({
+        id: 'pending-mu-visits',
+        type: 'warning',
+        icon: MapPin,
+        title: `未精算のMU訪問が ${pendingMuVisits}件 あります`,
+        description: '他クラブMU訪問の立替費用が未精算です。確認・精算処理を行ってください。',
+        href: '/members/mu-visits',
+        linkText: 'MU訪問管理へ',
       });
     }
   }
