@@ -161,8 +161,17 @@ export default function MeetingDetail({
         body: JSON.stringify({ [field]: value }),
       });
       if (!res.ok) throw new Error();
+      // camelCase と snake_case 両方を更新（表示側は snake_case を参照している）
+      const snakeMap: Record<string, string> = {
+        attendanceStatus: 'attendance_status',
+        paymentStatus: 'payment_status',
+        participationType: 'participation_type',
+      };
       setLocalAttendances(prev =>
-        prev.map(a => a.id === id ? { ...a, [field]: value } : a)
+        prev.map(a => a.id === id
+          ? { ...a, [field]: value, ...(snakeMap[field] ? { [snakeMap[field]]: value } : {}) }
+          : a
+        )
       );
       toast.success('更新しました');
     } catch {
@@ -621,7 +630,13 @@ export default function MeetingDetail({
                           waitlist: 'bg-yellow-100 text-yellow-700',
                         };
                         return (
-                          <tr key={a.id} className={`transition-colors ${isUpdating ? 'bg-blue-50' : selectedIds.has(a.id) ? 'bg-blue-50/60' : idx % 2 === 1 ? 'bg-gray-50/40 hover:bg-blue-50/30' : 'hover:bg-blue-50/30'}`}>
+                          <tr key={a.id} className={`transition-colors ${
+                            isUpdating ? 'bg-blue-50' :
+                            a.attendance_status === 'absent' ? 'bg-gray-100 text-gray-400' :
+                            selectedIds.has(a.id) ? 'bg-blue-50/60' :
+                            idx % 2 === 1 ? 'bg-gray-50/40 hover:bg-blue-50/30' :
+                            'hover:bg-blue-50/30'
+                          }`}>
                             <td className="px-2 py-2.5">
                               <input
                                 type="checkbox"
