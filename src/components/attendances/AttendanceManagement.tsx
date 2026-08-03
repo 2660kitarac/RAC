@@ -87,13 +87,10 @@ export default function AttendanceManagement({
     if (!editTarget) return;
     setEditSaving(true);
     const payload: Record<string, string> = {};
-    // userId があるユーザー（会員登録済み）は名前変更不可
-    const hasUserId = editTarget.userId || editTarget.user_id;
-    if (!hasUserId) {
-      payload.externalName = editForm.externalName;
-      payload.externalEmail = editForm.externalEmail;
-      payload.externalPhone = editForm.externalPhone;
-    }
+    // 全員 externalName/Email/Phone を編集可能
+    payload.externalName = editForm.externalName;
+    payload.externalEmail = editForm.externalEmail;
+    payload.externalPhone = editForm.externalPhone;
     payload.clubName = editForm.clubName;
     payload.memberType = editForm.memberType;
     payload.note = editForm.note;
@@ -540,50 +537,35 @@ export default function AttendanceManagement({
             <div className="px-5 py-4 space-y-4">
               {/* お名前 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  お名前
-                  {editTarget.user_id && (
-                    <span className="ml-2 text-xs text-gray-400 font-normal">（会員登録済みのため変更不可）</span>
-                  )}
-                </label>
-                {(editTarget.userId || editTarget.user_id) ? (
-                  <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 border border-gray-200">
-                    {editTarget.user?.name || editTarget.externalName || editTarget.external_name || '（未設定）'}
-                  </div>
-                ) : (
-                  <Input
-                    value={editForm.externalName}
-                    onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
-                    placeholder="例: 山田 太郎"
-                  />
-                )}
+                <label className="block text-sm font-medium text-gray-700 mb-1">お名前</label>
+                <Input
+                  value={editForm.externalName}
+                  onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
+                  placeholder="例: 山田 太郎"
+                />
               </div>
 
               {/* メールアドレス */}
-              {!editTarget.user_id && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
-                  <Input
-                    type="email"
-                    value={editForm.externalEmail}
-                    onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
-                    placeholder="例: taro@example.com"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                <Input
+                  type="email"
+                  value={editForm.externalEmail}
+                  onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
+                  placeholder="例: taro@example.com"
+                />
+              </div>
 
               {/* 電話番号 */}
-              {!editTarget.user_id && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
-                  <Input
-                    type="tel"
-                    value={editForm.externalPhone}
-                    onChange={e => setEditForm(f => ({ ...f, externalPhone: e.target.value }))}
-                    placeholder="例: 090-1234-5678"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                <Input
+                  type="tel"
+                  value={editForm.externalPhone}
+                  onChange={e => setEditForm(f => ({ ...f, externalPhone: e.target.value }))}
+                  placeholder="例: 090-1234-5678"
+                />
+              </div>
 
               {/* 所属クラブ */}
               <div>
