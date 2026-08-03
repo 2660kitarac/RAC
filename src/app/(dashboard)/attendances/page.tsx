@@ -2,11 +2,8 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
-import { eq, and, isNull, isNotNull, count, desc, inArray } from 'drizzle-orm';
-import Link from 'next/link';
-import { formatDate, formatCurrency } from '@/lib/utils';
-import { Pagination } from '@/components/ui/pagination';
-import { MEMBER_TYPE_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from '@/types';
+import { eq, and, isNull, count, desc, inArray } from 'drizzle-orm';
+import AttendancesList from '@/components/attendances/AttendancesList';
 
 export const metadata = { title: 'MU登録者一覧' };
 
@@ -132,88 +129,13 @@ export default async function AttendancesPage({
           MU登録者がいません
         </div>
       ) : (
-        <div className="bg-white border rounded-xl overflow-hidden">
-          {/* デスクトップ */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">氏名</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">所属クラブ</th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">種別</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">例会</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">開催日</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-600">参加費</th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">支払</th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">詳細</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map(a => (
-                  <tr key={a.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="font-medium">{a.externalName ?? '—'}</div>
-                      {a.externalEmail && <div className="text-xs text-gray-400">{a.externalEmail}</div>}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 text-xs">{a.clubName ?? '—'}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="text-xs text-gray-500">
-                        {MEMBER_TYPE_LABELS[a.memberType as keyof typeof MEMBER_TYPE_LABELS] ?? a.memberType}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 text-xs max-w-[12rem] truncate">
-                      {a.meeting?.title ?? '—'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 text-xs">
-                      {a.meeting?.date ? formatDate(a.meeting.date) : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-xs">
-                      {formatCurrency(a.feeAmount)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_COLORS[a.paymentStatus as keyof typeof PAYMENT_STATUS_COLORS] ?? ''}`}>
-                        {PAYMENT_STATUS_LABELS[a.paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] ?? a.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <Link href={`/meetings/${a.meetingId}/attendances`} className="text-xs text-blue-600 hover:underline">
-                        出席管理
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* モバイル */}
-          <div className="sm:hidden divide-y">
-            {list.map(a => (
-              <div key={a.id} className="p-4 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-medium">{a.externalName ?? '—'}</p>
-                    <p className="text-xs text-gray-400">{a.clubName ?? ''}</p>
-                  </div>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_COLORS[a.paymentStatus as keyof typeof PAYMENT_STATUS_COLORS] ?? ''}`}>
-                    {PAYMENT_STATUS_LABELS[a.paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] ?? a.paymentStatus}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500">
-                  {a.meeting?.title ?? ''} / {formatCurrency(a.feeAmount)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            totalCount={totalCount}
-            pageSize={PAGE_SIZE}
-            className="border-t px-4"
-          />
-        </div>
+        <AttendancesList
+          list={list}
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+        />
       )}
     </div>
   );
