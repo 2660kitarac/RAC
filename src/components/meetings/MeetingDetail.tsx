@@ -103,10 +103,15 @@ export default function MeetingDetail({
     if (!editTarget) return;
     setEditSaving(true);
     const payload: Record<string, string> = {};
-    // 全員 externalName/Email/Phone を編集可能
-    payload.externalName = editForm.externalName;
-    payload.externalEmail = editForm.externalEmail;
-    payload.externalPhone = editForm.externalPhone;
+    const hasUserId = editTarget.user_id || editTarget.userId;
+    const currentName = editTarget.external_name || editTarget.externalName || editTarget.display_name || editTarget.user_name || '';
+    const isClubName = currentName.includes('ローターアクトクラブ') || currentName.includes('ロータアクト');
+    // userId なし、またはクラブ名が入っている場合は名前・メール・電話も編集可
+    if (!hasUserId || isClubName) {
+      payload.externalName = editForm.externalName;
+      payload.externalEmail = editForm.externalEmail;
+      payload.externalPhone = editForm.externalPhone;
+    }
     payload.clubName = editForm.clubName;
     payload.memberType = editForm.memberType;
     payload.note = editForm.note;
@@ -791,25 +796,47 @@ export default function MeetingDetail({
             </div>
             <div className="p-5 space-y-4">
               {/* 氏名 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">氏名</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.externalName}
-                  onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
-                  placeholder="氏名"
-                />
-              </div>
-              {/* メールアドレス */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.externalEmail}
-                  onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
-                  placeholder="メールアドレス"
-                />
-              </div>
+              {(() => {
+                const hasUserId = editTarget.user_id || editTarget.userId;
+                const currentName = editTarget.external_name || editTarget.externalName || editTarget.display_name || editTarget.user_name || '';
+                const isClubName = currentName.includes('ローターアクトクラブ') || currentName.includes('ロータアクト');
+                const canEditName = !hasUserId || isClubName;
+                return (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        氏名
+                        {hasUserId && !isClubName && (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">（会員登録済みのため変更不可）</span>
+                        )}
+                      </label>
+                      {canEditName ? (
+                        <input
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={editForm.externalName}
+                          onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
+                          placeholder="氏名"
+                        />
+                      ) : (
+                        <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-200">
+                          {currentName || '（未設定）'}
+                        </div>
+                      )}
+                    </div>
+                    {canEditName && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                        <input
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={editForm.externalEmail}
+                          onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
+                          placeholder="メールアドレス"
+                        />
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">所属クラブ</label>
                 <input
