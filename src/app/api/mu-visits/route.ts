@@ -107,17 +107,16 @@ export async function POST(request: NextRequest) {
       await db.insert(transactions).values({
         id: transactionId,
         clubId,
-        type: 'expense',
+        transactionType: 'expense',
         category: 'mu_fee',
         amount: feeAmount,
         description: `MU費立替: ${visitedClubName}（${visitDate}）`,
         transactionDate: visitDate,
         paymentMethod: 'cash',
-        status: 'pending',
         createdBy: userId,
         createdAt: now,
         updatedAt: now,
-      } as any);
+      });
     }
 
     await db.insert(muVisits).values({
