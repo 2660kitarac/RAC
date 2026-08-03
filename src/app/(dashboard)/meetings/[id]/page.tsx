@@ -94,7 +94,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     paid_at:           a.paidAt,
     registered_at:     a.registeredAt,
     // JOIN したユーザー名
-    display_name:      a.userName ?? a.externalName ?? '（名前なし）',
+    // externalName が設定されていれば優先（管理者による名前修正を反映）、なければ users.name にフォールバック (#6)
+    display_name:      a.externalName ?? a.userName ?? '（名前なし）',
     user_name:         a.userName,
     user_email:        a.userEmail,
   }));
