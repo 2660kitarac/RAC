@@ -128,6 +128,9 @@ export default function MeetingDetail({
         a.id === editTarget.id
           ? {
               ...a,
+              // display_name / user_name も更新しないとテーブル表示が変わらない (#5)
+              display_name: editForm.externalName,
+              user_name: editForm.externalName,
               external_name: editForm.externalName,
               externalName: editForm.externalName,
               external_email: editForm.externalEmail,
