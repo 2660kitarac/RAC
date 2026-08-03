@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
-  Search, Download, ChevronUp, ChevronDown
+  Search, Download, ChevronUp, ChevronDown, Pencil, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +72,78 @@ export default function MeetingDetail({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // 参加者情報編集モーダル
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    externalName: '',
+    externalEmail: '',
+    externalPhone: '',
+    clubName: '',
+    memberType: '',
+    note: '',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEditModal = (a: any) => {
+    setEditTarget(a);
+    setEditForm({
+      externalName: a.external_name || a.externalName || '',
+      externalEmail: a.external_email || a.externalEmail || '',
+      externalPhone: a.external_phone || a.externalPhone || '',
+      clubName: a.club_name || a.clubName || '',
+      memberType: a.member_type || a.memberType || 'RAC',
+      note: a.note || '',
+    });
+  };
+
+  const closeEditModal = () => setEditTarget(null);
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setEditSaving(true);
+    const payload: Record<string, string> = {};
+    const hasUserId = editTarget.user_id || editTarget.userId;
+    if (!hasUserId) {
+      payload.externalName = editForm.externalName;
+      payload.externalEmail = editForm.externalEmail;
+      payload.externalPhone = editForm.externalPhone;
+    }
+    payload.clubName = editForm.clubName;
+    payload.memberType = editForm.memberType;
+    payload.note = editForm.note;
+
+    const res = await fetch(`/api/attendances/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      toast.error('更新に失敗しました');
+    } else {
+      setLocalAttendances(prev => prev.map(a =>
+        a.id === editTarget.id
+          ? {
+              ...a,
+              external_name: editForm.externalName,
+              externalName: editForm.externalName,
+              external_email: editForm.externalEmail,
+              externalEmail: editForm.externalEmail,
+              external_phone: editForm.externalPhone,
+              externalPhone: editForm.externalPhone,
+              club_name: editForm.clubName,
+              clubName: editForm.clubName,
+              member_type: editForm.memberType,
+              memberType: editForm.memberType,
+              note: editForm.note,
+            }
+          : a
+      ));
+      toast.success('参加者情報を更新しました');
+      closeEditModal();
+    }
+    setEditSaving(false);
+  };
 
   // 個別ステータス更新
   const updateAttendanceField = async (id: string, field: string, value: string) => {
@@ -514,6 +586,7 @@ export default function MeetingDetail({
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('name')}>
                           氏名 <SortIcon k="name" />
                         </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-7"></th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">所属</th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">区分</th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">参加形式</th>
@@ -565,6 +638,15 @@ export default function MeetingDetail({
                               {a.note && (
                                 <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[160px]" title={a.note}>{a.note}</p>
                               )}
+                            </td>
+                            <td className="px-2 py-2.5">
+                              <button
+                                onClick={() => openEditModal(a)}
+                                title="参加者情報を編集"
+                                className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
                             </td>
                             <td className="px-3 py-2.5 text-gray-600 text-xs">{a.club_name || '-'}</td>
                             <td className="px-3 py-2.5">
@@ -622,7 +704,7 @@ export default function MeetingDetail({
                     {filteredAttendances.length > 0 && (
                       <tfoot>
                         <tr className="border-t-2 border-gray-200 bg-gray-50">
-                          <td colSpan={7} className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
+                          <td colSpan={8} className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
                             合計 {filteredAttendances.length}名
                           </td>
                           <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums">
@@ -695,6 +777,98 @@ export default function MeetingDetail({
           )}
         </TabsContent>
       </Tabs>
+
+      {/* 参加者情報編集モーダル */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div className="flex items-center gap-2">
+                <Pencil className="h-4 w-4 text-blue-600" />
+                <h3 className="font-semibold text-gray-800">参加者情報を編集</h3>
+              </div>
+              <button onClick={closeEditModal} className="p-1 rounded hover:bg-gray-100">
+                <X className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* userId なし（外部参加者）のみ名前・メール変更可 */}
+              {!(editTarget.user_id || editTarget.userId) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">氏名</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editForm.externalName}
+                      onChange={e => setEditForm(f => ({ ...f, externalName: e.target.value }))}
+                      placeholder="氏名"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editForm.externalEmail}
+                      onChange={e => setEditForm(f => ({ ...f, externalEmail: e.target.value }))}
+                      placeholder="メールアドレス"
+                    />
+                  </div>
+                </>
+              )}
+              {(editTarget.user_id || editTarget.userId) && (
+                <p className="text-xs text-gray-400 bg-gray-50 rounded p-2">会員登録済みのため氏名・メールは変更できません</p>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">所属クラブ</label>
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editForm.clubName}
+                  onChange={e => setEditForm(f => ({ ...f, clubName: e.target.value }))}
+                  placeholder="所属クラブ名"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">区分</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editForm.memberType}
+                  onChange={e => setEditForm(f => ({ ...f, memberType: e.target.value }))}
+                >
+                  <option value="RAC">RAC</option>
+                  <option value="RC">RC（ロータリアン）</option>
+                  <option value="OB_OG">OB・OG</option>
+                  <option value="GUEST">ゲスト</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  value={editForm.note}
+                  onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="メモ（任意）"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <button
+                onClick={closeEditModal}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {editSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
