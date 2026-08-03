@@ -69,11 +69,12 @@ export default function AttendanceManagement({
   const openEditModal = (a: any) => {
     setEditTarget(a);
     setEditForm({
-      externalName: a.external_name || '',
-      externalEmail: a.external_email || '',
-      externalPhone: a.external_phone || '',
-      clubName: a.club_name || '',
-      memberType: a.member_type || 'RAC',
+      // サーバーはcamelCase、受付モード等はsnake_case、両方に対応
+      externalName: a.externalName || a.external_name || '',
+      externalEmail: a.externalEmail || a.external_email || '',
+      externalPhone: a.externalPhone || a.external_phone || '',
+      clubName: a.clubName || a.club_name || '',
+      memberType: a.memberType || a.member_type || 'RAC',
       note: a.note || '',
     });
   };
@@ -87,7 +88,8 @@ export default function AttendanceManagement({
     setEditSaving(true);
     const payload: Record<string, string> = {};
     // userId があるユーザー（会員登録済み）は名前変更不可
-    if (!editTarget.user_id) {
+    const hasUserId = editTarget.userId || editTarget.user_id;
+    if (!hasUserId) {
       payload.externalName = editForm.externalName;
       payload.externalEmail = editForm.externalEmail;
       payload.externalPhone = editForm.externalPhone;
@@ -108,10 +110,16 @@ export default function AttendanceManagement({
         (a as any).id === editTarget.id
           ? {
               ...a,
-              external_name: editForm.externalName || (a as any).external_name,
-              external_email: editForm.externalEmail || (a as any).external_email,
-              external_phone: editForm.externalPhone || (a as any).external_phone,
+              // camelCase・snake_case 両方を更新
+              externalName: editForm.externalName,
+              external_name: editForm.externalName,
+              externalEmail: editForm.externalEmail,
+              external_email: editForm.externalEmail,
+              externalPhone: editForm.externalPhone,
+              external_phone: editForm.externalPhone,
+              clubName: editForm.clubName,
               club_name: editForm.clubName,
+              memberType: editForm.memberType,
               member_type: editForm.memberType,
               note: editForm.note,
             }
@@ -400,8 +408,8 @@ export default function AttendanceManagement({
                       return (
                         <tr key={a.id} className={`hover:bg-gray-50 transition-colors ${pType === 'absent' ? 'opacity-50' : ''}`}>
                           <td className="px-4 py-3">
-                            <p className="font-medium">{a.user?.name || a.external_name}</p>
-                            {a.club_name && <p className="text-xs text-gray-400">{a.club_name}</p>}
+                            <p className="font-medium">{a.user?.name || a.externalName || a.external_name}</p>
+                            {(a.clubName || a.club_name) && <p className="text-xs text-gray-400">{a.clubName || a.club_name}</p>}
                             {a.receipt_required && (
                               <span className="text-xs text-blue-600">領収書希望</span>
                             )}
@@ -538,9 +546,9 @@ export default function AttendanceManagement({
                     <span className="ml-2 text-xs text-gray-400 font-normal">（会員登録済みのため変更不可）</span>
                   )}
                 </label>
-                {editTarget.user_id ? (
+                {(editTarget.userId || editTarget.user_id) ? (
                   <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 border border-gray-200">
-                    {editTarget.user?.name || editTarget.external_name || '（未設定）'}
+                    {editTarget.user?.name || editTarget.externalName || editTarget.external_name || '（未設定）'}
                   </div>
                 ) : (
                   <Input
