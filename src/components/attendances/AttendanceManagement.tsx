@@ -56,6 +56,44 @@ export default function AttendanceManagement({
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // 登録料インライン編集
+  const [feeEditId, setFeeEditId] = useState<string | null>(null);
+  const [feeEditValue, setFeeEditValue] = useState<string>('');
+  const [feeEditLoading, setFeeEditLoading] = useState(false);
+
+  const startFeeEdit = (a: any) => {
+    setFeeEditId(a.id);
+    setFeeEditValue(String(a.fee_amount ?? a.feeAmount ?? 0));
+  };
+
+  const saveFeeEdit = async (id: string) => {
+    const parsed = parseInt(feeEditValue.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(parsed) || parsed < 0) {
+      toast.error('正しい金額を入力してください');
+      return;
+    }
+    setFeeEditLoading(true);
+    const res = await fetch(`/api/attendances/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeAmount: parsed }),
+    });
+    if (!res.ok) {
+      toast.error('登録料の更新に失敗しました');
+    } else {
+      setAttendances(prev => prev.map(a =>
+        (a as any).id === id
+          ? { ...a, fee_amount: parsed, feeAmount: parsed }
+          : a
+      ));
+      toast.success('登録料を更新しました');
+    }
+    setFeeEditId(null);
+    setFeeEditLoading(false);
+  };
+
+  const cancelFeeEdit = () => setFeeEditId(null);
+
   const deleteAttendance = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
@@ -414,7 +452,7 @@ export default function AttendanceManagement({
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">参加形態</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">出席確認</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">支払</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">合計金額</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録料</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">メモ</th>
                     </tr>
                   </thead>
@@ -505,12 +543,45 @@ export default function AttendanceManagement({
                               </Select>
                             )}
                           </td>
-                          <td className="px-4 py-3 font-medium">
-                            {pType !== 'absent' ? formatCurrency(totalFee) : '-'}
-                            {a.after_party_fee_amount > 0 && (
-                              <div className="text-xs text-purple-600">
-                                (懇親会 {formatCurrency(a.after_party_fee_amount)})
+                          <td className="px-4 py-3">
+                            {pType === 'absent' ? (
+                              <span className="text-xs text-gray-400">-</span>
+                            ) : feeEditId === a.id ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-gray-400">¥</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="100"
+                                  value={feeEditValue}
+                                  onChange={e => setFeeEditValue(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') saveFeeEdit(a.id);
+                                    if (e.key === 'Escape') cancelFeeEdit();
+                                  }}
+                                  onBlur={() => saveFeeEdit(a.id)}
+                                  className="w-20 h-7 px-1.5 text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  autoFocus
+                                  disabled={feeEditLoading}
+                                />
                               </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startFeeEdit(a)}
+                                title="クリックして登録料を変更"
+                                className="group text-left"
+                              >
+                                <span className="font-medium group-hover:text-blue-600 transition-colors">
+                                  {formatCurrency(a.fee_amount ?? a.feeAmount ?? 0)}
+                                </span>
+                                {a.after_party_fee_amount > 0 && (
+                                  <div className="text-xs text-purple-600">
+                                    +懇親会 {formatCurrency(a.after_party_fee_amount)}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-300 group-hover:text-blue-400 transition-colors">✎ 変更</div>
+                              </button>
                             )}
                           </td>
                           <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-500 max-w-32">
@@ -533,7 +604,7 @@ export default function AttendanceManagement({
                         {formatCurrency(filtered.reduce((sum, a) => {
                           const pt = (a as any).participation_type || (a as any).participationType;
                           if (pt === 'absent') return sum;
-                          return sum + ((a as any).fee_amount || 0) + ((a as any).after_party_fee_amount || 0);
+                          return sum + ((a as any).fee_amount ?? (a as any).feeAmount ?? 0) + ((a as any).after_party_fee_amount || 0);
                         }, 0))}
                       </td>
                       <td />
