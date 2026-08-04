@@ -5,6 +5,7 @@ import { users, clubs, receipts, meetings, attendances } from '@/lib/db/schema';
 import { eq, and, isNull, count, desc } from 'drizzle-orm';
 import ReceiptsList from '@/components/receipts/ReceiptsList';
 import { Pagination } from '@/components/ui/pagination';
+import type { UserRole } from '@/types';
 
 export const metadata = { title: '領収書管理' };
 
@@ -33,18 +34,18 @@ export default async function ReceiptsPage({
   const [countResult, receiptsResult, meetingsResult, pendingResult] = await Promise.all([
     db.select({ value: count() }).from(receipts).where(receiptWhere),
 
-    // ReceiptsList.tsx が snake_case キーで参照するためエイリアスで snake_case に揃える
+    // camelCase で返す（Drizzle ORM のデフォルト）
     db.select({
       id: receipts.id,
-      receipt_number: receipts.receiptNumber,
-      receipt_name: receipts.receiptName,
+      receiptNumber: receipts.receiptNumber,
+      receiptName: receipts.receiptName,
       amount: receipts.amount,
       description: receipts.description,
-      issued_date: receipts.issuedDate,
+      issuedDate: receipts.issuedDate,
       status: receipts.status,
-      cancel_reason: receipts.cancelReason,
-      meeting_id: receipts.meetingId,
-      attendance_id: receipts.attendanceId,
+      cancelReason: receipts.cancelReason,
+      meetingId: receipts.meetingId,
+      attendanceId: receipts.attendanceId,
     })
       .from(receipts)
       .where(receiptWhere)
@@ -60,14 +61,13 @@ export default async function ReceiptsPage({
       .orderBy(desc(meetings.date))
       .limit(100),
 
-    // 領収書発行待ち: ReceiptsList.tsx が snake_case キーで参照するためエイリアスで揃える
-    // clubId フィルタを追加して自クラブ分のみ取得
+    // 領収書発行待ち: camelCase で返す（clubId フィルタで自クラブ分のみ取得）
     db.select({
       id: attendances.id,
-      external_name: attendances.externalName,
-      fee_amount: attendances.feeAmount,
-      meeting_id: attendances.meetingId,
-      receipt_name: attendances.receiptName,
+      externalName: attendances.externalName,
+      feeAmount: attendances.feeAmount,
+      meetingId: attendances.meetingId,
+      receiptName: attendances.receiptName,
     })
       .from(attendances)
       .where(and(
@@ -96,7 +96,7 @@ export default async function ReceiptsPage({
         meetings={meetingsResult}
         clubId={clubId || ''}
         clubName={clubName}
-        userRole={session.user.role || 'system_owner'}
+        userRole={(session.user.role || 'system_owner') as UserRole}
         totalCount={totalCount}
       />
       <Pagination

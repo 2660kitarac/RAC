@@ -14,9 +14,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { formatDate, formatCurrency, exportToCSV } from '@/lib/utils';
-import type { Receipt, UserRole } from '@/types';
+import type { UserRole } from '@/types';
 import { RECEIPT_STATUS_LABELS } from '@/types';
 import { canManageReceipts } from '@/lib/hooks/useAuth';
+
+// Drizzle ORM が camelCase で返すため camelCase で定義
+interface ReceiptRow {
+  id: string;
+  receiptNumber: string;
+  receiptName: string;
+  amount: number;
+  description: string;
+  issuedDate: string;
+  status: 'issued' | 'cancelled' | 'reissued';
+  cancelReason?: string | null;
+  meetingId?: string | null;
+  attendanceId?: string | null;
+}
+
+interface PendingAttendance {
+  id: string;
+  externalName?: string | null;
+  feeAmount?: number | null;
+  meetingId?: string | null;
+  receiptName?: string | null;
+}
 
 interface BulkTarget {
   id: string;
@@ -28,8 +50,8 @@ interface BulkTarget {
 }
 
 interface ReceiptsListProps {
-  receipts: Receipt[];
-  pendingAttendances: Record<string, unknown>[];
+  receipts: ReceiptRow[];
+  pendingAttendances: PendingAttendance[];
   meetings: { id: string; title: string }[];
   clubId: string;
   clubName: string;
@@ -40,7 +62,7 @@ interface ReceiptsListProps {
 export default function ReceiptsList({
   receipts: init, pendingAttendances, meetings, clubId, clubName, userRole, totalCount
 }: ReceiptsListProps) {
-  const [receipts, setReceipts] = useState(init);
+  const [receipts, setReceipts] = useState<ReceiptRow[]>(init);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +85,10 @@ export default function ReceiptsList({
   const [bulkStep, setBulkStep] = useState<'config' | 'preview' | 'done'>('config');
   const [bulkCreatedIds, setBulkCreatedIds] = useState<string[]>([]);
 
+  // ── 既存領収書の一括印刷 ──
+  const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set());
+  const [printSelectMode, setPrintSelectMode] = useState(false);
+
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
@@ -83,7 +109,6 @@ export default function ReceiptsList({
 
       const targets: BulkTarget[] = data.targets || [];
       setBulkTargets(targets);
-      // 初期選択：未発行のものを全選択
       setBulkSelected(new Set(targets.filter(t => !t.alreadyIssued).map(t => t.id)));
       setBulkStep('preview');
     } catch (e) {
@@ -112,7 +137,7 @@ export default function ReceiptsList({
           issuedDate: bulkIssuedDate,
           description: bulkDescription || undefined,
           targetIds: selectedIds,
-          skipExisting: false, // 選択制なのでAPIでのスキップは無効化
+          skipExisting: false,
         }),
       });
       const data = await res.json();
@@ -149,17 +174,18 @@ export default function ReceiptsList({
     setBulkDescription('');
   };
 
+  // ── 単票発行フォーム ──
   const [form, setForm] = useState({
-    receipt_name: '',
+    receiptName: '',
     amount: '',
     description: 'ローターアクトクラブ例会登録料として',
-    issued_date: new Date().toISOString().split('T')[0],
-    meeting_id: '',
-    attendance_id: '',
+    issuedDate: new Date().toISOString().split('T')[0],
+    meetingId: '',
+    attendanceId: '',
   });
 
   const handleCreate = async () => {
-    if (!form.receipt_name || !form.amount || !form.description || !form.issued_date) {
+    if (!form.receiptName || !form.amount || !form.description || !form.issuedDate) {
       toast.error('必須項目を入力してください');
       return;
     }
@@ -170,47 +196,39 @@ export default function ReceiptsList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clubId,
-          meetingId: form.meeting_id || null,
-          attendanceId: form.attendance_id || null,
-          receiptName: form.receipt_name,
+          meetingId: form.meetingId || null,
+          attendanceId: form.attendanceId || null,
+          receiptName: form.receiptName,
           amount: parseInt(form.amount),
           description: form.description,
-          issuedDate: form.issued_date,
+          issuedDate: form.issuedDate,
         }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '発行に失敗しました');
 
-      // 新しく作成した領収書をリストの先頭に追加
-      const newReceipt: Receipt = {
+      const newReceipt: ReceiptRow = {
         id: data.id,
-        club_id: clubId,
-        meeting_id: form.meeting_id || null,
-        attendance_id: form.attendance_id || null,
-        transaction_id: null,
-        receipt_number: data.receiptNumber,
-        receipt_name: form.receipt_name,
+        receiptNumber: data.receiptNumber,
+        receiptName: form.receiptName,
         amount: parseInt(form.amount),
         description: form.description,
-        issued_date: form.issued_date,
-        pdf_url: null,
+        issuedDate: form.issuedDate,
         status: 'issued',
-        issued_by: null,
-        cancel_reason: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deleted_at: null,
+        cancelReason: null,
+        meetingId: form.meetingId || null,
+        attendanceId: form.attendanceId || null,
       };
       setReceipts(prev => [newReceipt, ...prev]);
       setShowCreateDialog(false);
       setForm({
-        receipt_name: '',
+        receiptName: '',
         amount: '',
         description: 'ローターアクトクラブ例会登録料として',
-        issued_date: new Date().toISOString().split('T')[0],
-        meeting_id: '',
-        attendance_id: '',
+        issuedDate: new Date().toISOString().split('T')[0],
+        meetingId: '',
+        attendanceId: '',
       });
       toast.success(`領収書 ${data.receiptNumber} を発行しました`);
     } catch (e: unknown) {
@@ -238,7 +256,7 @@ export default function ReceiptsList({
       }
 
       setReceipts(prev => prev.map(r =>
-        r.id === id ? { ...r, status: 'cancelled' as const, cancel_reason: cancelReason } : r
+        r.id === id ? { ...r, status: 'cancelled' as const, cancelReason } : r
       ));
       setShowCancelDialog(null);
       setCancelReason('');
@@ -250,17 +268,37 @@ export default function ReceiptsList({
 
   const exportCSV = () => {
     exportToCSV(receipts.map(r => ({
-      '領収書番号': r.receipt_number,
-      '宛名': r.receipt_name,
+      '領収書番号': r.receiptNumber,
+      '宛名': r.receiptName,
       '金額': r.amount,
       '但し書き': r.description,
-      '発行日': r.issued_date,
-      'ステータス': RECEIPT_STATUS_LABELS[r.status],
-      '例会': (r as any).meeting?.title || '',
+      '発行日': r.issuedDate,
+      'ステータス': RECEIPT_STATUS_LABELS[r.status] ?? r.status,
     })), '領収書一覧');
   };
 
-  const statusColors = {
+  // ── 一括印刷（既存領収書の選択印刷） ──
+  const togglePrintSelect = (id: string) => {
+    setSelectedForPrint(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAllForPrint = () => {
+    setSelectedForPrint(new Set(receipts.filter(r => r.status === 'issued').map(r => r.id)));
+  };
+  const clearPrintSelect = () => setSelectedForPrint(new Set());
+  const openBulkPrint = () => {
+    if (selectedForPrint.size === 0) {
+      toast.error('印刷する領収書を選択してください');
+      return;
+    }
+    const ids = Array.from(selectedForPrint).join(',');
+    window.open(`/receipts/bulk-print?ids=${ids}`, '_blank');
+  };
+
+  const statusColors: Record<string, string> = {
     issued: 'bg-green-100 text-green-700',
     cancelled: 'bg-red-100 text-red-700',
     reissued: 'bg-blue-100 text-blue-700',
@@ -275,12 +313,35 @@ export default function ReceiptsList({
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={exportCSV}><Download className="h-4 w-4" />CSV</Button>
+          {/* 一括印刷モード切替 */}
+          <Button
+            variant={printSelectMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (printSelectMode) {
+                openBulkPrint();
+              } else {
+                setPrintSelectMode(true);
+                setSelectedForPrint(new Set());
+              }
+            }}
+            className={printSelectMode ? 'bg-blue-600 hover:bg-blue-700' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}
+          >
+            <Printer className="h-4 w-4" />
+            {printSelectMode ? `${selectedForPrint.size}件を一括印刷` : '一括印刷'}
+          </Button>
+          {printSelectMode && (
+            <>
+              <Button variant="outline" size="sm" onClick={selectAllForPrint}>全選択</Button>
+              <Button variant="outline" size="sm" onClick={() => { clearPrintSelect(); setPrintSelectMode(false); }}>キャンセル</Button>
+            </>
+          )}
           {canManage && (
             <>
               <Button
                 variant="outline"
                 onClick={() => { resetBulkDialog(); setShowBulkDialog(true); }}
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                className="border-green-300 text-green-700 hover:bg-green-50"
               >
                 <Layers className="h-4 w-4" />一括発行
               </Button>
@@ -305,7 +366,7 @@ export default function ReceiptsList({
             <div className="space-y-1">
               {pendingAttendances.slice(0, 5).map((a, i) => (
                 <div key={i} className="text-xs text-yellow-700 flex items-center gap-2">
-                  <span>・{String(a.external_name || '')} / {String((a.meeting as any)?.title || '')}</span>
+                  <span>・{String(a.externalName || '')}</span>
                   {canManage && (
                     <Button
                       size="sm"
@@ -314,10 +375,10 @@ export default function ReceiptsList({
                       onClick={() => {
                         setForm(prev => ({
                           ...prev,
-                          receipt_name: String(a.receipt_name || a.external_name || ''),
-                          amount: String(a.fee_amount || 0),
-                          attendance_id: String(a.id),
-                          meeting_id: String(a.meeting_id || ''),
+                          receiptName: String(a.receiptName || a.externalName || ''),
+                          amount: String(a.feeAmount || 0),
+                          attendanceId: String(a.id),
+                          meetingId: String(a.meetingId || ''),
                         }));
                         setShowCreateDialog(true);
                       }}
@@ -343,6 +404,7 @@ export default function ReceiptsList({
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
+                  {printSelectMode && <th className="px-3 py-3 w-8" />}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">領収書番号</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">宛名</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">金額</th>
@@ -354,29 +416,49 @@ export default function ReceiptsList({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {receipts.map(receipt => (
-                  <tr key={receipt.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-sm text-blue-600">{receipt.receipt_number}</td>
-                    <td className="px-4 py-3 font-medium">{receipt.receipt_name}</td>
+                  <tr
+                    key={receipt.id}
+                    className={`hover:bg-gray-50 ${printSelectMode && receipt.status === 'issued' && selectedForPrint.has(receipt.id) ? 'bg-blue-50' : ''}`}
+                    onClick={printSelectMode && receipt.status === 'issued' ? () => togglePrintSelect(receipt.id) : undefined}
+                    style={printSelectMode && receipt.status === 'issued' ? { cursor: 'pointer' } : undefined}
+                  >
+                    {printSelectMode && (
+                      <td className="px-3 py-3">
+                        {receipt.status === 'issued' && (
+                          <input
+                            type="checkbox"
+                            checked={selectedForPrint.has(receipt.id)}
+                            onChange={() => togglePrintSelect(receipt.id)}
+                            onClick={e => e.stopPropagation()}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                          />
+                        )}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 font-mono text-sm text-blue-600">{receipt.receiptNumber}</td>
+                    <td className="px-4 py-3 font-medium">{receipt.receiptName}</td>
                     <td className="px-4 py-3 text-right font-medium">{formatCurrency(receipt.amount)}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate">{receipt.description}</td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(receipt.issued_date)}</td>
+                    <td className="px-4 py-3 text-gray-600">{formatDate(receipt.issuedDate)}</td>
                     <td className="px-4 py-3">
-                      <Badge className={statusColors[receipt.status]}>{RECEIPT_STATUS_LABELS[receipt.status]}</Badge>
+                      <Badge className={statusColors[receipt.status] ?? 'bg-gray-100 text-gray-700'}>
+                        {RECEIPT_STATUS_LABELS[receipt.status as keyof typeof RECEIPT_STATUS_LABELS] ?? receipt.status}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        {receipt.status === 'issued' && (
+                        {receipt.status === 'issued' && !printSelectMode && (
                           <Button
                             variant="ghost"
                             size="icon-sm"
                             className="text-blue-500 hover:text-blue-700"
                             onClick={() => window.open(`/receipts/${receipt.id}/print`, '_blank')}
-                            title="印刷"
+                            title="単票印刷"
                           >
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
-                        {canManage && receipt.status === 'issued' && (
+                        {canManage && receipt.status === 'issued' && !printSelectMode && (
                           <Button
                             variant="ghost"
                             size="icon-sm"
@@ -394,6 +476,26 @@ export default function ReceiptsList({
               </tbody>
             </table>
           </div>
+          {/* 一括印刷モード時のフッター */}
+          {printSelectMode && (
+            <div className="border-t bg-blue-50 px-4 py-3 flex items-center justify-between">
+              <p className="text-sm text-blue-700">
+                {selectedForPrint.size}件を選択中（行クリックで選択）
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAllForPrint}>全て選択</Button>
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={selectedForPrint.size === 0}
+                  onClick={openBulkPrint}
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  {selectedForPrint.size}件を一括印刷
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -406,7 +508,7 @@ export default function ReceiptsList({
           <div className="space-y-3 py-2">
             <div className="form-group">
               <Label required>宛名</Label>
-              <Input value={form.receipt_name} onChange={e => setForm({...form, receipt_name: e.target.value})} placeholder="〇〇クラブ 御中" className="mt-1" />
+              <Input value={form.receiptName} onChange={e => setForm({...form, receiptName: e.target.value})} placeholder="〇〇クラブ 御中" className="mt-1" />
             </div>
             <div className="form-group">
               <Label required>金額（円）</Label>
@@ -427,11 +529,11 @@ export default function ReceiptsList({
             </div>
             <div className="form-group">
               <Label required>発行日</Label>
-              <Input type="date" value={form.issued_date} onChange={e => setForm({...form, issued_date: e.target.value})} className="mt-1" />
+              <Input type="date" value={form.issuedDate} onChange={e => setForm({...form, issuedDate: e.target.value})} className="mt-1" />
             </div>
             <div className="form-group">
               <Label>関連例会</Label>
-              <Select value={form.meeting_id} onValueChange={v => setForm({...form, meeting_id: v})}>
+              <Select value={form.meetingId} onValueChange={v => setForm({...form, meetingId: v})}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="選択..." /></SelectTrigger>
                 <SelectContent>
                   {meetings.map(m => <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>)}
@@ -444,7 +546,7 @@ export default function ReceiptsList({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>キャンセル</Button>
-            <Button onClick={handleCreate} loading={loading}>発行する</Button>
+            <Button onClick={handleCreate} disabled={loading}>{loading ? '発行中...' : '発行する'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -481,7 +583,7 @@ export default function ReceiptsList({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-blue-600" />
+              <Layers className="h-5 w-5 text-green-600" />
               領収書の一括発行
             </DialogTitle>
           </DialogHeader>
@@ -500,7 +602,7 @@ export default function ReceiptsList({
                 </Select>
                 <p className="text-xs text-gray-500">
                   {bulkMode === 'external'
-                    ? '選択した例会で「領収書必要」かつ「支払済み」の外部参加者が対象です。クラブメンバーは含まれません。'
+                    ? '選択した例会の外部参加者が対象です。クラブメンバーは含まれません。'
                     : '指定年度の年会費が「支払済み」のメンバー全員が対象です。'}
                 </p>
               </div>
@@ -676,7 +778,7 @@ export default function ReceiptsList({
                 <Button
                   onClick={handleBulkCreate}
                   disabled={bulkLoading || bulkSelected.size === 0}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-green-600 hover:bg-green-700"
                 >
                   {bulkLoading ? '発行中...' : `${bulkSelected.size}件を一括発行`}
                 </Button>
