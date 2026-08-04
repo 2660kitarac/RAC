@@ -33,17 +33,18 @@ export default async function ReceiptsPage({
   const [countResult, receiptsResult, meetingsResult, pendingResult] = await Promise.all([
     db.select({ value: count() }).from(receipts).where(receiptWhere),
 
+    // ReceiptsList.tsx が snake_case キーで参照するためエイリアスで snake_case に揃える
     db.select({
       id: receipts.id,
-      receiptNumber: receipts.receiptNumber,
-      receiptName: receipts.receiptName,
+      receipt_number: receipts.receiptNumber,
+      receipt_name: receipts.receiptName,
       amount: receipts.amount,
       description: receipts.description,
-      issuedDate: receipts.issuedDate,
+      issued_date: receipts.issuedDate,
       status: receipts.status,
-      cancelReason: receipts.cancelReason,
-      meetingId: receipts.meetingId,
-      attendanceId: receipts.attendanceId,
+      cancel_reason: receipts.cancelReason,
+      meeting_id: receipts.meetingId,
+      attendance_id: receipts.attendanceId,
     })
       .from(receipts)
       .where(receiptWhere)
@@ -59,16 +60,19 @@ export default async function ReceiptsPage({
       .orderBy(desc(meetings.date))
       .limit(100),
 
+    // 領収書発行待ち: ReceiptsList.tsx が snake_case キーで参照するためエイリアスで揃える
+    // clubId フィルタを追加して自クラブ分のみ取得
     db.select({
       id: attendances.id,
-      externalName: attendances.externalName,
-      feeAmount: attendances.feeAmount,
-      meetingId: attendances.meetingId,
-      receiptName: attendances.receiptName,
+      external_name: attendances.externalName,
+      fee_amount: attendances.feeAmount,
+      meeting_id: attendances.meetingId,
+      receipt_name: attendances.receiptName,
     })
       .from(attendances)
       .where(and(
         isNull(attendances.deletedAt),
+        clubId ? eq(attendances.clubId, clubId) : undefined,
       ))
       .limit(50),
   ]);

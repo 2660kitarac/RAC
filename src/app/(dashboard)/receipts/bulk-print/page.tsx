@@ -11,7 +11,8 @@ export const metadata = { title: '領収書 一括印刷' };
  * 一括印刷ページ
  * URL: /receipts/bulk-print?ids=id1,id2,id3
  *
- * A4用紙に2列×複数行でレイアウト。
+ * A4縦に1列で領収書を並べる（1枚あたり約54mm）。
+ * 5枚ごとに1ページに収まるよう設定。
  * ブラウザの印刷機能でPDF保存も可。
  */
 export default async function BulkPrintPage({
@@ -56,7 +57,7 @@ export default async function BulkPrintPage({
         .where(conditions);
     }
   } else if (params.meetingId && clubId) {
-    // 例会IDで外部参加者の発行済み領収書を取得
+    // 例会IDで発行済み領収書を取得
     receiptList = await db
       .select({
         id: receipts.id,
@@ -107,11 +108,18 @@ export default async function BulkPrintPage({
       );
   }
 
+  // A4縦に5枚ずつページ分割
+  const RECEIPTS_PER_PAGE = 5;
+  const pages: any[][] = [];
+  for (let i = 0; i < receiptList.length; i += RECEIPTS_PER_PAGE) {
+    pages.push(receiptList.slice(i, i + RECEIPTS_PER_PAGE));
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* 操作バー（印刷時非表示） */}
       <div className="print:hidden bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => window.history.back()}
@@ -120,7 +128,7 @@ export default async function BulkPrintPage({
               ← 戻る
             </button>
             <span className="text-gray-500 text-sm">
-              {receiptList.length}件の領収書
+              {receiptList.length}件の領収書（A4縦・1ページに5枚）
             </span>
           </div>
           <button
@@ -133,95 +141,229 @@ export default async function BulkPrintPage({
       </div>
 
       {receiptList.length === 0 ? (
-        <div className="flex items-center justify-center min-h-64">
+        <div className="flex items-center justify-center min-h-64 print:hidden">
           <div className="text-center text-gray-400">
             <p className="text-lg">印刷する領収書がありません</p>
             <p className="text-sm mt-1">一括発行後にこのページを開いてください</p>
           </div>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto p-6 print:p-0 print:max-w-none">
-          {/* 2列グリッドで領収書を並べる */}
-          <div
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 print:gap-0"
-            style={{ printColorAdjust: 'exact' } as React.CSSProperties}
-          >
-            {receiptList.map((receipt, index) => (
+        <>
+          {/* 画面プレビュー（印刷時非表示） */}
+          <div className="print:hidden max-w-3xl mx-auto p-6 space-y-3">
+            <div className="text-sm text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+              📄 印刷時はA4縦1枚に5枚ずつ並んで出力されます
+            </div>
+            {receiptList.map((receipt) => (
+              <ReceiptCardScreen key={receipt.id} receipt={receipt} />
+            ))}
+          </div>
+
+          {/* 印刷用レイアウト（画面では非表示・印刷時のみ） */}
+          <div className="hidden print:block">
+            {pages.map((pageReceipts, pageIndex) => (
               <div
-                key={receipt.id}
-                className="print:break-inside-avoid"
-                style={index > 0 && index % 2 === 0 ? { pageBreakBefore: 'always' } : undefined}
+                key={pageIndex}
+                className="print-page"
+                style={pageIndex > 0 ? { pageBreakBefore: 'always' } : undefined}
               >
-                <ReceiptCard receipt={receipt} />
+                {pageReceipts.map((receipt, slipIndex) => (
+                  <div key={receipt.id} className="receipt-slip-wrapper">
+                    <div className="receipt-slip-print">
+                      <ReceiptPrintContent receipt={receipt} />
+                    </div>
+                    {/* 切り取り線（最後の1枚以外） */}
+                    {slipIndex < pageReceipts.length - 1 && (
+                      <div className="cut-line-print">
+                        ✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-        </div>
+        </>
       )}
 
       <style>{`
+        /* ===== 印刷設定 ===== */
         @page {
-          size: A4;
-          margin: 10mm;
+          size: A4 portrait;
+          margin: 8mm 10mm;
         }
+
         @media print {
-          body { background: white; margin: 0; }
-          .print\\:hidden { display: none !important; }
-          .print\\:p-0 { padding: 0 !important; }
-          .print\\:gap-0 { gap: 0 !important; }
-          .print\\:break-inside-avoid { break-inside: avoid; }
-          .print\\:max-w-none { max-width: none !important; }
+          html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* 操作バー・画面プレビューを非表示 */
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          /* 印刷ブロックを表示 */
+          .hidden.print\\:block,
+          .print\\:block {
+            display: block !important;
+          }
+
+          /* 1ページ = A4縦（余白込み実効高さ 約281mm） */
+          .print-page {
+            width: 190mm;
+            height: 281mm;
+            display: flex;
+            flex-direction: column;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            overflow: hidden;
+          }
+
+          /* 1枚のラッパー（領収書 + 切り取り線） */
+          .receipt-slip-wrapper {
+            flex-shrink: 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          /* 領収書本体: 1枚 = 48mm */
+          .receipt-slip-print {
+            width: 190mm;
+            height: 48mm;
+            box-sizing: border-box;
+            padding: 3mm 5mm;
+            border: 0.5pt solid #aaa;
+            background: white;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+
+          /* 切り取り線: 5mm */
+          .cut-line-print {
+            height: 5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6.5pt;
+            color: #aaa;
+            letter-spacing: 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+        }
+
+        /* 画面では印刷ブロックを非表示 */
+        @media screen {
+          .hidden.print\\:block,
+          .print\\:block {
+            display: none !important;
+          }
         }
       `}</style>
     </div>
   );
 }
 
-function ReceiptCard({ receipt }: { receipt: any }) {
+/** 画面表示用カード */
+function ReceiptCardScreen({ receipt }: { receipt: any }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm print:shadow-none print:rounded-none print:border print:border-gray-300 print:m-1">
-      {/* タイトル */}
-      <h2 className="text-2xl font-bold text-center text-gray-900 mb-0.5 tracking-widest">領 収 書</h2>
-      <p className="text-center text-xs text-gray-400 mb-4">No. {receipt.receiptNumber}</p>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <p className="text-xs text-gray-400">No. {receipt.receiptNumber}</p>
+          <p className="text-lg font-bold text-gray-900">{receipt.receiptName} 様</p>
+        </div>
+        <p className="text-2xl font-bold text-gray-900">¥{receipt.amount.toLocaleString()}</p>
+      </div>
+      <div className="flex items-center justify-between text-sm text-gray-600">
+        <div>
+          <span className="text-xs text-gray-400 mr-1">但し書き:</span>
+          {receipt.description}
+          {receipt.meetingTitle && <span className="text-xs text-gray-400 ml-1">（{receipt.meetingTitle}）</span>}
+        </div>
+        <div className="text-right text-xs text-gray-400">
+          {formatDate(receipt.issuedDate)} / {receipt.clubName}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 印刷用コンパクトレイアウト（1枚 48mm × 190mm に収める） */
+function ReceiptPrintContent({ receipt }: { receipt: any }) {
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      fontSize: '8pt',
+      fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", "Yu Gothic", sans-serif',
+    }}>
+      {/* ヘッダー行: タイトル + No */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1mm' }}>
+        <div style={{ fontSize: '13pt', fontWeight: 'bold', letterSpacing: '4px' }}>領 収 書</div>
+        <div style={{ fontSize: '7pt', color: '#666' }}>No. {receipt.receiptNumber}</div>
+      </div>
 
       {/* 宛名 */}
-      <div className="border-b-2 border-gray-800 pb-1.5 mb-4">
-        <p className="text-lg font-bold text-gray-900">{receipt.receiptName} 様</p>
+      <div style={{ borderBottom: '1.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm' }}>
+        <span style={{ fontSize: '11pt', fontWeight: 'bold' }}>{receipt.receiptName}</span>
+        <span style={{ fontSize: '9pt' }}> 様</span>
       </div>
 
       {/* 金額 */}
-      <div className="text-center mb-4">
-        <p className="text-xs text-gray-500 mb-0.5">金額</p>
-        <p className="text-3xl font-bold text-gray-900">
-          ¥{receipt.amount.toLocaleString()}<span className="text-base"> -</span>
-        </p>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm', marginBottom: '1.5mm' }}>
+        <span style={{ fontSize: '7pt', color: '#666' }}>金額</span>
+        <span style={{ fontSize: '14pt', fontWeight: 'bold' }}>
+          ¥{receipt.amount.toLocaleString()} -
+        </span>
       </div>
 
       {/* 但し書き */}
-      <div className="bg-gray-50 rounded-lg p-3 mb-4">
-        <p className="text-xs text-gray-500 mb-0.5">但し書き</p>
-        <p className="text-sm font-medium text-gray-800">{receipt.description}</p>
+      <div style={{ backgroundColor: '#f5f5f5', padding: '1.5mm 2mm', marginBottom: '1.5mm', borderRadius: '1mm' }}>
+        <span style={{ fontSize: '7pt', color: '#666' }}>但し書き: </span>
+        <span style={{ fontSize: '8pt' }}>{receipt.description}</span>
         {receipt.meetingTitle && (
-          <p className="text-xs text-gray-500 mt-0.5">（{receipt.meetingTitle}）</p>
+          <span style={{ fontSize: '7pt', color: '#666' }}> （{receipt.meetingTitle}）</span>
         )}
       </div>
 
-      {/* 発行情報 */}
-      <div className="flex justify-between items-end">
+      {/* フッター: 発行日 + クラブ名 + 印章 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto' }}>
         <div>
-          <p className="text-xs text-gray-500">発行日</p>
-          <p className="text-sm text-gray-800">{formatDate(receipt.issuedDate)}</p>
+          <div style={{ fontSize: '7pt', color: '#666' }}>発行日</div>
+          <div style={{ fontSize: '8pt' }}>{formatDate(receipt.issuedDate)}</div>
         </div>
-        <div className="text-right flex items-end gap-3">
-          <div>
-            <p className="text-sm font-bold text-gray-900">{receipt.clubName}</p>
-            {receipt.clubAddress && <p className="text-xs text-gray-500">{receipt.clubAddress}</p>}
-            {receipt.clubPhone && <p className="text-xs text-gray-500">TEL: {receipt.clubPhone}</p>}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2mm' }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '8pt' }}>{receipt.clubName}</div>
+            {receipt.clubAddress && (
+              <div style={{ fontSize: '6.5pt', color: '#666' }}>{receipt.clubAddress}</div>
+            )}
+            {receipt.clubPhone && (
+              <div style={{ fontSize: '6.5pt', color: '#666' }}>TEL: {receipt.clubPhone}</div>
+            )}
           </div>
           {/* 印章スペース */}
-          <div className="w-12 h-12 border-2 border-gray-300 rounded-full flex items-center justify-center text-xs text-gray-300 shrink-0">
-            印
-          </div>
+          <div style={{
+            width: '10mm',
+            height: '10mm',
+            border: '1pt solid #ccc',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '7pt',
+            color: '#ccc',
+            flexShrink: 0,
+          }}>印</div>
         </div>
       </div>
     </div>
