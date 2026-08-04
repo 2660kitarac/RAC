@@ -56,7 +56,7 @@ export default async function ReceiptPrintPage({
   if (!receipt) notFound();
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 print:min-h-0 print:bg-white">
       {/* 操作バー（印刷時は非表示 / Client Component） */}
       <PrintToolbar
         backHref={`/club/${slug}/my/receipts`}
@@ -115,9 +115,9 @@ export default async function ReceiptPrintPage({
       </div>
 
       <style>{`
-        @media print {
-          body { background: white; }
-          .print\\:hidden { display: none !important; }
+        @page {
+          size: A4 portrait;
+          margin: 12mm;
         }
       `}</style>
     </div>

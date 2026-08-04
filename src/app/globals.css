@@ -141,3 +141,51 @@
     }
   }
 }
+
+/* =========================================================
+   印刷共通リセット（レイアウトシェルの解除）
+   ダッシュボードのサイドバー・ヘッダー・スクロール枠が
+   印刷に混入し、内容が見切れる問題を防ぐ。
+   ========================================================= */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* サイドバー・トップバー等のクロームを非表示 */
+  [data-app-chrome] {
+    display: none !important;
+  }
+
+  /* h-screen / overflow-hidden / flex を解除して自然な流し込みに */
+  [data-app-shell],
+  [data-app-body],
+  [data-app-main] {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  /* メインコンテンツの余白・最大幅を解除（見切れ防止） */
+  [data-app-content] {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  /* 印刷ページ内で sticky/fixed が残ると重なるため解除 */
+  .sticky,
+  .fixed {
+    position: static !important;
+  }
+}

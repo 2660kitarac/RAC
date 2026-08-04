@@ -45,7 +45,7 @@ export default async function AdminReceiptPrintPage({
   const copies = Array(5).fill(receipt);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 print:min-h-0 print:bg-white">
       {/* 操作バー（印刷時非表示 / Client Component） */}
       <PrintToolbar
         backHref="/receipts"
@@ -53,27 +53,33 @@ export default async function AdminReceiptPrintPage({
         maxWidthClass="max-w-2xl"
       />
 
-      {/* 画面プレビュー（印刷時非表示） */}
-      <div className="print:hidden max-w-2xl mx-auto p-6">
+      {/* 画面プレビュー（印刷時は非表示） */}
+      <div className="screen-only max-w-2xl mx-auto p-6">
         <div className="mb-3 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
           📄 印刷時はA4縦1枚に同じ領収書が5枚並んで出力されます
         </div>
-        <ReceiptCard receipt={receipt} />
+        <div className="bg-white rounded-2xl shadow-sm p-8">
+          <ReceiptContent receipt={receipt} />
+        </div>
       </div>
 
       {/* 印刷用レイアウト（画面では非表示・印刷時のみ表示） */}
-      <div className="hidden print:block receipt-print-page">
-        {copies.map((r, i) => (
-          <div key={i} className="receipt-slip">
-            <ReceiptCard receipt={r} />
-            {/* 領収書間の切り取り線（最後の1枚以外） */}
-            {i < copies.length - 1 && (
-              <div className="cut-line">
-                <span>✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─</span>
+      <div className="print-root">
+        <div className="print-page">
+          {copies.map((r, i) => (
+            <div key={i} className="receipt-slip-wrapper">
+              <div className="receipt-slip-print">
+                <ReceiptPrintContent receipt={r} />
               </div>
-            )}
-          </div>
-        ))}
+              {/* 領収書間の切り取り線（最後の1枚以外） */}
+              {i < copies.length - 1 && (
+                <div className="cut-line-print">
+                  ✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <style>{`
@@ -83,53 +89,39 @@ export default async function AdminReceiptPrintPage({
           margin: 8mm 10mm;
         }
 
-        @media print {
-          html, body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
+        /* 画面表示時：印刷専用ブロックを隠す */
+        .print-root {
+          display: none;
+        }
 
-          /* 操作バー・プレビューを非表示 */
-          .print\\:hidden {
+        @media print {
+          /* 画面専用要素を隠す */
+          .screen-only {
             display: none !important;
           }
 
-          /* 印刷ページを表示 */
-          .hidden.print\\:block,
-          .print\\:block {
+          /* 印刷専用ブロックを表示 */
+          .print-root {
             display: block !important;
-          }
-
-          /* A4縦（余白込み実効高さ約281mm）に5枚収める */
-          /* 1枚あたり約54mm（281 / 5 = 56.2mm、余裕を持って54mm） */
-          .receipt-print-page {
             width: 190mm;
             margin: 0 auto;
           }
 
-          .receipt-slip {
+          /* 1ページ＝領収書5枚分。高さは固定しない（先頭見切れ防止） */
+          .print-page {
             width: 190mm;
+            display: block;
+            overflow: visible;
+          }
+
+          /* 1枚のラッパー（領収書 + 切り取り線） */
+          .receipt-slip-wrapper {
             page-break-inside: avoid;
             break-inside: avoid;
           }
 
-          /* 切り取り線 */
-          .cut-line {
-            width: 100%;
-            text-align: center;
-            font-size: 7pt;
-            color: #999;
-            line-height: 1;
-            height: 6mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            letter-spacing: 0;
-          }
-
-          /* 領収書カード（印刷時） */
-          .receipt-card-print {
+          /* 領収書本体: 1枚 = 48mm */
+          .receipt-slip-print {
             width: 190mm;
             height: 48mm;
             box-sizing: border-box;
@@ -142,12 +134,19 @@ export default async function AdminReceiptPrintPage({
             page-break-inside: avoid;
             break-inside: avoid;
           }
-        }
 
-        /* 画面用プレビュースタイル */
-        @media screen {
-          .receipt-print-page {
-            display: none;
+          /* 切り取り線: 5mm */
+          .cut-line-print {
+            height: 5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6.5pt;
+            color: #aaa;
+            line-height: 1;
+            letter-spacing: 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
         }
       `}</style>
@@ -155,22 +154,7 @@ export default async function AdminReceiptPrintPage({
   );
 }
 
-function ReceiptCard({ receipt }: { receipt: any }) {
-  return (
-    <>
-      {/* 画面表示用（印刷時は非表示） */}
-      <div className="print:hidden bg-white rounded-2xl shadow-sm p-8">
-        <ReceiptContent receipt={receipt} />
-      </div>
-
-      {/* 印刷用（画面では非表示） */}
-      <div className="receipt-card-print hidden print:flex" style={{ flexDirection: 'column' }}>
-        <ReceiptPrintContent receipt={receipt} />
-      </div>
-    </>
-  );
-}
-
+/** 画面プレビュー用レイアウト */
 function ReceiptContent({ receipt }: { receipt: any }) {
   return (
     <>

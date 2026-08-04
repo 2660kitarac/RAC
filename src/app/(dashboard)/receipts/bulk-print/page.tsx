@@ -117,7 +117,7 @@ export default async function BulkPrintPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 print:min-h-0 print:bg-white">
       {/* 操作バー（印刷時非表示 / Client Component） */}
       <PrintToolbar
         backHref="/receipts"
@@ -128,7 +128,7 @@ export default async function BulkPrintPage({
       />
 
       {receiptList.length === 0 ? (
-        <div className="flex items-center justify-center min-h-64 print:hidden">
+        <div className="screen-only flex items-center justify-center min-h-64">
           <div className="text-center text-gray-400">
             <p className="text-lg">印刷する領収書がありません</p>
             <p className="text-sm mt-1">一括発行後にこのページを開いてください</p>
@@ -137,7 +137,7 @@ export default async function BulkPrintPage({
       ) : (
         <>
           {/* 画面プレビュー（印刷時非表示） */}
-          <div className="print:hidden max-w-3xl mx-auto p-6 space-y-3">
+          <div className="screen-only max-w-3xl mx-auto p-6 space-y-3">
             <div className="text-sm text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
               📄 印刷時はA4縦1枚に5枚ずつ並んで出力されます
             </div>
@@ -147,13 +147,9 @@ export default async function BulkPrintPage({
           </div>
 
           {/* 印刷用レイアウト（画面では非表示・印刷時のみ） */}
-          <div className="hidden print:block">
+          <div className="print-root">
             {pages.map((pageReceipts, pageIndex) => (
-              <div
-                key={pageIndex}
-                className="print-page"
-                style={pageIndex > 0 ? { pageBreakBefore: 'always' } : undefined}
-              >
+              <div key={pageIndex} className="print-page">
                 {pageReceipts.map((receipt, slipIndex) => (
                   <div key={receipt.id} className="receipt-slip-wrapper">
                     <div className="receipt-slip-print">
@@ -180,38 +176,39 @@ export default async function BulkPrintPage({
           margin: 8mm 10mm;
         }
 
-        @media print {
-          html, body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
+        /* 画面表示時：印刷専用ブロックを隠す */
+        .print-root {
+          display: none;
+        }
 
-          /* 操作バー・画面プレビューを非表示 */
-          .print\\:hidden {
+        @media print {
+          /* 画面専用要素を隠す */
+          .screen-only {
             display: none !important;
           }
 
-          /* 印刷ブロックを表示 */
-          .hidden.print\\:block,
-          .print\\:block {
+          /* 印刷専用ブロックを表示 */
+          .print-root {
             display: block !important;
+            width: 190mm;
+            margin: 0 auto;
           }
 
-          /* 1ページ = A4縦（余白込み実効高さ 約281mm） */
+          /* 1ページ＝領収書5枚分。高さ固定しない（先頭見切れ防止） */
           .print-page {
             width: 190mm;
-            height: 281mm;
-            display: flex;
-            flex-direction: column;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            overflow: hidden;
+            display: block;
+            overflow: visible;
+          }
+
+          /* 2ページ目以降の先頭で改ページ */
+          .print-page + .print-page {
+            page-break-before: always;
+            break-before: page;
           }
 
           /* 1枚のラッパー（領収書 + 切り取り線） */
           .receipt-slip-wrapper {
-            flex-shrink: 0;
             page-break-inside: avoid;
             break-inside: avoid;
           }
@@ -242,14 +239,6 @@ export default async function BulkPrintPage({
             letter-spacing: 0;
             page-break-inside: avoid;
             break-inside: avoid;
-          }
-        }
-
-        /* 画面では印刷ブロックを非表示 */
-        @media screen {
-          .hidden.print\\:block,
-          .print\\:block {
-            display: none !important;
           }
         }
       `}</style>

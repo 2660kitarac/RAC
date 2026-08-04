@@ -16,9 +16,9 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50" data-app-shell>
       {/* デスクトップサイドバー */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
+      <div className="hidden lg:flex lg:flex-shrink-0 print:hidden" data-app-chrome>
         <div className="w-64">
           <Sidebar user={user} pendingMembersCount={pendingMembersCount} />
         </div>
@@ -26,7 +26,7 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
 
       {/* モバイルサイドバー */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden print:hidden" data-app-chrome>
           <div
             className="fixed inset-0 bg-black/50"
             onClick={() => setSidebarOpen(false)}
@@ -46,9 +46,12 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
       )}
 
       {/* メインコンテンツ */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden" data-app-body>
         {/* トップバー */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0">
+        <header
+          className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0 print:hidden"
+          data-app-chrome
+        >
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
@@ -74,8 +77,8 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
         </header>
 
         {/* ページコンテンツ */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-6 max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto" data-app-main>
+          <div className="p-4 md:p-6 max-w-7xl mx-auto" data-app-content>
             {children}
           </div>
         </main>
