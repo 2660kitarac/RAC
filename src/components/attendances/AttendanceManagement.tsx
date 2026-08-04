@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   Search, ArrowLeft, Download, Users, DollarSign,
   CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass,
-  Pencil, X, Trash2, ArrowUpDown, ArrowUp, ArrowDown,
+  Pencil, X, Trash2, ArrowUpDown, ArrowUp, ArrowDown, UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,110 @@ export default function AttendanceManagement({
   // 参加形態インライン編集
   const [ptEditId, setPtEditId] = useState<string | null>(null);
   const [ptEditLoading, setPtEditLoading] = useState(false);
+
+  // 手動追加モーダル
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: '', phone: '', email: '', clubName: '',
+    memberType: 'RAC', participationType: 'meeting_only',
+    feeAmount: 0, feeOverride: false, note: '',
+  });
+  const [addSaving, setAddSaving] = useState(false);
+
+  // 登録料自動計算
+  const calcFee = (memberType: string, participationType: string): number => {
+    const m = meeting as any;
+    const feeRac   = m.feeRac   ?? m.fee_rac   ?? 0;
+    const feeRc    = m.feeRc    ?? m.fee_rc    ?? 0;
+    const feeObog  = m.feeObog  ?? m.fee_obog  ?? 0;
+    const feeGuest = m.feeGuest ?? m.fee_guest ?? 0;
+    let base = 0;
+    switch (memberType) {
+      case 'RAC':   base = feeRac;   break;
+      case 'RC':    base = feeRc;    break;
+      case 'OB_OG': base = feeObog;  break;
+      case 'GUEST': base = feeGuest; break;
+      default:      base = feeGuest;
+    }
+    let party = 0;
+    if (participationType === 'meeting_and_party' && hasAfterParty) {
+      switch (memberType) {
+        case 'RAC':   party = m.afterPartyFeeRac   ?? m.after_party_fee_rac   ?? 0; break;
+        case 'RC':    party = m.afterPartyFeeRc    ?? m.after_party_fee_rc    ?? 0; break;
+        case 'OB_OG': party = m.afterPartyFeeObog  ?? m.after_party_fee_obog  ?? 0; break;
+        case 'GUEST': party = m.afterPartyFeeGuest ?? m.after_party_fee_guest ?? 0; break;
+      }
+    }
+    return base + party;
+  };
+
+  const updateAddField = (field: string, value: string | number | boolean) => {
+    setAddForm(prev => {
+      const next = { ...prev, [field]: value } as typeof prev;
+      if (!next.feeOverride) {
+        next.feeAmount = calcFee(next.memberType, next.participationType);
+      }
+      return next;
+    });
+  };
+
+  const openAddModal = () => {
+    const fee = calcFee('RAC', 'meeting_only');
+    setAddForm({ name: '', phone: '', email: '', clubName: '', memberType: 'RAC', participationType: 'meeting_only', feeAmount: fee, feeOverride: false, note: '' });
+    setShowAddModal(true);
+  };
+
+  const handleAddSubmit = async () => {
+    if (!addForm.name.trim()) { toast.error('氏名を入力してください'); return; }
+    setAddSaving(true);
+    try {
+      const res = await fetch('/api/attendances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingId: meeting.id,
+          externalName: addForm.name.trim(),
+          externalPhone: addForm.phone.trim() || null,
+          externalEmail: addForm.email.trim() || null,
+          clubName: addForm.clubName.trim() || null,
+          memberType: addForm.memberType,
+          participationType: addForm.participationType,
+          feeAmount: addForm.feeAmount,
+          attendanceStatus: 'undecided',
+          paymentStatus: 'unpaid',
+          registrationType: 'manual',
+          note: addForm.note.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const created = await res.json();
+      setAttendances(prev => [...prev, {
+        id: created.id,
+        externalName: addForm.name.trim(),
+        external_name: addForm.name.trim(),
+        clubName: addForm.clubName.trim() || null,
+        club_name: addForm.clubName.trim() || null,
+        memberType: addForm.memberType,
+        member_type: addForm.memberType,
+        participationType: addForm.participationType,
+        participation_type: addForm.participationType,
+        feeAmount: addForm.feeAmount,
+        fee_amount: addForm.feeAmount,
+        attendanceStatus: 'undecided',
+        attendance_status: 'undecided',
+        paymentStatus: 'unpaid',
+        payment_status: 'unpaid',
+        note: addForm.note.trim() || null,
+        userId: null,
+      } as any]);
+      toast.success(`${addForm.name} を登録しました`);
+      setShowAddModal(false);
+    } catch {
+      toast.error('登録に失敗しました');
+    } finally {
+      setAddSaving(false);
+    }
+  };
 
   const startFeeEdit = (a: any) => {
     setFeeEditId(a.id);
@@ -454,6 +558,14 @@ export default function AttendanceManagement({
             <Download className="h-4 w-4" />
             CSV
           </Button>
+          <Button
+            size="sm"
+            onClick={openAddModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+          >
+            <UserPlus className="h-4 w-4" />
+            手動追加
+          </Button>
         </div>
       </div>
 
@@ -778,6 +890,150 @@ export default function AttendanceManagement({
             </Card>
           )}
         </>
+      )}
+
+      {/* ===== 手動追加モーダル ===== */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-blue-600" />
+                <h2 className="font-bold text-gray-900 text-base">参加者を手動追加</h2>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* フォーム */}
+            <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+              {/* 氏名 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  氏名 <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={addForm.name}
+                  onChange={e => updateAddField('name', e.target.value)}
+                  placeholder="例: 山田 太郎"
+                  autoFocus
+                />
+              </div>
+
+              {/* 電話番号 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  電話番号 <span className="text-xs text-gray-400 font-normal">（任意）</span>
+                </label>
+                <Input
+                  type="tel"
+                  value={addForm.phone}
+                  onChange={e => updateAddField('phone', e.target.value)}
+                  placeholder="例: 090-1234-5678"
+                />
+              </div>
+
+              {/* 所属クラブ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  所属クラブ <span className="text-xs text-gray-400 font-normal">（任意）</span>
+                </label>
+                <Input
+                  value={addForm.clubName}
+                  onChange={e => updateAddField('clubName', e.target.value)}
+                  placeholder="例: ○○ローターアクトクラブ"
+                />
+              </div>
+
+              {/* 区分 + 参加形態 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">区分</label>
+                  <Select value={addForm.memberType} onValueChange={v => updateAddField('memberType', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="RAC">RAC</SelectItem>
+                      <SelectItem value="RC">RC</SelectItem>
+                      <SelectItem value="OB_OG">OB・OG</SelectItem>
+                      <SelectItem value="GUEST">ゲスト</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">参加形態</label>
+                  <Select value={addForm.participationType} onValueChange={v => updateAddField('participationType', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="meeting_only">例会のみ</SelectItem>
+                      {hasAfterParty && <SelectItem value="meeting_and_party">例会＋懇親会</SelectItem>}
+                      <SelectItem value="absent">欠席</SelectItem>
+                      <SelectItem value="waitlist">キャンセル待ち</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* 登録料 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  登録料
+                  {!addForm.feeOverride && <span className="ml-1 text-xs text-blue-500 font-normal">（自動計算）</span>}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 text-sm">¥</span>
+                  <Input
+                    type="number" min="0" step="100"
+                    value={addForm.feeAmount}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 0;
+                      setAddForm(prev => ({ ...prev, feeAmount: val, feeOverride: true }));
+                    }}
+                    className="flex-1"
+                  />
+                  {addForm.feeOverride && (
+                    <button
+                      type="button"
+                      onClick={() => setAddForm(prev => ({ ...prev, feeAmount: calcFee(prev.memberType, prev.participationType), feeOverride: false }))}
+                      className="text-xs text-blue-500 hover:underline whitespace-nowrap"
+                    >
+                      自動計算に戻す
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* メモ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  メモ <span className="text-xs text-gray-400 font-normal">（任意）</span>
+                </label>
+                <textarea
+                  value={addForm.note}
+                  onChange={e => setAddForm(prev => ({ ...prev, note: e.target.value }))}
+                  placeholder="電話受付、紹介者名など"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* フッター */}
+            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-2xl flex-shrink-0">
+              <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={addSaving}>
+                キャンセル
+              </Button>
+              <Button
+                onClick={handleAddSubmit}
+                disabled={addSaving || !addForm.name.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {addSaving ? '追加中...' : '追加する'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 削除確認ダイアログ */}
