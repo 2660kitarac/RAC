@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   Search, ArrowLeft, Download, Users, DollarSign,
   CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass, AlertCircle,
-  Pencil, X
+  Pencil, X, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,22 @@ export default function AttendanceManagement({
   const [participationFilter, setParticipationFilter] = useState<string>('all');
   const [loading, setLoading] = useState<string | null>(null);
   const [receptionMode, setReceptionMode] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const deleteAttendance = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const res = await fetch(`/api/attendances/${deleteTarget.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('削除に失敗しました');
+    } else {
+      setAttendances(prev => prev.filter(a => (a as any).id !== deleteTarget.id));
+      toast.success('参加者を削除しました');
+      setDeleteTarget(null);
+    }
+    setDeleteLoading(false);
+  };
 
   // 参加者基本情報編集モーダル用
   const [editTarget, setEditTarget] = useState<any | null>(null);
@@ -417,15 +433,26 @@ export default function AttendanceManagement({
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditModal(a)}
-                              title="参加者情報を編集"
-                              className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditModal(a)}
+                                title="参加者情報を編集"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteTarget(a)}
+                                title="参加者を削除"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant="secondary" className="text-xs">
@@ -518,6 +545,41 @@ export default function AttendanceManagement({
             </Card>
           )}
         </>
+      )}
+
+      {/* 削除確認ダイアログ */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-red-500" />
+                参加者を削除
+              </h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">
+                  {(deleteTarget as any).user?.name || (deleteTarget as any).externalName || (deleteTarget as any).external_name || '（名前なし）'}
+                </span>
+                を参加者リストから削除しますか？
+              </p>
+              <p className="text-xs text-red-600 mt-2">この操作は取り消せません。</p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+                キャンセル
+              </Button>
+              <Button
+                onClick={deleteAttendance}
+                disabled={deleteLoading}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteLoading ? '削除中...' : '削除する'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 参加者基本情報編集モーダル */}

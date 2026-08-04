@@ -88,11 +88,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
       }
 
-      // 対象出席レコードを取得
+      // 対象出席レコードを取得（支払済み・領収書必要の制限を撤廃 #issue3）
       const baseConditions = and(
         eq(attendances.meetingId, meetingId),
-        eq(attendances.receiptRequired, true),
-        eq(attendances.paymentStatus, 'paid'),
         isNull(attendances.deletedAt),
       );
 
@@ -299,10 +297,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'meetingId は必須です' }, { status: 400 });
       }
 
+      // 支払済み・領収書必要の制限を撤廃 #issue3
       const baseConditions = and(
         eq(attendances.meetingId, meetingId),
-        eq(attendances.receiptRequired, true),
-        eq(attendances.paymentStatus, 'paid'),
         isNull(attendances.deletedAt),
       );
       const condition = mode === 'external'

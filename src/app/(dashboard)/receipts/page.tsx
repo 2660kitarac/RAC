@@ -68,8 +68,6 @@ export default async function ReceiptsPage({
     })
       .from(attendances)
       .where(and(
-        eq(attendances.receiptRequired, true),
-        eq(attendances.paymentStatus, 'paid'),
         isNull(attendances.deletedAt),
       ))
       .limit(50),

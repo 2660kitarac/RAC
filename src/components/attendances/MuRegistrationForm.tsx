@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2 } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2, UserX } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
 
 // 役職の選択肢
@@ -104,6 +104,7 @@ function calcAfterPartyFee(memberType: string, meeting: MeetingWithParty): numbe
 export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuRegistrationFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [absentLoading, setAbsentLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [registrationData, setRegistrationData] = useState<{
     name: string;
@@ -112,6 +113,14 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
     participationType: string;
     email: string;
   } | null>(null);
+
+  // 自クラブ会員判定（loggedInUser の clubId と meeting の club_id が一致する場合）
+  const isOwnClubMember = !!(
+    loggedInUser &&
+    loggedInUser.clubId &&
+    (meeting as any).club_id &&
+    loggedInUser.clubId === (meeting as any).club_id
+  );
 
   const hasAfterParty = !!(meeting.has_after_party);
   const afterPartyFeeType = meeting.after_party_fee_type ?? 'fixed';
@@ -191,7 +200,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           externalName: (loggedInUser && !isAdminRole(loggedInUser.role)) ? null : data.name,
           externalEmail: (loggedInUser && !isAdminRole(loggedInUser.role)) ? null : data.email,
           externalPhone: data.phone || null,
-          memberType: data.member_type,
+          // 自クラブ会員は RAC 固定
+          memberType: isOwnClubMember && !isAdminRole(loggedInUser?.role ?? '') ? 'RAC' : data.member_type,
           attendanceStatus: 'undecided',
           registrationType: 'mu',
           mealRequired: data.meal_required,
@@ -246,6 +256,58 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
     }
   };
 
+  // 欠席登録（自クラブ会員専用）
+  const handleAbsentSubmit = async () => {
+    if (!loggedInUser) return;
+    setAbsentLoading(true);
+    try {
+      const res = await fetch('/api/attendances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meetingId: meeting.id,
+          userId: loggedInUser.id,
+          clubId: loggedInUser.clubId || null,
+          clubName: loggedInUser.clubName || '',
+          externalName: null,
+          externalEmail: null,
+          externalPhone: null,
+          memberType: 'RAC',
+          attendanceStatus: 'absent',
+          registrationType: 'mu',
+          mealRequired: false,
+          feeAmount: 0,
+          paymentStatus: 'exempt',
+          participationType: 'absent',
+          afterPartyFeeAmount: 0,
+          receiptRequired: false,
+          note: '欠席登録（MU登録フォームより）',
+        }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        if (resData.error?.includes('重複') || resData.error?.includes('UNIQUE')) {
+          toast.error('すでに登録済みです', { description: 'この例会はすでに欠席登録されています' });
+          return;
+        }
+        throw new Error(resData.error);
+      }
+      setRegistrationData({
+        name: loggedInUser.name,
+        feeAmount: 0,
+        afterPartyFeeAmount: 0,
+        participationType: 'absent',
+        email: loggedInUser.email,
+      });
+      setSubmitted(true);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '欠席登録に失敗しました';
+      toast.error('エラーが発生しました', { description: message });
+    } finally {
+      setAbsentLoading(false);
+    }
+  };
+
   // 登録完了画面
   if (submitted && registrationData) {
     return (
@@ -255,9 +317,14 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">登録が完了しました</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              {registrationData.participationType === 'absent' ? '欠席登録が完了しました' : '登録が完了しました'}
+            </h2>
             <p className="text-gray-600 text-sm mb-4">
-              {registrationData.name} 様のご登録を承りました。
+              {registrationData.participationType === 'absent'
+                ? `${registrationData.name} 様の欠席を承りました。`
+                : `${registrationData.name} 様のご登録を承りました。`
+              }
             </p>
 
             <div className="bg-gray-50 rounded-lg p-4 text-left space-y-2 mb-6">
@@ -519,38 +586,78 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
       {/* フォーム */}
       <div className="max-w-2xl mx-auto px-4 py-6">
-
         {/* ログイン済みバナー */}
         {loggedInUser ? (
-          <div className={`mb-4 border rounded-lg p-4 flex items-start gap-3 ${
-            isAdminRole(loggedInUser.role)
-              ? 'bg-blue-50 border-blue-200'
-              : 'bg-green-50 border-green-200'
-          }`}>
-            <LogIn className={`h-5 w-5 mt-0.5 shrink-0 ${
-              isAdminRole(loggedInUser.role) ? 'text-blue-600' : 'text-green-600'
-            }`} />
-            <div>
-              <p className={`text-sm font-medium ${
-                isAdminRole(loggedInUser.role) ? 'text-blue-800' : 'text-green-800'
-              }`}>
-                {loggedInUser.name} さんとしてログイン中
-                {isAdminRole(loggedInUser.role) && (
-                  <span className="ml-2 text-xs font-normal bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                    管理者モード
-                  </span>
-                )}
-              </p>
-              <p className={`text-xs mt-0.5 ${
-                isAdminRole(loggedInUser.role) ? 'text-blue-600' : 'text-green-600'
-              }`}>
-                {isAdminRole(loggedInUser.role)
-                  ? '管理者権限でログイン中です。お名前・メール・所属クラブは自由に入力できます。'
-                  : 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
-                }
-              </p>
+          <>
+            <div className={`mb-4 border rounded-lg p-4 flex items-start gap-3 ${
+              isAdminRole(loggedInUser.role)
+                ? 'bg-blue-50 border-blue-200'
+                : isOwnClubMember
+                  ? 'bg-indigo-50 border-indigo-200'
+                  : 'bg-green-50 border-green-200'
+            }`}>
+              <LogIn className={`h-5 w-5 mt-0.5 shrink-0 ${
+                isAdminRole(loggedInUser.role) ? 'text-blue-600'
+                  : isOwnClubMember ? 'text-indigo-600'
+                  : 'text-green-600'
+              }`} />
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${
+                  isAdminRole(loggedInUser.role) ? 'text-blue-800'
+                    : isOwnClubMember ? 'text-indigo-800'
+                    : 'text-green-800'
+                }`}>
+                  {loggedInUser.name} さんとしてログイン中
+                  {isAdminRole(loggedInUser.role) && (
+                    <span className="ml-2 text-xs font-normal bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                      管理者モード
+                    </span>
+                  )}
+                  {isOwnClubMember && !isAdminRole(loggedInUser.role) && (
+                    <span className="ml-2 text-xs font-normal bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                      自クラブ会員
+                    </span>
+                  )}
+                </p>
+                <p className={`text-xs mt-0.5 ${
+                  isAdminRole(loggedInUser.role) ? 'text-blue-600'
+                    : isOwnClubMember ? 'text-indigo-600'
+                    : 'text-green-600'
+                }`}>
+                  {isAdminRole(loggedInUser.role)
+                    ? '管理者権限でログイン中です。お名前・メール・所属クラブは自由に入力できます。'
+                    : isOwnClubMember
+                      ? 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
+                      : 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
+                  }
+                </p>
+              </div>
             </div>
-          </div>
+
+            {/* 自クラブ会員向け欠席ボタン */}
+            {isOwnClubMember && !isAdminRole(loggedInUser.role) && (
+              <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <UserX className="h-4 w-4 text-gray-500" />
+                  欠席の方はこちら
+                </p>
+                <p className="text-xs text-gray-500 mb-3">
+                  この例会を欠席する場合は、下のボタンから欠席登録ができます。
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={absentLoading}
+                  onClick={handleAbsentSubmit}
+                  className="w-full border-gray-300 text-gray-700 hover:bg-gray-100"
+                >
+                  <UserX className="h-4 w-4 mr-1.5" />
+                  欠席を登録する
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
             <LogIn className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
@@ -603,21 +710,29 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
               <div className="form-group">
                 <Label required>区分</Label>
-                <Select
-                  onValueChange={v => setValue('member_type', v as MemberType)}
-                  defaultValue="RAC"
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RAC">ローターアクター（RAC）</SelectItem>
-                    <SelectItem value="RC">ロータリアン（RC）</SelectItem>
-                    <SelectItem value="OB_OG">OB・OG</SelectItem>
-                    <SelectItem value="GUEST">ゲスト</SelectItem>
-                    <SelectItem value="OTHER">その他</SelectItem>
-                  </SelectContent>
-                </Select>
+                {isOwnClubMember && !isAdminRole(loggedInUser?.role ?? '') ? (
+                  // 自クラブ会員は RAC 固定
+                  <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">RAC</span>
+                    ローターアクター（自動設定）
+                  </div>
+                ) : (
+                  <Select
+                    onValueChange={v => setValue('member_type', v as MemberType)}
+                    defaultValue="RAC"
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="RAC">ローターアクター（RAC）</SelectItem>
+                      <SelectItem value="RC">ロータリアン（RC）</SelectItem>
+                      <SelectItem value="OB_OG">OB・OG</SelectItem>
+                      <SelectItem value="GUEST">ゲスト</SelectItem>
+                      <SelectItem value="OTHER">その他</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {/* 役職 */}
