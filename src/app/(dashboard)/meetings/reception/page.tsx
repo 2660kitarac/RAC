@@ -19,8 +19,14 @@ export default async function MeetingReceptionPage() {
   const meetingsResult = await db
     .select({
       id: meetings.id, title: meetings.title, date: meetings.date,
-      status: meetings.status, feeRac: meetings.feeRac, feeRc: meetings.feeRc,
+      status: meetings.status,
+      feeRac: meetings.feeRac, feeRc: meetings.feeRc,
       feeObog: meetings.feeObog, feeGuest: meetings.feeGuest,
+      mealFee: meetings.mealFee,
+      hasAfterParty: meetings.hasAfterParty,
+      afterPartyFeeRac: meetings.afterPartyFeeRac, afterPartyFeeRc: meetings.afterPartyFeeRc,
+      afterPartyFeeObog: meetings.afterPartyFeeObog, afterPartyFeeGuest: meetings.afterPartyFeeGuest,
+      ownClubFee: meetings.ownClubFee,
     })
     .from(meetings)
     .where(and(
