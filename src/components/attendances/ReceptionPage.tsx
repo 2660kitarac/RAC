@@ -8,19 +8,48 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import type { UserRole, Attendance, PaymentStatus } from '@/types';
-import { ATTENDANCE_STATUS_LABELS, PAYMENT_STATUS_COLORS, MEMBER_TYPE_LABELS } from '@/types';
-import { CheckCircle2, XCircle, Clock, Users } from 'lucide-react';
+import type { UserRole, PaymentStatus } from '@/types';
+import { MEMBER_TYPE_LABELS } from '@/types';
+import { CheckCircle2, XCircle, Clock, Users, Building2, Globe } from 'lucide-react';
 
 interface ReceptionMeeting {
   id: string;
   title: string;
   date: string;
   status: string;
-  fee_rac: number;
-  fee_rc: number;
-  fee_obog: number;
-  fee_guest: number;
+  // camelCase (SELECTの結果)
+  feeRac?: number;
+  feeRc?: number;
+  feeObog?: number;
+  feeGuest?: number;
+  // snake_case (後方互換)
+  fee_rac?: number;
+  fee_rc?: number;
+  fee_obog?: number;
+  fee_guest?: number;
+}
+
+interface AttendanceItem {
+  id: string;
+  userId?: string | null;
+  user_id?: string | null;
+  // camelCase (API返却)
+  userName?: string | null;
+  externalName?: string | null;
+  clubName?: string | null;
+  memberType?: string;
+  attendanceStatus?: string;
+  attendance_status?: string;
+  paymentStatus?: string;
+  payment_status?: string;
+  feeAmount?: number;
+  fee_amount?: number;
+  receiptRequired?: boolean;
+  receipt_required?: boolean;
+  participationType?: string;
+  participation_type?: string;
+  // その他
+  [key: string]: unknown;
 }
 
 interface ReceptionPageProps {
@@ -29,9 +58,35 @@ interface ReceptionPageProps {
   userRole: UserRole;
 }
 
+// データアクセスヘルパー
+function getName(a: AttendanceItem): string {
+  return a.userName ?? a.externalName ?? '—';
+}
+function getAttendanceStatus(a: AttendanceItem): string {
+  return (a.attendanceStatus ?? a.attendance_status ?? 'undecided') as string;
+}
+function getPaymentStatus(a: AttendanceItem): string {
+  return (a.paymentStatus ?? a.payment_status ?? 'unpaid') as string;
+}
+function getFeeAmount(a: AttendanceItem): number {
+  return (a.feeAmount ?? a.fee_amount ?? 0) as number;
+}
+function getMemberType(a: AttendanceItem): string {
+  return (a.memberType ?? (a as any).member_type ?? 'RAC') as string;
+}
+function getClubName(a: AttendanceItem): string {
+  return (a.clubName ?? (a as any).club_name ?? '') as string;
+}
+function getUserId(a: AttendanceItem): string | null {
+  return (a.userId ?? a.user_id ?? null) as string | null;
+}
+function getParticipationType(a: AttendanceItem): string {
+  return (a.participationType ?? a.participation_type ?? 'meeting_only') as string;
+}
+
 export default function ReceptionPage({ meetings, clubId, userRole }: ReceptionPageProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState(meetings[0]?.id ?? '');
-  const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
 
@@ -60,18 +115,11 @@ export default function ReceptionPage({ meetings, clubId, userRole }: ReceptionP
     if (meetings[0]?.id) fetchAttendances(meetings[0].id);
   });
 
-  // 出席・支払確認を一括更新（受付モード）
-  const handleCheckin = async (attendance: Attendance) => {
-    setLoadingIds(prev => new Set([...prev, attendance.id]));
+  // 受付ボタン（出席済み + 支払済に一括更新）
+  const handleCheckin = async (a: AttendanceItem) => {
+    setLoadingIds(prev => new Set([...prev, a.id]));
     try {
-      const updates: Partial<Attendance> = {
-        attendance_status: 'present',
-        payment_status: 'paid' as PaymentStatus,
-        payment_method: 'cash',
-        paid_at: new Date().toISOString(),
-      };
-
-      const res = await fetch(`/api/attendances/${attendance.id}`, {
+      const res = await fetch(`/api/attendances/${a.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,46 +129,56 @@ export default function ReceptionPage({ meetings, clubId, userRole }: ReceptionP
       });
       if (!res.ok) throw new Error();
 
-      setAttendances(prev => prev.map(a =>
-        a.id === attendance.id ? { ...a, ...updates } : a
+      setAttendances(prev => prev.map(item =>
+        item.id === a.id ? {
+          ...item,
+          attendanceStatus: 'present', attendance_status: 'present',
+          paymentStatus: 'paid', payment_status: 'paid',
+        } : item
       ));
-      toast.success(`${attendance.external_name ?? attendance.user?.name ?? '参加者'} の受付完了`);
+      toast.success(`${getName(a)} の受付完了`);
     } catch {
       toast.error('更新に失敗しました');
     } finally {
-      setLoadingIds(prev => { const s = new Set(prev); s.delete(attendance.id); return s; });
+      setLoadingIds(prev => { const s = new Set(prev); s.delete(a.id); return s; });
     }
   };
 
-  const handleAbsent = async (attendance: Attendance) => {
-    setLoadingIds(prev => new Set([...prev, attendance.id]));
+  const handleAbsent = async (a: AttendanceItem) => {
+    setLoadingIds(prev => new Set([...prev, a.id]));
     try {
-      const res = await fetch(`/api/attendances/${attendance.id}`, {
+      const res = await fetch(`/api/attendances/${a.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ attendanceStatus: 'absent' }),
       });
       if (!res.ok) throw new Error();
-      setAttendances(prev => prev.map(a =>
-        a.id === attendance.id ? { ...a, attendance_status: 'absent' } : a
+      setAttendances(prev => prev.map(item =>
+        item.id === a.id ? { ...item, attendanceStatus: 'absent', attendance_status: 'absent' } : item
       ));
       toast.success('欠席に設定しました');
     } catch {
       toast.error('更新に失敗しました');
     } finally {
-      setLoadingIds(prev => { const s = new Set(prev); s.delete(attendance.id); return s; });
+      setLoadingIds(prev => { const s = new Set(prev); s.delete(a.id); return s; });
     }
   };
 
-  // 集計
-  const presentCount = attendances.filter(a => a.attendance_status === 'present').length;
-  const undecidedCount = attendances.filter(a => a.attendance_status === 'undecided').length;
-  const paidCount = attendances.filter(a => a.payment_status === 'paid').length;
+  // 集計（欠席・キャンセル待ち除外）
+  const activeAttendances = attendances.filter(a => {
+    const pt = getParticipationType(a);
+    return pt !== 'absent' && pt !== 'waitlist';
+  });
+  const presentCount = activeAttendances.filter(a => getAttendanceStatus(a) === 'present').length;
+  const undecidedCount = activeAttendances.filter(a => getAttendanceStatus(a) === 'undecided').length;
+  const paidCount = attendances.filter(a => getPaymentStatus(a) === 'paid').length;
   const totalFee = attendances
-    .filter(a => a.payment_status === 'paid')
-    .reduce((s, a) => s + a.fee_amount, 0);
+    .filter(a => getPaymentStatus(a) === 'paid')
+    .reduce((s, a) => s + getFeeAmount(a), 0);
 
-  const selectedMeeting = meetings.find(m => m.id === selectedMeetingId);
+  // 自クラブ会員 (userId あり) と外部参加者 (userId null) に分離
+  const ownClubMembers = attendances.filter(a => getUserId(a) !== null);
+  const externalMembers = attendances.filter(a => getUserId(a) === null);
 
   if (meetings.length === 0) {
     return (
@@ -195,100 +253,204 @@ export default function ReceptionPage({ meetings, clubId, userRole }: ReceptionP
       </div>
 
       {/* 参加者リスト */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">参加登録者一覧</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="py-16 text-center text-gray-400">読み込み中...</div>
-          ) : attendances.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">
-              <Users className="h-12 w-12 mx-auto mb-3 text-gray-200" />
-              <p>登録者がいません</p>
+      {loading ? (
+        <Card>
+          <CardContent className="py-16 text-center text-gray-400">読み込み中...</CardContent>
+        </Card>
+      ) : attendances.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center text-gray-400">
+            <Users className="h-12 w-12 mx-auto mb-3 text-gray-200" />
+            <p>登録者がいません</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {/* 自クラブ会員セクション */}
+          {ownClubMembers.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  自クラブ会員
+                  <Badge variant="secondary" className="text-xs">{ownClubMembers.length}名</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {ownClubMembers.map(a => (
+                    <AttendanceRow
+                      key={a.id}
+                      a={a}
+                      loadingIds={loadingIds}
+                      onCheckin={handleCheckin}
+                      onAbsent={handleAbsent}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 外部参加者セクション */}
+          {externalMembers.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-purple-600" />
+                  外部参加者
+                  <Badge variant="secondary" className="text-xs">{externalMembers.length}名</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {externalMembers.map(a => (
+                    <AttendanceRow
+                      key={a.id}
+                      a={a}
+                      loadingIds={loadingIds}
+                      onCheckin={handleCheckin}
+                      onAbsent={handleAbsent}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 個別の受付行コンポーネント
+function AttendanceRow({
+  a, loadingIds, onCheckin, onAbsent,
+}: {
+  a: AttendanceItem;
+  loadingIds: Set<string>;
+  onCheckin: (a: AttendanceItem) => void;
+  onAbsent: (a: AttendanceItem) => void;
+}) {
+  const name = getName(a);
+  const attendanceStatus = getAttendanceStatus(a);
+  const paymentStatus = getPaymentStatus(a);
+  const feeAmount = getFeeAmount(a);
+  const memberType = getMemberType(a);
+  const clubName = getClubName(a);
+  const participationType = getParticipationType(a);
+  const isPresent = attendanceStatus === 'present';
+  const isAbsent = attendanceStatus === 'absent';
+  const isPaid = paymentStatus === 'paid';
+  const isLoading = loadingIds.has(a.id);
+  const isAbsentType = participationType === 'absent';
+
+  const PARTICIPATION_LABELS: Record<string, string> = {
+    meeting_only: '例会のみ',
+    meeting_and_party: '例会＋懇親会',
+    absent: '欠席',
+    waitlist: 'キャンセル待ち',
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+        isPresent ? 'bg-green-50 border-green-200' :
+        isAbsent || isAbsentType ? 'bg-gray-50 border-gray-200 opacity-60' :
+        'bg-white border-gray-200'
+      }`}
+    >
+      {/* 状態アイコン */}
+      <div className="flex-shrink-0">
+        {isPresent ? (
+          <CheckCircle2 className="h-6 w-6 text-green-500" />
+        ) : isAbsent || isAbsentType ? (
+          <XCircle className="h-6 w-6 text-gray-400" />
+        ) : (
+          <Clock className="h-6 w-6 text-yellow-400" />
+        )}
+      </div>
+
+      {/* 名前・情報 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`font-medium text-sm ${isAbsent || isAbsentType ? 'line-through text-gray-400' : ''}`}>
+            {name}
+          </span>
+          <span className="text-xs text-gray-400">
+            {MEMBER_TYPE_LABELS[memberType] ?? memberType}
+          </span>
+          {participationType !== 'meeting_only' && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+              participationType === 'meeting_and_party' ? 'bg-purple-100 text-purple-600' :
+              participationType === 'absent' ? 'bg-red-100 text-red-600' :
+              'bg-yellow-100 text-yellow-600'
+            }`}>
+              {PARTICIPATION_LABELS[participationType] ?? participationType}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-0.5">
+          {clubName && (
+            <span className="text-xs text-gray-400">{clubName}</span>
+          )}
+          <span className="text-xs text-gray-500">
+            参加費: {formatCurrency(feeAmount)}
+          </span>
+          {isPaid && (
+            <span className="text-xs text-green-600 font-medium">✓ 支払済</span>
+          )}
+          {(a.receiptRequired || a.receipt_required) && (
+            <span className="text-xs text-blue-500">領収書希望</span>
+          )}
+        </div>
+      </div>
+
+      {/* 操作ボタン */}
+      {!isAbsentType && (
+        <>
+          {!isPresent && !isAbsent ? (
+            <div className="flex gap-2 flex-shrink-0">
+              <Button size="sm"
+                onClick={() => onCheckin(a)}
+                disabled={isLoading}
+                className="text-xs bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+              >
+                {isLoading ? '...' : '受付'}
+              </Button>
+              <Button size="sm" variant="outline"
+                onClick={() => onAbsent(a)}
+                disabled={isLoading}
+                className="text-xs h-8 px-2"
+              >
+                欠席
+              </Button>
+            </div>
+          ) : isPresent ? (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs font-medium text-green-600">受付済</span>
+              <Button size="sm" variant="ghost"
+                onClick={() => onAbsent(a)}
+                disabled={isLoading}
+                className="text-xs h-7 px-2 text-gray-400 hover:text-red-600"
+              >
+                取消
+              </Button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {attendances.map(a => {
-                const name = a.external_name ?? a.user?.name ?? '—';
-                const isPresent = a.attendance_status === 'present';
-                const isAbsent = a.attendance_status === 'absent';
-                const isPaid = a.payment_status === 'paid';
-                const isLoading = loadingIds.has(a.id);
-
-                return (
-                  <div key={a.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                      isPresent ? 'bg-green-50 border-green-200' :
-                      isAbsent ? 'bg-gray-50 border-gray-200 opacity-60' :
-                      'bg-white border-gray-200'
-                    }`}
-                  >
-                    {/* 状態アイコン */}
-                    <div className="flex-shrink-0">
-                      {isPresent ? (
-                        <CheckCircle2 className="h-6 w-6 text-green-500" />
-                      ) : isAbsent ? (
-                        <XCircle className="h-6 w-6 text-gray-400" />
-                      ) : (
-                        <Clock className="h-6 w-6 text-yellow-400" />
-                      )}
-                    </div>
-
-                    {/* 名前・情報 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`font-medium text-sm ${isAbsent ? 'line-through text-gray-400' : ''}`}>
-                          {name}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {MEMBER_TYPE_LABELS[a.member_type]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-xs text-gray-500">
-                          参加費: {formatCurrency(a.fee_amount)}
-                        </span>
-                        {isPaid && (
-                          <span className="text-xs text-green-600 font-medium">✓ 支払済</span>
-                        )}
-                        {a.receipt_required && (
-                          <span className="text-xs text-blue-500">領収書希望</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 操作ボタン */}
-                    {!isPresent && !isAbsent && (
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Button size="sm"
-                          onClick={() => handleCheckin(a)}
-                          disabled={isLoading}
-                          className="text-xs bg-green-600 hover:bg-green-700 text-white h-8 px-3"
-                        >
-                          {isLoading ? '...' : '受付'}
-                        </Button>
-                        <Button size="sm" variant="outline"
-                          onClick={() => handleAbsent(a)}
-                          disabled={isLoading}
-                          className="text-xs h-8 px-2"
-                        >
-                          欠席
-                        </Button>
-                      </div>
-                    )}
-                    {isPresent && (
-                      <span className="text-xs font-medium text-green-600 flex-shrink-0">
-                        受付済
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-gray-400">欠席</span>
+              <Button size="sm" variant="ghost"
+                onClick={() => onCheckin(a)}
+                disabled={isLoading}
+                className="text-xs h-7 px-2 text-gray-400 hover:text-green-600"
+              >
+                受付
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
     </div>
   );
 }

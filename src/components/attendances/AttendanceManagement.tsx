@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 
 import {
   Search, ArrowLeft, Download, Users, DollarSign,
-  CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass, AlertCircle,
-  Pencil, X, Trash2
+  CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass,
+  Pencil, X, Trash2, ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,10 @@ const PARTICIPATION_COLORS: Record<string, string> = {
   waitlist: 'bg-yellow-100 text-yellow-700',
 };
 
+// ソートキーの型
+type SortKey = 'name' | 'club' | 'memberType' | 'participationType' | 'attendanceStatus' | 'paymentStatus' | 'fee' | '';
+type SortDir = 'asc' | 'desc';
+
 interface AttendanceManagementProps {
   meeting: Meeting;
   initialAttendances: Attendance[];
@@ -56,10 +60,18 @@ export default function AttendanceManagement({
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // ソート状態
+  const [sortKey, setSortKey] = useState<SortKey>('');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
   // 登録料インライン編集
   const [feeEditId, setFeeEditId] = useState<string | null>(null);
   const [feeEditValue, setFeeEditValue] = useState<string>('');
   const [feeEditLoading, setFeeEditLoading] = useState(false);
+
+  // 参加形態インライン編集
+  const [ptEditId, setPtEditId] = useState<string | null>(null);
+  const [ptEditLoading, setPtEditLoading] = useState(false);
 
   const startFeeEdit = (a: any) => {
     setFeeEditId(a.id);
@@ -94,6 +106,28 @@ export default function AttendanceManagement({
 
   const cancelFeeEdit = () => setFeeEditId(null);
 
+  // 参加形態更新
+  const saveParticipationType = async (id: string, value: string) => {
+    setPtEditLoading(true);
+    const res = await fetch(`/api/attendances/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participationType: value }),
+    });
+    if (!res.ok) {
+      toast.error('参加形態の更新に失敗しました');
+    } else {
+      setAttendances(prev => prev.map(a =>
+        (a as any).id === id
+          ? { ...a, participation_type: value, participationType: value }
+          : a
+      ));
+      toast.success('参加形態を更新しました');
+    }
+    setPtEditId(null);
+    setPtEditLoading(false);
+  };
+
   const deleteAttendance = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
@@ -123,7 +157,6 @@ export default function AttendanceManagement({
   const openEditModal = (a: any) => {
     setEditTarget(a);
     setEditForm({
-      // サーバーはcamelCase、受付モード等はsnake_case、両方に対応
       externalName: a.externalName || a.external_name || '',
       externalEmail: a.externalEmail || a.external_email || '',
       externalPhone: a.externalPhone || a.external_phone || '',
@@ -144,7 +177,6 @@ export default function AttendanceManagement({
     const hasUserId = editTarget.userId || editTarget.user_id;
     const currentName = editTarget.externalName || editTarget.external_name || '';
     const isClubName = currentName.includes('ローターアクトクラブ') || currentName.includes('ロータアクト');
-    // userId なし、またはクラブ名が入っている場合は名前・メール・電話も編集可
     if (!hasUserId || isClubName) {
       payload.externalName = editForm.externalName;
       payload.externalEmail = editForm.externalEmail;
@@ -166,7 +198,6 @@ export default function AttendanceManagement({
         (a as any).id === editTarget.id
           ? {
               ...a,
-              // camelCase・snake_case 両方を更新
               externalName: editForm.externalName,
               external_name: editForm.externalName,
               externalEmail: editForm.externalEmail,
@@ -187,21 +218,107 @@ export default function AttendanceManagement({
     setEditSaving(false);
   };
 
+  // ソートトグル
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  // ソートアイコン表示
+  const SortIcon = ({ sk }: { sk: SortKey }) => {
+    if (sortKey !== sk) return <ArrowUpDown className="h-3 w-3 ml-1 text-gray-300 inline" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1 text-blue-500 inline" />
+      : <ArrowDown className="h-3 w-3 ml-1 text-blue-500 inline" />;
+  };
+
+  // ソート可能なヘッダーセル
+  const SortableHeader = ({ sk, children }: { sk: SortKey; children: React.ReactNode }) => (
+    <th
+      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer select-none hover:bg-gray-100 transition-colors"
+      onClick={() => toggleSort(sk)}
+    >
+      <span className="flex items-center gap-1">
+        {children}
+        <SortIcon sk={sk} />
+      </span>
+    </th>
+  );
+
+  // getName ヘルパー（camelCase/snake_case 両対応）
+  const getName = (a: any) =>
+    a.userName ?? a.user?.name ?? a.externalName ?? a.external_name ?? '';
+
   const filtered = useMemo(() => {
-    return attendances.filter(a => {
-      const name = (a as any).user?.name || (a as any).external_name || '';
-      const club = (a as any).club_name || '';
+    let result = attendances.filter(a => {
+      const name = getName(a as any);
+      const club = (a as any).clubName || (a as any).club_name || '';
       const matchSearch = !searchQuery ||
         name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         club.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter;
-      const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter;
-      const matchType = memberTypeFilter === 'all' || (a as any).member_type === memberTypeFilter;
+      const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter || (a as any).attendanceStatus === statusFilter;
+      const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter || (a as any).paymentStatus === paymentFilter;
+      const matchType = memberTypeFilter === 'all' || (a as any).member_type === memberTypeFilter || (a as any).memberType === memberTypeFilter;
       const pType = (a as any).participation_type || (a as any).participationType || 'meeting_only';
       const matchParticipation = participationFilter === 'all' || pType === participationFilter;
       return matchSearch && matchStatus && matchPayment && matchType && matchParticipation;
     });
-  }, [attendances, searchQuery, statusFilter, paymentFilter, memberTypeFilter, participationFilter]);
+
+    // ソート
+    if (sortKey) {
+      result = [...result].sort((a: any, b: any) => {
+        let va = '', vb = '';
+        switch (sortKey) {
+          case 'name':
+            va = getName(a);
+            vb = getName(b);
+            break;
+          case 'club':
+            va = a.clubName || a.club_name || '';
+            vb = b.clubName || b.club_name || '';
+            break;
+          case 'memberType':
+            va = MEMBER_TYPE_LABELS[a.memberType || a.member_type] || '';
+            vb = MEMBER_TYPE_LABELS[b.memberType || b.member_type] || '';
+            break;
+          case 'participationType': {
+            const ORDER = { meeting_and_party: 0, meeting_only: 1, waitlist: 2, absent: 3 };
+            const ptA = a.participation_type || a.participationType || 'meeting_only';
+            const ptB = b.participation_type || b.participationType || 'meeting_only';
+            const diff = ((ORDER as any)[ptA] ?? 9) - ((ORDER as any)[ptB] ?? 9);
+            return sortDir === 'asc' ? diff : -diff;
+          }
+          case 'attendanceStatus': {
+            const ORDER2 = { present: 0, undecided: 1, absent: 2 };
+            const stA = a.attendance_status || a.attendanceStatus || 'undecided';
+            const stB = b.attendance_status || b.attendanceStatus || 'undecided';
+            const diff2 = ((ORDER2 as any)[stA] ?? 9) - ((ORDER2 as any)[stB] ?? 9);
+            return sortDir === 'asc' ? diff2 : -diff2;
+          }
+          case 'paymentStatus': {
+            const ORDER3 = { unpaid: 0, paid: 1, exempt: 2 };
+            const psA = a.payment_status || a.paymentStatus || 'unpaid';
+            const psB = b.payment_status || b.paymentStatus || 'unpaid';
+            const diff3 = ((ORDER3 as any)[psA] ?? 9) - ((ORDER3 as any)[psB] ?? 9);
+            return sortDir === 'asc' ? diff3 : -diff3;
+          }
+          case 'fee': {
+            const fA = (a.fee_amount ?? a.feeAmount ?? 0);
+            const fB = (b.fee_amount ?? b.feeAmount ?? 0);
+            return sortDir === 'asc' ? fA - fB : fB - fA;
+          }
+        }
+        const cmp = va.localeCompare(vb, 'ja');
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [attendances, searchQuery, statusFilter, paymentFilter, memberTypeFilter, participationFilter, sortKey, sortDir]);
 
   const stats = useMemo(() => {
     const active = attendances.filter(a => {
@@ -210,7 +327,7 @@ export default function AttendanceManagement({
     });
     return {
       total: active.length,
-      present: attendances.filter(a => (a as any).attendance_status === 'present').length,
+      present: attendances.filter(a => (a as any).attendance_status === 'present' || (a as any).attendanceStatus === 'present').length,
       absent: attendances.filter(a => {
         const pt = (a as any).participation_type || (a as any).participationType;
         return pt === 'absent';
@@ -223,9 +340,16 @@ export default function AttendanceManagement({
         const pt = (a as any).participation_type || (a as any).participationType;
         return pt === 'meeting_and_party';
       }).length,
-      unpaid: attendances.filter(a => (a as any).payment_status === 'unpaid' && (a as any).participation_type !== 'absent').length,
-      paidAmount: attendances.filter(a => (a as any).payment_status === 'paid').reduce((sum, a) => sum + ((a as any).fee_amount || 0) + ((a as any).after_party_fee_amount || 0), 0),
-      totalAmount: active.reduce((sum, a) => sum + ((a as any).fee_amount || 0) + ((a as any).after_party_fee_amount || 0), 0),
+      unpaid: attendances.filter(a => {
+        const ps = (a as any).payment_status || (a as any).paymentStatus;
+        const pt = (a as any).participation_type || (a as any).participationType;
+        return ps === 'unpaid' && pt !== 'absent';
+      }).length,
+      paidAmount: attendances.filter(a => {
+        const ps = (a as any).payment_status || (a as any).paymentStatus;
+        return ps === 'paid';
+      }).reduce((sum, a) => sum + ((a as any).fee_amount || (a as any).feeAmount || 0) + ((a as any).after_party_fee_amount || 0), 0),
+      totalAmount: active.reduce((sum, a) => sum + ((a as any).fee_amount || (a as any).feeAmount || 0) + ((a as any).after_party_fee_amount || 0), 0),
     };
   }, [attendances]);
 
@@ -241,7 +365,7 @@ export default function AttendanceManagement({
     if (!res.ok) {
       toast.error('更新に失敗しました');
     } else {
-      setAttendances(prev => prev.map(a => (a as any).id === id ? { ...a, attendance_status: status } : a));
+      setAttendances(prev => prev.map(a => (a as any).id === id ? { ...a, attendance_status: status, attendanceStatus: status } : a));
       toast.success('出席状況を更新しました');
     }
     setLoading(null);
@@ -262,7 +386,7 @@ export default function AttendanceManagement({
       toast.error('更新に失敗しました');
     } else {
       setAttendances(prev => prev.map(a => (a as any).id === id ? {
-        ...a, payment_status: status,
+        ...a, payment_status: status, paymentStatus: status,
         paid_at: status === 'paid' ? new Date().toISOString() : null,
       } : a));
       if (status === 'paid' && attendance) {
@@ -279,17 +403,17 @@ export default function AttendanceManagement({
 
   const exportCSV = () => {
     const csvData = filtered.map(a => ({
-      '氏名': (a as any).user?.name || (a as any).external_name || '',
-      '所属クラブ': (a as any).club_name || '',
-      '区分': MEMBER_TYPE_LABELS[(a as any).member_type] || (a as any).member_type,
+      '氏名': getName(a as any),
+      '所属クラブ': (a as any).clubName || (a as any).club_name || '',
+      '区分': MEMBER_TYPE_LABELS[(a as any).memberType || (a as any).member_type] || '',
       '参加形態': PARTICIPATION_LABELS[(a as any).participation_type || (a as any).participationType || 'meeting_only'] || '',
-      '出席状況': ATTENDANCE_STATUS_LABELS[(a as any).attendance_status] || '',
-      '支払状況': PAYMENT_STATUS_LABELS[(a as any).payment_status] || '',
-      '例会費': (a as any).fee_amount || 0,
+      '出席状況': ATTENDANCE_STATUS_LABELS[(a as any).attendanceStatus || (a as any).attendance_status] || '',
+      '支払状況': PAYMENT_STATUS_LABELS[(a as any).paymentStatus || (a as any).payment_status] || '',
+      '例会費': (a as any).fee_amount || (a as any).feeAmount || 0,
       '懇親会費': (a as any).after_party_fee_amount || 0,
-      '領収書': (a as any).receipt_required ? '希望' : '不要',
+      '領収書': (a as any).receipt_required || (a as any).receiptRequired ? '希望' : '不要',
       'メモ': (a as any).note || '',
-      '登録日時': (a as any).registered_at,
+      '登録日時': (a as any).registered_at || (a as any).registeredAt,
     }));
     exportToCSV(csvData, `出席者一覧_${meeting.title}`);
   };
@@ -446,13 +570,16 @@ export default function AttendanceManagement({
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">区分</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">参加形態</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">出席確認</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">支払</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録料</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8">
+                        {/* チェックボックス列 */}
+                      </th>
+                      <SortableHeader sk="name">氏名</SortableHeader>
+                      <SortableHeader sk="club">所属</SortableHeader>
+                      <SortableHeader sk="memberType">区分</SortableHeader>
+                      <SortableHeader sk="participationType">参加形態</SortableHeader>
+                      <SortableHeader sk="attendanceStatus">出席</SortableHeader>
+                      <SortableHeader sk="paymentStatus">支払</SortableHeader>
+                      <SortableHeader sk="fee">登録料</SortableHeader>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">メモ</th>
                     </tr>
                   </thead>
@@ -460,17 +587,12 @@ export default function AttendanceManagement({
                     {filtered.map(attendance => {
                       const a = attendance as any;
                       const pType = a.participation_type || a.participationType || 'meeting_only';
-                      const totalFee = (a.fee_amount || 0) + (a.after_party_fee_amount || 0);
+                      const displayName = getName(a);
+                      const feeAmt = a.fee_amount ?? a.feeAmount ?? 0;
                       return (
                         <tr key={a.id} className={`hover:bg-gray-50 transition-colors ${pType === 'absent' ? 'opacity-50' : ''}`}>
-                          <td className="px-4 py-3">
-                            <p className="font-medium">{a.user?.name || a.externalName || a.external_name}</p>
-                            {(a.clubName || a.club_name) && <p className="text-xs text-gray-400">{a.clubName || a.club_name}</p>}
-                            {a.receipt_required && (
-                              <span className="text-xs text-blue-600">領収書希望</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
+                          {/* 操作列（編集・削除） */}
+                          <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
@@ -492,28 +614,66 @@ export default function AttendanceManagement({
                               </Button>
                             </div>
                           </td>
+                          {/* 氏名 */}
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{displayName}</p>
+                            {(a.receiptRequired || a.receipt_required) && (
+                              <span className="text-xs text-blue-600">領収書希望</span>
+                            )}
+                          </td>
+                          {/* 所属 */}
+                          <td className="px-4 py-3">
+                            <p className="text-xs text-gray-500">
+                              {a.clubName || a.club_name || '—'}
+                            </p>
+                          </td>
+                          {/* 区分 */}
                           <td className="px-4 py-3">
                             <Badge variant="secondary" className="text-xs">
-                              {MEMBER_TYPE_LABELS[a.member_type] || a.member_type}
+                              {MEMBER_TYPE_LABELS[a.memberType || a.member_type] || a.memberType || a.member_type}
                             </Badge>
                           </td>
+                          {/* 参加形態 — インライン Select */}
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${PARTICIPATION_COLORS[pType] || 'bg-gray-100 text-gray-600'}`}>
-                              {pType === 'meeting_and_party' && <PartyPopper className="h-3 w-3" />}
-                              {pType === 'absent' && <XCircle className="h-3 w-3" />}
-                              {pType === 'waitlist' && <Hourglass className="h-3 w-3" />}
-                              {PARTICIPATION_LABELS[pType] || pType}
-                            </span>
+                            {ptEditId === a.id ? (
+                              <Select
+                                value={pType}
+                                onValueChange={v => saveParticipationType(a.id, v)}
+                                disabled={ptEditLoading}
+                              >
+                                <SelectTrigger className="h-8 text-xs w-36 border-blue-400">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(PARTICIPATION_LABELS).map(([v, l]) => (
+                                    <SelectItem key={v} value={v} className="text-xs">{l}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPtEditId(a.id)}
+                                title="クリックして変更"
+                                className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-opacity hover:opacity-70 ${PARTICIPATION_COLORS[pType] || 'bg-gray-100 text-gray-600'}`}
+                              >
+                                {pType === 'meeting_and_party' && <PartyPopper className="h-3 w-3" />}
+                                {pType === 'absent' && <XCircle className="h-3 w-3" />}
+                                {pType === 'waitlist' && <Hourglass className="h-3 w-3" />}
+                                {PARTICIPATION_LABELS[pType] || pType}
+                              </button>
+                            )}
                           </td>
+                          {/* 出席確認 */}
                           <td className="px-4 py-3">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
                             ) : (
                               <Select
-                                value={a.attendance_status}
+                                value={a.attendanceStatus || a.attendance_status || 'undecided'}
                                 onValueChange={v => updateAttendanceStatus(a.id, v as AttendanceStatus)}
                               >
-                                <SelectTrigger className={`h-8 text-xs w-28 ${ATTENDANCE_STATUS_COLORS[a.attendance_status] || ''}`}>
+                                <SelectTrigger className={`h-8 text-xs w-28 ${ATTENDANCE_STATUS_COLORS[a.attendanceStatus || a.attendance_status] || ''}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -524,15 +684,16 @@ export default function AttendanceManagement({
                               </Select>
                             )}
                           </td>
+                          {/* 支払 */}
                           <td className="px-4 py-3">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
                             ) : (
                               <Select
-                                value={a.payment_status}
+                                value={a.paymentStatus || a.payment_status || 'unpaid'}
                                 onValueChange={v => updatePaymentStatus(a.id, v as PaymentStatus)}
                               >
-                                <SelectTrigger className={`h-8 text-xs w-28 ${PAYMENT_STATUS_COLORS[a.payment_status] || ''}`}>
+                                <SelectTrigger className={`h-8 text-xs w-28 ${PAYMENT_STATUS_COLORS[a.paymentStatus || a.payment_status] || ''}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -543,6 +704,7 @@ export default function AttendanceManagement({
                               </Select>
                             )}
                           </td>
+                          {/* 登録料 */}
                           <td className="px-4 py-3">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
@@ -573,9 +735,9 @@ export default function AttendanceManagement({
                                 className="group text-left"
                               >
                                 <span className="font-medium group-hover:text-blue-600 transition-colors">
-                                  {formatCurrency(a.fee_amount ?? a.feeAmount ?? 0)}
+                                  {formatCurrency(feeAmt)}
                                 </span>
-                                {a.after_party_fee_amount > 0 && (
+                                {(a.after_party_fee_amount ?? 0) > 0 && (
                                   <div className="text-xs text-purple-600">
                                     +懇親会 {formatCurrency(a.after_party_fee_amount)}
                                   </div>
@@ -584,6 +746,7 @@ export default function AttendanceManagement({
                               </button>
                             )}
                           </td>
+                          {/* メモ */}
                           <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-500 max-w-32">
                             {a.note && <span title={a.note}>{a.note.length > 20 ? a.note.substring(0, 20) + '…' : a.note}</span>}
                           </td>
@@ -593,7 +756,7 @@ export default function AttendanceManagement({
                   </tbody>
                   <tfoot className="bg-gray-50 border-t border-gray-200">
                     <tr>
-                      <td colSpan={6} className="px-4 py-2 text-sm font-medium text-gray-700">
+                      <td colSpan={7} className="px-4 py-2 text-sm font-medium text-gray-700">
                         参加 {filtered.filter(a => {
                           const pt = (a as any).participation_type || (a as any).participationType;
                           return pt !== 'absent' && pt !== 'waitlist';
@@ -607,7 +770,6 @@ export default function AttendanceManagement({
                           return sum + ((a as any).fee_amount ?? (a as any).feeAmount ?? 0) + ((a as any).after_party_fee_amount || 0);
                         }, 0))}
                       </td>
-                      <td />
                       <td />
                     </tr>
                   </tfoot>
@@ -631,7 +793,7 @@ export default function AttendanceManagement({
             <div className="px-5 py-4">
               <p className="text-sm text-gray-700">
                 <span className="font-medium">
-                  {(deleteTarget as any).user?.name || (deleteTarget as any).externalName || (deleteTarget as any).external_name || '（名前なし）'}
+                  {getName(deleteTarget)}
                 </span>
                 を参加者リストから削除しますか？
               </p>
@@ -657,7 +819,6 @@ export default function AttendanceManagement({
       {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            {/* モーダルヘッダー */}
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-2">
                 <Pencil className="h-4 w-4 text-blue-600" />
@@ -671,7 +832,6 @@ export default function AttendanceManagement({
               </button>
             </div>
 
-            {/* モーダルボディ */}
             <div className="px-5 py-4 space-y-4">
               {/* お名前 */}
               <div>
@@ -685,7 +845,7 @@ export default function AttendanceManagement({
                 {((editTarget.userId || editTarget.user_id) &&
                   !(editTarget.externalName || editTarget.external_name || '').includes('ロータ')) ? (
                   <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600 border border-gray-200">
-                    {editTarget.user?.name || editTarget.externalName || editTarget.external_name || '（未設定）'}
+                    {editTarget.userName || editTarget.user?.name || editTarget.externalName || editTarget.external_name || '（未設定）'}
                   </div>
                 ) : (
                   <Input
@@ -696,7 +856,7 @@ export default function AttendanceManagement({
                 )}
               </div>
 
-              {/* メールアドレス・電話：userIdなしまたはクラブ名入りの場合のみ表示 */}
+              {/* メール・電話：外部参加者のみ */}
               {(!(editTarget.userId || editTarget.user_id) ||
                 (editTarget.externalName || editTarget.external_name || '').includes('ロータ')) && (
                 <>
@@ -763,7 +923,6 @@ export default function AttendanceManagement({
               </div>
             </div>
 
-            {/* モーダルフッター */}
             <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-xl">
               <Button variant="outline" size="sm" onClick={closeEditModal} disabled={editSaving}>
                 キャンセル
@@ -791,7 +950,8 @@ function ReceptionCard({
 }) {
   const a = attendance;
   const pType = a.participation_type || a.participationType || 'meeting_only';
-  const totalFee = (a.fee_amount || 0) + (a.after_party_fee_amount || 0);
+  const totalFee = (a.fee_amount ?? a.feeAmount ?? 0) + (a.after_party_fee_amount || 0);
+  const displayName = a.userName ?? a.user?.name ?? a.externalName ?? a.external_name ?? '—';
 
   if (pType === 'absent') {
     return (
@@ -799,8 +959,8 @@ function ReceptionCard({
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-bold text-gray-700">{a.user?.name || a.external_name}</p>
-              <p className="text-sm text-gray-400">{a.club_name} · {MEMBER_TYPE_LABELS[a.member_type]}</p>
+              <p className="font-bold text-gray-700">{displayName}</p>
+              <p className="text-sm text-gray-400">{a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}</p>
             </div>
             <Badge className="bg-red-100 text-red-700 text-xs">
               <XCircle className="h-3 w-3 mr-1" />
@@ -819,8 +979,8 @@ function ReceptionCard({
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-bold text-gray-900">{a.user?.name || a.external_name}</p>
-              <p className="text-sm text-gray-500">{a.club_name} · {MEMBER_TYPE_LABELS[a.member_type]}</p>
+              <p className="font-bold text-gray-900">{displayName}</p>
+              <p className="text-sm text-gray-500">{a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}</p>
             </div>
             <Badge className="bg-yellow-100 text-yellow-700 text-xs">
               <Hourglass className="h-3 w-3 mr-1" />
@@ -835,18 +995,16 @@ function ReceptionCard({
 
   return (
     <Card className={`border-l-4 ${
-      a.attendance_status === 'present' ? 'border-l-green-500' :
-      a.attendance_status === 'absent' ? 'border-l-red-500' :
+      a.attendance_status === 'present' || a.attendanceStatus === 'present' ? 'border-l-green-500' :
+      a.attendance_status === 'absent' || a.attendanceStatus === 'absent' ? 'border-l-red-500' :
       'border-l-gray-300'
     }`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="text-lg font-bold text-gray-900">
-              {a.user?.name || a.external_name}
-            </p>
+            <p className="text-lg font-bold text-gray-900">{displayName}</p>
             <p className="text-sm text-gray-500">
-              {a.club_name} · {MEMBER_TYPE_LABELS[a.member_type]}
+              {a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}
             </p>
             {pType === 'meeting_and_party' && (
               <span className="inline-flex items-center gap-1 text-xs text-purple-600 mt-0.5">
@@ -857,7 +1015,7 @@ function ReceptionCard({
           </div>
           <div className="text-right">
             <p className="font-bold text-blue-600 text-lg">{formatCurrency(totalFee)}</p>
-            {a.after_party_fee_amount > 0 && (
+            {(a.after_party_fee_amount ?? 0) > 0 && (
               <p className="text-xs text-purple-600">懇親会込み</p>
             )}
           </div>
@@ -872,10 +1030,10 @@ function ReceptionCard({
         <div className="flex gap-2">
           <Button
             size="lg"
-            variant={a.attendance_status === 'present' ? 'default' : 'outline'}
+            variant={(a.attendance_status === 'present' || a.attendanceStatus === 'present') ? 'default' : 'outline'}
             onClick={() => onAttendanceChange(a.id, 'present')}
             disabled={loading}
-            className={`flex-1 ${a.attendance_status === 'present' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+            className={`flex-1 ${(a.attendance_status === 'present' || a.attendanceStatus === 'present') ? 'bg-green-600 hover:bg-green-700' : ''}`}
           >
             <CheckCircle className="h-5 w-5" />
             出席
@@ -883,20 +1041,20 @@ function ReceptionCard({
 
           <Button
             size="lg"
-            variant={a.payment_status === 'paid' ? 'default' : 'outline'}
-            onClick={() => onPaymentChange(a.id, a.payment_status === 'paid' ? 'unpaid' : 'paid')}
+            variant={(a.payment_status === 'paid' || a.paymentStatus === 'paid') ? 'default' : 'outline'}
+            onClick={() => onPaymentChange(a.id, (a.payment_status === 'paid' || a.paymentStatus === 'paid') ? 'unpaid' : 'paid')}
             disabled={loading}
-            className={`flex-1 ${a.payment_status === 'paid' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-red-300 text-red-600 hover:bg-red-50'}`}
+            className={`flex-1 ${(a.payment_status === 'paid' || a.paymentStatus === 'paid') ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-red-300 text-red-600 hover:bg-red-50'}`}
           >
             <DollarSign className="h-5 w-5" />
-            {a.payment_status === 'paid' ? '支払済' : '未払い'}
+            {(a.payment_status === 'paid' || a.paymentStatus === 'paid') ? '支払済' : '未払い'}
           </Button>
         </div>
 
-        {a.receipt_required && (
+        {(a.receipt_required || a.receiptRequired) && (
           <p className="text-xs text-blue-600 mt-2 flex items-center gap-1">
             <CheckCircle className="h-3 w-3" />
-            領収書希望（宛名: {a.receipt_name || '未設定'}）
+            領収書希望（宛名: {a.receipt_name || a.receiptName || '未設定'}）
           </p>
         )}
       </CardContent>
