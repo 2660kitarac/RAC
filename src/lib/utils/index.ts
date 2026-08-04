@@ -69,10 +69,19 @@ export function generateReceiptNumber(date: Date, sequence: number): string {
 // ============================================================
 export function calculateFee(
   memberType: string,
-  meeting: { fee_rac: number; fee_rc: number; fee_obog: number; fee_guest: number },
+  meeting: { fee_rac: number; fee_rc: number; fee_obog: number; fee_guest: number; own_club_fee?: number | null },
   mealRequired: boolean,
-  mealFee: number
+  mealFee: number,
+  /** 自クラブ会員かどうか（true の場合 own_club_fee を優先） */
+  isOwnClubMember = false,
 ): number {
+  // 自クラブ会員で own_club_fee が設定されている場合はそれを使用
+  // own_club_fee が null/undefined の場合は 0円（自クラブ会員デフォルト）
+  if (isOwnClubMember) {
+    const ownFee = meeting.own_club_fee ?? 0;
+    return ownFee + (mealRequired ? mealFee : 0);
+  }
+
   let baseFee = 0;
   switch (memberType) {
     case 'RAC':

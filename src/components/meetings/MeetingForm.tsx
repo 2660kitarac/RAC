@@ -52,6 +52,9 @@ const meetingSchema = z.object({
   after_party_fee_guest: z.string().default('0'),
   after_party_allow_party_only: z.boolean().default(false),
   after_party_capacity: z.string().optional(),
+  // 自クラブ会員登録料
+  own_club_fee_enabled: z.boolean().default(false), // false = 0円固定、true = カスタム金額
+  own_club_fee: z.string().default('0'),
 });
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
@@ -120,12 +123,18 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
       after_party_fee_guest: (meeting as any)?.after_party_fee_guest?.toString() || '0',
       after_party_allow_party_only: (meeting as any)?.after_party_allow_party_only || false,
       after_party_capacity: (meeting as any)?.after_party_capacity?.toString() || '',
+      // 自クラブ会員登録料
+      own_club_fee_enabled: (meeting as any)?.own_club_fee != null && (meeting as any)?.own_club_fee !== 0
+        ? true
+        : false,
+      own_club_fee: (meeting as any)?.own_club_fee?.toString() || '0',
     },
   });
 
   const hasAfterParty = watch('has_after_party');
   const afterPartyFeeType = watch('after_party_fee_type');
   const afterPartyAllowPartyOnly = watch('after_party_allow_party_only');
+  const ownClubFeeEnabled = watch('own_club_fee_enabled');
 
   const onSubmit = async (data: MeetingFormData) => {
     setLoading(true);
@@ -169,6 +178,8 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
         afterPartyFeeGuest: (data.has_after_party && data.after_party_fee_type === 'fixed') ? (parseInt(data.after_party_fee_guest) || 0) : 0,
         afterPartyAllowPartyOnly: data.has_after_party ? data.after_party_allow_party_only : false,
         afterPartyCapacity: data.has_after_party && data.after_party_capacity ? parseInt(data.after_party_capacity) : null,
+        // 自クラブ会員登録料（有効時のみ設定、無効時はnull］0円）
+        ownClubFee: data.own_club_fee_enabled ? (parseInt(data.own_club_fee) || 0) : null,
       };
 
       if (mode === 'create') {
@@ -406,6 +417,61 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* 自クラブ会員の登録料設定 */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-indigo-500" />
+              自クラブ会員の登録料
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-gray-500">
+              自クラブ会員の登録料は通常0円です。この例会で異なる金額を設定する場合のみ有効にしてください。
+            </p>
+            {/* トグル */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ownClubFeeEnabled}
+                onClick={() => setValue('own_club_fee_enabled', !ownClubFeeEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                  ownClubFeeEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  ownClubFeeEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className="text-sm text-gray-700">
+                {ownClubFeeEnabled ? 'カスタム金額を設定する' : '0円（デフォルト）'}
+              </span>
+            </div>
+
+            {/* カスタム金額入力 */}
+            {ownClubFeeEnabled && (
+              <div className="form-group max-w-xs">
+                <Label>自クラブ会員 登録料</Label>
+                <div className="relative mt-1">
+                  <Input
+                    {...register('own_club_fee')}
+                    type="number"
+                    min="0"
+                    step="100"
+                    className="pr-6"
+                    placeholder="例: 1000"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  MU登録フォームでもこの金額が自動適用されます
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

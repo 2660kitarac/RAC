@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
       afterPartyFeeRac = 0, afterPartyFeeRc = 0, afterPartyFeeObog = 0, afterPartyFeeGuest = 0,
       afterPartyAllowPartyOnly = false,
       afterPartyCapacity = null,
+      // 自クラブ会員登録料（null = 0円デフォルト）
+      ownClubFee = null,
     } = body;
 
     if (!title || !date) return NextResponse.json({ error: 'タイトルと日付は必須です' }, { status: 400 });
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
       hasAfterParty, afterPartyVenue, afterPartyStartTime,
       afterPartyFeeType, afterPartyFeeRac, afterPartyFeeRc, afterPartyFeeObog, afterPartyFeeGuest,
       afterPartyAllowPartyOnly, afterPartyCapacity,
+      ownClubFee,
     } as any);
 
     return NextResponse.json({ meeting: { id, title, date, status } });

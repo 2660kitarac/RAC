@@ -33,6 +33,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
       committee: meetings.committee,
       clubId: meetings.clubId,
       capacity: meetings.capacity,
+      ownClubFee: meetings.ownClubFee,
       // 懇親会フィールド
       hasAfterParty: meetings.hasAfterParty,
       afterPartyVenue: meetings.afterPartyVenue,
@@ -62,6 +63,7 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
     registration_deadline:   meetingRaw.registrationDeadline,
     program_detail:          meetingRaw.programDetail,
     club_id:                 meetingRaw.clubId,
+    own_club_fee:            meetingRaw.ownClubFee ?? null,
     // 懇親会（snake_case — MuRegistrationForm が has_after_party 等で参照）
     has_after_party:         meetingRaw.hasAfterParty,
     after_party_venue:         meetingRaw.afterPartyVenue,

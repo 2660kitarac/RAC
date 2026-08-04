@@ -115,6 +115,8 @@ export const meetings = pgTable('meetings', {
   afterPartyAllowPartyOnly: boolean('after_party_allow_party_only').notNull().default(false),
   capacity: integer('capacity'),
   afterPartyCapacity: integer('after_party_capacity'),
+  // 自クラブ会員の登録料（null = 0円デフォルト、数値 = その金額）
+  ownClubFee: integer('own_club_fee'),
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),

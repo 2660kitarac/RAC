@@ -400,6 +400,17 @@ export default function MeetingDetail({
                 {meeting.meal_fee > 0 && (
                   <InfoRow label="お弁当代" value={formatCurrency(meeting.meal_fee)} />
                 )}
+                {/* 自クラブ会員の登録料（設定されている場合のみ表示） */}
+                <div className="border-t border-gray-100 pt-2 mt-2">
+                  <InfoRow
+                    label="自クラブ会員"
+                    value={
+                      (meeting as any).own_club_fee != null
+                        ? `${formatCurrency((meeting as any).own_club_fee)}（カスタム設定）`
+                        : '¥0（デフォルト）'
+                    }
+                  />
+                </div>
               </CardContent>
             </Card>
 

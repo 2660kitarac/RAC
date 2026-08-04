@@ -73,6 +73,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     deleted_at:            meetingRaw.deletedAt,
     club_id:               meetingRaw.clubId,
     manager_user_id:       meetingRaw.managerUserId,
+    own_club_fee:          meetingRaw.ownClubFee ?? null,
   };
 
   // Drizzle camelCase → snake_case マッピング（MeetingDetail が snake_case を期待）

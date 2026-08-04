@@ -155,9 +155,11 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   const positionCustom = watch('position_custom');
 
   // 例会登録料（meeting_only / meeting_and_party の場合）
+  // 自クラブ会員は own_club_fee（null = 0円）を優先適用
+  const effectiveIsOwnClub = isOwnClubMember && !isAdminRole(loggedInUser?.role ?? '');
   const meetingFee = participationType === 'party_only'
     ? 0
-    : calculateFee(memberType, meeting, mealRequired, meeting.meal_fee);
+    : calculateFee(memberType, meeting, mealRequired, meeting.meal_fee, effectiveIsOwnClub);
 
   // 懇親会登録料
   const afterPartyFee = (hasAfterParty && (participationType === 'meeting_and_party' || participationType === 'party_only'))
@@ -849,7 +851,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                     value: 'meeting_only',
                     label: '例会のみ参加',
                     desc: '例会にのみ参加します',
-                    meetingFeeVal: calculateFee(memberType, meeting, false, 0),
+                    meetingFeeVal: calculateFee(memberType, meeting, false, 0, effectiveIsOwnClub),
                     partyFeeVal: null as number | null,
                     show: true,
                   },
@@ -857,7 +859,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                     value: 'meeting_and_party',
                     label: '例会＋懇親会に参加',
                     desc: '例会と懇親会の両方に参加します',
-                    meetingFeeVal: calculateFee(memberType, meeting, false, 0),
+                    meetingFeeVal: calculateFee(memberType, meeting, false, 0, effectiveIsOwnClub),
                     partyFeeVal: afterPartyFeeType === 'fixed' ? calcAfterPartyFee(memberType, meeting) : null,
                     show: true,
                   },
