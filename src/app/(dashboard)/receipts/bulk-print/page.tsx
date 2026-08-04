@@ -4,6 +4,7 @@ import { receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
+import PrintToolbar from '@/components/receipts/PrintToolbar';
 
 export const metadata = { title: '領収書 一括印刷' };
 
@@ -117,28 +118,14 @@ export default async function BulkPrintPage({
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 操作バー（印刷時非表示） */}
-      <div className="print:hidden bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => window.history.back()}
-              className="text-gray-600 text-sm hover:text-gray-900 flex items-center gap-1"
-            >
-              ← 戻る
-            </button>
-            <span className="text-gray-500 text-sm">
-              {receiptList.length}件の領収書（A4縦・1ページに5枚）
-            </span>
-          </div>
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow"
-          >
-            🖨️ 全件印刷 / PDF保存
-          </button>
-        </div>
-      </div>
+      {/* 操作バー（印刷時非表示 / Client Component） */}
+      <PrintToolbar
+        backHref="/receipts"
+        note={`${receiptList.length}件の領収書（A4縦・1ページに5枚）`}
+        printLabel="全件印刷 / PDF保存"
+        sticky
+        maxWidthClass="max-w-3xl"
+      />
 
       {receiptList.length === 0 ? (
         <div className="flex items-center justify-center min-h-64 print:hidden">

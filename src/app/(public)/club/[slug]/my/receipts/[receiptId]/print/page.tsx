@@ -3,9 +3,8 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
-import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { ArrowLeft, Printer } from 'lucide-react';
+import PrintToolbar from '@/components/receipts/PrintToolbar';
 
 export default async function ReceiptPrintPage({
   params,
@@ -58,20 +57,11 @@ export default async function ReceiptPrintPage({
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 操作バー（印刷時は非表示） */}
-      <div className="print:hidden bg-white border-b">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href={`/club/${slug}/my/receipts`} className="flex items-center gap-1.5 text-gray-600 text-sm hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4" /> 戻る
-          </Link>
-          <button
-            onClick={() => typeof window !== 'undefined' && window.print()}
-            className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Printer className="h-4 w-4" /> 印刷 / PDF保存
-          </button>
-        </div>
-      </div>
+      {/* 操作バー（印刷時は非表示 / Client Component） */}
+      <PrintToolbar
+        backHref={`/club/${slug}/my/receipts`}
+        maxWidthClass="max-w-lg"
+      />
 
       {/* 領収書本体 */}
       <div className="max-w-md mx-auto p-6 print:p-0 print:max-w-none">

@@ -4,6 +4,7 @@ import { receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
+import PrintToolbar from '@/components/receipts/PrintToolbar';
 
 export const metadata = { title: '領収書印刷' };
 
@@ -45,26 +46,12 @@ export default async function AdminReceiptPrintPage({
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 操作バー（印刷時非表示） */}
-      <div className="print:hidden bg-white border-b shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => window.history.back()}
-            className="flex items-center gap-1.5 text-gray-600 text-sm hover:text-gray-900"
-          >
-            ← 戻る
-          </button>
-          <div className="flex gap-2 items-center">
-            <span className="text-xs text-gray-500">A4縦・5枚印刷</span>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              🖨️ 印刷 / PDF保存
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* 操作バー（印刷時非表示 / Client Component） */}
+      <PrintToolbar
+        backHref="/receipts"
+        note="A4縦・5枚印刷"
+        maxWidthClass="max-w-2xl"
+      />
 
       {/* 画面プレビュー（印刷時非表示） */}
       <div className="print:hidden max-w-2xl mx-auto p-6">
