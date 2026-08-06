@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { attendances, users } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { attendances, users, meetings } from '@/lib/db/schema';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { resolveClubScope } from '@/lib/auth/tenant';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
+// クラブアカウント → 自クラブの例会の出席情報のみ（clubIdクエリは無視され自クラブに強制）
+// 地区スタッフ     → clubId指定で任意クラブ／未指定で全クラブ横断
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -14,10 +17,55 @@ export async function GET(request: NextRequest) {
     const db = await getDbFromContext();
     const url = new URL(request.url);
     const meetingId = url.searchParams.get('meetingId');
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    const sessionUser = session.user as any;
+
+    // ---- テナント検証: クエリの clubId は信頼せず、自クラブへ強制する ----
+    const scope = resolveClubScope(sessionUser, url.searchParams.get('clubId'));
+    if (scope.forbidden) {
+      return NextResponse.json(
+        { error: '他クラブの出席情報は参照できません' },
+        { status: 403 },
+      );
+    }
+
+    // クラブ横断参照でない場合は、自クラブの例会に限定する
+    let scopeCondition: any = undefined;
+    if (!scope.crossClub) {
+      if (!scope.clubId) {
+        return NextResponse.json({ error: '参照権限がありません' }, { status: 403 });
+      }
+
+      if (meetingId) {
+        // 指定された例会が自クラブのものかを検証
+        const [meeting] = await db
+          .select({ clubId: meetings.clubId })
+          .from(meetings)
+          .where(and(eq(meetings.id, meetingId), isNull(meetings.deletedAt)))
+          .limit(1);
+
+        if (!meeting || meeting.clubId !== scope.clubId) {
+          return NextResponse.json(
+            { error: '他クラブの例会の出席情報は参照できません' },
+            { status: 403 },
+          );
+        }
+      } else {
+        // 例会未指定の場合は自クラブの例会IDに絞り込む
+        const clubMeetings = await db
+          .select({ id: meetings.id })
+          .from(meetings)
+          .where(and(eq(meetings.clubId, scope.clubId), isNull(meetings.deletedAt)));
+
+        const meetingIds = clubMeetings.map((m: any) => m.id);
+        // 例会が0件なら該当なし（全件フォールバックしない）
+        if (meetingIds.length === 0) return NextResponse.json([]);
+        scopeCondition = inArray(attendances.meetingId, meetingIds);
+      }
+    }
 
     const conditions = and(
       meetingId ? eq(attendances.meetingId, meetingId) : undefined,
+      scopeCondition,
       isNull(attendances.deletedAt),
     );
 

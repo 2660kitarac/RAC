@@ -4,10 +4,12 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { muVisits, users, transactions, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { resolveClubScope, isDistrictScope } from '@/lib/auth/tenant';
 
 // GET /api/mu-visits?clubId=xxx&userId=xxx
-// クラブアカウント → clubId指定で全会員の訪問一覧
-// 個人会員 → userId指定（または自分のセッション）で自分の訪問一覧
+// クラブアカウント → 自クラブの全会員の訪問一覧（clubIdクエリは無視され自クラブに強制）
+// 個人会員       → 自分の訪問一覧のみ
+// 地区スタッフ   → clubId指定で任意クラブ／未指定で全クラブ横断
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -15,11 +17,59 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
-    const userId = url.searchParams.get('userId');
+    const sessionUser = session.user as any;
+
+    // ---- テナント検証: クエリの clubId は信頼せず、自クラブへ強制する ----
+    const requestedClubId = url.searchParams.get('clubId');
+    const scope = resolveClubScope(sessionUser, requestedClubId);
+
+    if (scope.forbidden) {
+      return NextResponse.json(
+        { error: '他クラブのMU訪問履歴は参照できません' },
+        { status: 403 },
+      );
+    }
+
+    // ---- userId も同様に検証: 自クラブ以外の会員は指定できない ----
+    const requestedUserId = url.searchParams.get('userId');
+    let userId: string | null = null;
+
+    if (requestedUserId) {
+      if (isDistrictScope(sessionUser.role)) {
+        // 地区スタッフは任意の会員を参照可能
+        userId = requestedUserId;
+      } else if (requestedUserId === sessionUser.id) {
+        // 自分自身は常に許可
+        userId = requestedUserId;
+      } else {
+        // 指定された会員が自クラブ所属かを確認
+        const [target] = await db
+          .select({ clubId: users.clubId })
+          .from(users)
+          .where(and(eq(users.id, requestedUserId), isNull(users.deletedAt)))
+          .limit(1);
+
+        if (!target || !scope.clubId || target.clubId !== scope.clubId) {
+          return NextResponse.json(
+            { error: '他クラブ会員のMU訪問履歴は参照できません' },
+            { status: 403 },
+          );
+        }
+        userId = requestedUserId;
+      }
+    }
+
+    // クラブに属さないアカウント（未所属の個人会員など）は
+    // クラブ横断参照を許さず、自分自身の履歴のみに限定する
+    if (!scope.clubId && !scope.crossClub && !userId) {
+      userId = sessionUser.id ?? null;
+      if (!userId) {
+        return NextResponse.json({ error: '参照権限がありません' }, { status: 403 });
+      }
+    }
 
     const conditions = and(
-      clubId ? eq(muVisits.clubId, clubId) : undefined,
+      scope.clubId ? eq(muVisits.clubId, scope.clubId) : undefined,
       userId ? eq(muVisits.userId, userId) : undefined,
       isNull(muVisits.deletedAt),
     );

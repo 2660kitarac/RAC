@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, count, desc, inArray } from 'drizzle-orm';
 import AttendancesList from '@/components/attendances/AttendancesList';
+import { isDistrictScope } from '@/lib/auth/tenant';
 
 export const metadata = { title: 'MU登録者一覧' };
 
@@ -24,8 +25,13 @@ export default async function AttendancesPage({
   const offset = (page - 1) * PAGE_SIZE;
 
   const clubId = session.user.clubId;
+  // 地区スタッフ（system_owner / district_admin 等）のみクラブ横断参照可
+  const crossClub = isDistrictScope((session.user as any).role);
 
-  // clubId がある場合、先にそのクラブの meeting_ids を取得
+  // クラブ未所属かつ地区スタッフでもないアカウントは参照不可
+  if (!clubId && !crossClub) redirect('/dashboard');
+
+  // 自クラブの meeting_ids を取得
   let meetingIds: string[] = [];
   if (clubId) {
     const clubMeetings = await db
@@ -35,52 +41,55 @@ export default async function AttendancesPage({
     meetingIds = clubMeetings.map(m => m.id);
   }
 
-  const buildWhere = () => {
-    const base = [isNull(attendances.userId), isNull(attendances.deletedAt)];
-    if (clubId && meetingIds.length > 0) {
-      base.push(inArray(attendances.meetingId, meetingIds));
-    }
-    return and(...base);
-  };
+  // 自クラブに例会が1件もない場合は「0件」として扱う。
+  // （以前は絞り込み条件が付かず全クラブのデータが表示されていた）
+  const noAccessibleMeetings = !crossClub && meetingIds.length === 0;
 
-  const [countResult, listResult, paidCountResult, unpaidCountResult] = await Promise.all([
-    db.select({ value: count() }).from(attendances).where(buildWhere()),
+  // クラブ横断参照でない限り、必ず自クラブの例会に限定する
+  const scopeCondition = crossClub
+    ? undefined
+    : inArray(attendances.meetingId, meetingIds);
 
-    db.select({
-      id: attendances.id,
-      externalName: attendances.externalName,
-      externalEmail: attendances.externalEmail,
-      clubName: attendances.clubName,
-      memberType: attendances.memberType,
-      feeAmount: attendances.feeAmount,
-      paymentStatus: attendances.paymentStatus,
-      registeredAt: attendances.registeredAt,
-      meetingId: attendances.meetingId,
-    })
-      .from(attendances)
-      .where(buildWhere())
-      .orderBy(desc(attendances.registeredAt))
-      .limit(PAGE_SIZE)
-      .offset(offset),
+  const buildWhere = (extra?: any) =>
+    and(
+      isNull(attendances.userId),
+      isNull(attendances.deletedAt),
+      scopeCondition,
+      extra,
+    );
 
-    db.select({ value: count() })
-      .from(attendances)
-      .where(and(
-        isNull(attendances.userId),
-        isNull(attendances.deletedAt),
-        eq(attendances.paymentStatus, 'paid'),
-        clubId && meetingIds.length > 0 ? inArray(attendances.meetingId, meetingIds) : undefined,
-      )),
+  const emptyCount = [{ value: 0 }];
 
-    db.select({ value: count() })
-      .from(attendances)
-      .where(and(
-        isNull(attendances.userId),
-        isNull(attendances.deletedAt),
-        eq(attendances.paymentStatus, 'unpaid'),
-        clubId && meetingIds.length > 0 ? inArray(attendances.meetingId, meetingIds) : undefined,
-      )),
-  ]);
+  const [countResult, listResult, paidCountResult, unpaidCountResult] = noAccessibleMeetings
+    ? [emptyCount, [] as any[], emptyCount, emptyCount]
+    : await Promise.all([
+        db.select({ value: count() }).from(attendances).where(buildWhere()),
+
+        db.select({
+          id: attendances.id,
+          externalName: attendances.externalName,
+          externalEmail: attendances.externalEmail,
+          clubName: attendances.clubName,
+          memberType: attendances.memberType,
+          feeAmount: attendances.feeAmount,
+          paymentStatus: attendances.paymentStatus,
+          registeredAt: attendances.registeredAt,
+          meetingId: attendances.meetingId,
+        })
+          .from(attendances)
+          .where(buildWhere())
+          .orderBy(desc(attendances.registeredAt))
+          .limit(PAGE_SIZE)
+          .offset(offset),
+
+        db.select({ value: count() })
+          .from(attendances)
+          .where(buildWhere(eq(attendances.paymentStatus, 'paid'))),
+
+        db.select({ value: count() })
+          .from(attendances)
+          .where(buildWhere(eq(attendances.paymentStatus, 'unpaid'))),
+      ]);
 
   // 例会タイトルをまとめて取得
   const meetingIdList = [...new Set(listResult.map(a => a.meetingId))];

@@ -3,6 +3,42 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { muVisits } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+
+/**
+ * 対象MU訪問レコードを取得し、操作権限を検証する。
+ * 権限がなければ NextResponse（エラー）を返す。
+ */
+async function loadAndAuthorize(
+  db: any,
+  sessionUser: any,
+  id: string,
+): Promise<{ ok: true; clubId: string | null } | { ok: false; res: NextResponse }> {
+  const [record] = await db
+    .select({ id: muVisits.id, clubId: muVisits.clubId })
+    .from(muVisits)
+    .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt)))
+    .limit(1);
+
+  if (!record) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: 'MU訪問履歴が見つかりません' }, { status: 404 }),
+    };
+  }
+
+  if (!canMutateClubRecord(sessionUser, record.clubId)) {
+    return {
+      ok: false,
+      res: NextResponse.json(
+        { error: '他クラブのMU訪問履歴は操作できません' },
+        { status: 403 },
+      ),
+    };
+  }
+
+  return { ok: true, clubId: record.clubId };
+}
 
 // PATCH /api/mu-visits/[id] - 精算済みに更新 or 内容修正
 export async function PATCH(
@@ -15,11 +51,18 @@ export async function PATCH(
 
     const { id } = await params;
     const db = await getDbFromContext();
+    const sessionUser = session.user as any;
+
+    // ---- 所有クラブ検証（他クラブのレコードは操作不可） ----
+    const authz = await loadAndAuthorize(db, sessionUser, id);
+    if (!authz.ok) return authz.res;
+
     const body = await request.json();
 
     const now = new Date().toISOString();
     const updateData: Record<string, unknown> = { updatedAt: now };
 
+    // clubId / userId はクライアントから変更させない（テナント移動の防止）
     const allowedFields = [
       'visitedClubName', 'visitDate', 'feeAmount', 'note',
       'settlementStatus', 'settledAt', 'settledBy', 'transactionId',
@@ -34,10 +77,15 @@ export async function PATCH(
       updateData.settledBy = updateData.settledBy || session.user.id;
     }
 
+    // WHERE 句にも clubId 条件を付与（二重防御）
+    const scopeCondition = isDistrictScope(sessionUser.role)
+      ? undefined
+      : eq(muVisits.clubId, sessionUser.clubId);
+
     await db
       .update(muVisits)
       .set(updateData as any)
-      .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt)));
+      .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt), scopeCondition));
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -57,11 +105,21 @@ export async function DELETE(
 
     const { id } = await params;
     const db = await getDbFromContext();
+    const sessionUser = session.user as any;
+
+    // ---- 所有クラブ検証（他クラブのレコードは削除不可） ----
+    const authz = await loadAndAuthorize(db, sessionUser, id);
+    if (!authz.ok) return authz.res;
+
+    // WHERE 句にも clubId 条件を付与（二重防御）
+    const scopeCondition = isDistrictScope(sessionUser.role)
+      ? undefined
+      : eq(muVisits.clubId, sessionUser.clubId);
 
     await db
       .update(muVisits)
       .set({ deletedAt: new Date().toISOString() } as any)
-      .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt)));
+      .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt), scopeCondition));
 
     return NextResponse.json({ success: true });
   } catch (error) {
