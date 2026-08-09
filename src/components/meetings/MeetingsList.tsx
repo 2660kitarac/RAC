@@ -14,6 +14,7 @@ import type { Meeting, UserRole } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS, MeetingStatus } from '@/types';
 import { canManageMeetings } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
+import FinishMeetingButton from '@/components/meetings/FinishMeetingButton';
 
 interface PaginationInfo {
   page: number;
@@ -259,6 +260,17 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
+                              {/* 例会終了ボタン（開催日以降・未終了のみ表示） */}
+                              {canManage && (
+                                <FinishMeetingButton
+                                  meetingId={meeting.id}
+                                  meetingTitle={meeting.title}
+                                  meetingDate={meeting.date}
+                                  status={meeting.status}
+                                  finishedAt={(meeting as any).finished_at ?? null}
+                                  compact
+                                />
+                              )}
                               <Link href={`/meetings/${meeting.id}`}>
                                 <Button variant="ghost" size="icon-sm" title="詳細">
                                   <Eye className="h-4 w-4" />
@@ -367,6 +379,19 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Button>
                         </a>
+                      </div>
+                    )}
+
+                    {/* 例会終了（モバイル） */}
+                    {canManage && (
+                      <div className="mb-3">
+                        <FinishMeetingButton
+                          meetingId={meeting.id}
+                          meetingTitle={meeting.title}
+                          meetingDate={meeting.date}
+                          status={meeting.status}
+                          finishedAt={(meeting as any).finished_at ?? null}
+                        />
                       </div>
                     )}
 

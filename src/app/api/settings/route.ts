@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { validatePassword } from '@/lib/auth/password';
 
 // GET /api/settings - 現在のユーザーとクラブ設定を取得
 export async function GET(_: NextRequest) {
@@ -63,8 +64,18 @@ export async function PATCH(request: NextRequest) {
     if (target === 'password') {
       // パスワード変更
       const { currentPassword, newPassword } = data;
-      if (!currentPassword || !newPassword) {
-        return NextResponse.json({ error: '現在のパスワードと新しいパスワードは必須です' }, { status: 400 });
+      if (!currentPassword) {
+        return NextResponse.json({ error: '現在のパスワードを入力してください' }, { status: 400 });
+      }
+
+      // パスワード強度検証（/api/profile/password と同じルール）
+      const validationError = validatePassword(newPassword);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+
+      if (currentPassword === newPassword) {
+        return NextResponse.json({ error: '現在のパスワードと同じものは使用できません' }, { status: 400 });
       }
 
       const userResult = await db.select({ passwordHash: users.passwordHash })

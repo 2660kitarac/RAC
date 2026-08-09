@@ -117,6 +117,15 @@ export const meetings = pgTable('meetings', {
   afterPartyCapacity: integer('after_party_capacity'),
   // 自クラブ会員の登録料（null = 0円デフォルト、数値 = その金額）
   ownClubFee: integer('own_club_fee'),
+  // ---- 例会終了処理（クロージング） ----
+  // 終了処理を実行した日時（null = 未終了）
+  finishedAt: text('finished_at'),
+  // 終了処理を実行したユーザーID
+  finishedBy: text('finished_by'),
+  // 出席確定済みフラグ（未回答が解消され出席/欠席が確定した状態）
+  attendanceFinalized: boolean('attendance_finalized').notNull().default(false),
+  // 終了時メモ（振り返り・特記事項）
+  closingNote: text('closing_note'),
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),

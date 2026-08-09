@@ -17,6 +17,7 @@ import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS, MeetingStatus } from '@/t
 import { canManageMeetings, canManageFinance } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
 import QrCodeModal from '@/components/ui/QrCodeModal';
+import FinishMeetingButton from '@/components/meetings/FinishMeetingButton';
 
 interface MeetingDetailProps {
   meeting: Meeting;
@@ -296,12 +297,22 @@ export default function MeetingDetail({
           </div>
         </div>
         {canManage && (
-          <Link href={`/meetings/${meeting.id}/edit`}>
-            <Button variant="outline" size="sm">
-              <Edit className="h-4 w-4" />
-              編集
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* 例会終了（クロージング） */}
+            <FinishMeetingButton
+              meetingId={meeting.id}
+              meetingTitle={meeting.title}
+              meetingDate={meeting.date}
+              status={meeting.status}
+              finishedAt={(meeting as any).finished_at ?? null}
+            />
+            <Link href={`/meetings/${meeting.id}/edit`}>
+              <Button variant="outline" size="sm">
+                <Edit className="h-4 w-4" />
+                編集
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 
@@ -432,6 +443,23 @@ export default function MeetingDetail({
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-700 whitespace-pre-wrap text-sm">{meeting.description}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 終了メモ（例会終了時に記録された内容） */}
+            {(meeting as any).closing_note && (
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+                    <CheckCircle className="h-4 w-4" />
+                    終了メモ
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-700 whitespace-pre-wrap text-sm">
+                    {(meeting as any).closing_note}
+                  </p>
                 </CardContent>
               </Card>
             )}

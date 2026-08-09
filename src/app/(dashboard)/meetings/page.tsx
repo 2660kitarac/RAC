@@ -65,6 +65,9 @@ export default async function MeetingsPage({
       venueName: meetings.venueName,
       muRegistrationSlug: meetings.muRegistrationSlug,
       muRegistrationUrl: meetings.muRegistrationUrl,
+      // 例会終了（クロージング）情報
+      finishedAt: meetings.finishedAt,
+      attendanceFinalized: meetings.attendanceFinalized,
     })
       .from(meetings)
       .where(and(...baseWhere))
@@ -76,9 +79,22 @@ export default async function MeetingsPage({
   const totalCount = countResult[0]?.value || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  // MeetingsList は snake_case のフィールド名を参照するためマッピング
+  const meetingsMapped = meetingsResult.map((m: any) => ({
+    ...m,
+    meeting_number:        m.meetingNumber,
+    start_time:            m.startTime,
+    end_time:              m.endTime,
+    venue_name:            m.venueName,
+    mu_registration_slug:  m.muRegistrationSlug,
+    mu_registration_url:   m.muRegistrationUrl,
+    finished_at:           m.finishedAt ?? null,
+    attendance_finalized:  m.attendanceFinalized ?? false,
+  }));
+
   return (
     <MeetingsList
-      meetings={meetingsResult as any}
+      meetings={meetingsMapped as any}
       userRole={session.user.role || 'system_owner'}
       pagination={{ page, totalPages, totalCount, pageSize: PAGE_SIZE }}
       filters={{ status: statusFilter, year }}

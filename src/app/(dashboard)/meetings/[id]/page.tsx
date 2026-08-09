@@ -74,6 +74,11 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     club_id:               meetingRaw.clubId,
     manager_user_id:       meetingRaw.managerUserId,
     own_club_fee:          meetingRaw.ownClubFee ?? null,
+    // 例会終了（クロージング）情報
+    finished_at:           meetingRaw.finishedAt ?? null,
+    finished_by:           meetingRaw.finishedBy ?? null,
+    attendance_finalized:  meetingRaw.attendanceFinalized ?? false,
+    closing_note:          meetingRaw.closingNote ?? null,
   };
 
   // Drizzle camelCase → snake_case マッピング（MeetingDetail が snake_case を期待）
