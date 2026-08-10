@@ -298,6 +298,11 @@ export interface Meeting {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // 例会終了（クロージング）情報
+  finished_at?: string | null;
+  finished_by?: string | null;
+  attendance_finalized?: boolean;
+  closing_note?: string | null;
   // Relations
   club?: Club;
   manager?: User;

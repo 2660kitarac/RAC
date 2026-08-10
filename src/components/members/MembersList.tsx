@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import {
-  Plus, Search, Download, Edit, UserX, UserCheck, Trash2
+  Plus, Search, Download, Edit, UserX, UserCheck, Trash2, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import type { User, UserRole, Club } from '@/types';
 import { MEMBER_TYPE_LABELS, USER_ROLE_LABELS } from '@/types';
 import { isClubAdmin, isDistrictAdmin } from '@/lib/hooks/useAuth';
 import { Pagination } from '@/components/ui/pagination';
+import ResetPasswordDialog from '@/components/members/ResetPasswordDialog';
 
 interface PaginationInfo {
   page: number;
@@ -51,6 +52,9 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
   // 削除確認ダイアログ
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // パスワード再設定ダイアログ
+  const [passwordTarget, setPasswordTarget] = useState<{ id: string; name: string; email: string } | null>(null);
 
   const [form, setForm] = useState({
     name: '', name_kana: '', email: '', phone: '',
@@ -313,6 +317,15 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
+                                onClick={() => setPasswordTarget({ id: member.id, name: member.name, email: member.email })}
+                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                title="パスワードを再設定"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
                                 onClick={() => toggleActive(member)}
                                 className={member.is_active ? 'text-amber-500 hover:text-amber-700' : 'text-green-500 hover:text-green-700'}
                                 title={member.is_active ? '無効にする' : '有効にする'}
@@ -363,6 +376,14 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
                     <div className="flex gap-2 mt-3">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(member)}>
                         <Edit className="h-3 w-3 mr-1" /> 編集
+                      </Button>
+                      <Button
+                        variant="outline" size="sm"
+                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                        onClick={() => setPasswordTarget({ id: member.id, name: member.name, email: member.email })}
+                        title="パスワードを再設定"
+                      >
+                        <KeyRound className="h-3 w-3" />
                       </Button>
                       <Button
                         variant="outline" size="sm"
@@ -497,6 +518,12 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* パスワード再設定ダイアログ */}
+      <ResetPasswordDialog
+        member={passwordTarget}
+        onClose={() => setPasswordTarget(null)}
+      />
     </div>
   );
 }

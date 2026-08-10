@@ -91,15 +91,20 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
 
   // パスワード変更
   const handlePasswordChange = async () => {
+    if (!pwForm.current) { toast.error('現在のパスワードを入力してください'); return; }
     if (!pwForm.next) { toast.error('新しいパスワードを入力してください'); return; }
     if (pwForm.next.length < 8) { toast.error('パスワードは8文字以上にしてください'); return; }
+    if (!/[A-Za-z]/.test(pwForm.next) || !/[0-9]/.test(pwForm.next)) {
+      toast.error('パスワードは英字と数字をそれぞれ1文字以上含めてください'); return;
+    }
     if (pwForm.next !== pwForm.confirm) { toast.error('パスワードが一致しません'); return; }
+    if (pwForm.current === pwForm.next) { toast.error('現在のパスワードと同じものは使用できません'); return; }
     setPwLoading(true);
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch('/api/profile/password', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: 'password', currentPassword: pwForm.current, newPassword: pwForm.next }),
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
@@ -285,8 +290,16 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
           </CardHeader>
           <CardContent className="space-y-4 max-w-sm">
             <div className="space-y-1.5">
+              <Label required>現在のパスワード</Label>
+              <Input type="password" placeholder="現在のパスワードを入力"
+                autoComplete="current-password"
+                value={pwForm.current}
+                onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label required>新しいパスワード</Label>
-              <Input type="password" placeholder="8文字以上"
+              <Input type="password" placeholder="8文字以上（英字と数字を含む）"
+                autoComplete="new-password"
                 value={pwForm.next}
                 onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
             </div>
