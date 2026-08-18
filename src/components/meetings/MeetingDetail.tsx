@@ -25,6 +25,7 @@ interface MeetingDetailProps {
   stats: {
     totalAttendances: number;
     presentCount: number;
+    muCount: number;
     unpaidCount: number;
     paidAmount: number;
     incomeTotal: number;
@@ -317,15 +318,17 @@ export default function MeetingDetail({
       </div>
 
       {/* 統計カード */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="登録者数" value={`${stats.totalAttendances}名`} color="blue" />
-        <StatCard title="出席予定" value={`${stats.presentCount}名`} color="green" />
+      <div className="grid grid-cols-2 gap-4">
         <StatCard
-          title="未払い"
-          value={`${stats.unpaidCount}名`}
-          color={stats.unpaidCount > 0 ? 'red' : 'green'}
+          title="出席者数"
+          value={`${localAttendances.filter(a => a.attendance_status === 'present').length}名`}
+          color="green"
         />
-        <StatCard title="収支" value={formatCurrency(stats.incomeTotal - stats.expenseTotal)} color="blue" />
+        <StatCard
+          title="MU登録者数"
+          value={`${localAttendances.filter(a => (a as any).registration_type === 'mu').length}名`}
+          color="blue"
+        />
       </div>
 
       {/* MU登録URL（タブ外・常時表示） */}
@@ -511,10 +514,10 @@ export default function MeetingDetail({
                 {localAttendances.filter(a => a.attendance_status === 'absent').length}名
               </p>
             </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5 text-center">
-              <p className="text-xs text-orange-600">未払い</p>
-              <p className="text-lg font-bold text-orange-700">
-                {localAttendances.filter(a => a.payment_status === 'unpaid').length}名
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-center">
+              <p className="text-xs text-indigo-600">MU登録</p>
+              <p className="text-lg font-bold text-indigo-700">
+                {localAttendances.filter(a => (a as any).registration_type === 'mu').length}名
               </p>
             </div>
           </div>

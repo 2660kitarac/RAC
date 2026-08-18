@@ -25,6 +25,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       clubName:         attendances.clubName,
       memberType:       attendances.memberType,
       attendanceStatus: attendances.attendanceStatus,
+      registrationType: attendances.registrationType,
       participationType:attendances.participationType,
       mealRequired:     attendances.mealRequired,
       feeAmount:        attendances.feeAmount,
@@ -92,6 +93,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     club_name:         a.clubName,
     member_type:       a.memberType,
     attendance_status: a.attendanceStatus,
+    registration_type: a.registrationType,
     participation_type:a.participationType,
     meal_required:     a.mealRequired,
     fee_amount:        a.feeAmount,
@@ -109,6 +111,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
   const stats = {
     totalAttendances: attendanceList.length,
     presentCount: attendanceList.filter(a => a.attendance_status === 'present').length,
+    // MU登録者数（他クラブからのMU登録フォーム経由の登録）
+    muCount: attendanceList.filter(a => a.registration_type === 'mu').length,
     unpaidCount: attendanceList.filter(a => a.payment_status === 'unpaid').length,
     paidAmount: attendanceList.filter(a => a.payment_status === 'paid').reduce((s, a) => s + a.fee_amount, 0),
     incomeTotal: txResult.filter(t => t.transactionType === 'income').reduce((s, t) => s + t.amount, 0),
