@@ -321,7 +321,7 @@ export default function MeetingDetail({
       <div className="grid grid-cols-2 gap-4">
         <StatCard
           title="出席者数"
-          value={`${localAttendances.filter(a => a.attendance_status === 'present').length}名`}
+          value={`${localAttendances.filter(a => a.attendance_status !== 'absent').length}名`}
           color="green"
         />
         <StatCard
