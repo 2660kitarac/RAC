@@ -227,7 +227,7 @@ export default function FinishMeetingButton({
                     </Button>
                   </Link>
                 )}
-                <Link href={`/receipts/bulk-print?meeting_id=${meetingId}`} className="block">
+                <Link href={`/receipts/bulk-print?meetingId=${meetingId}`} className="block">
                   <Button variant="outline" className="w-full justify-start">
                     <Printer className="h-4 w-4" />
                     領収書をまとめて印刷する

@@ -5,6 +5,7 @@ import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
+import ReceiptStamp from '@/components/receipts/ReceiptStamp';
 
 export const metadata = { title: '領収書 一括印刷' };
 
@@ -51,6 +52,9 @@ export default async function BulkPrintPage({
           clubName: clubs.name,
           clubAddress: clubs.address,
           clubPhone: clubs.phone,
+          stampImageUrl: clubs.stampImageUrl,
+          stampText: clubs.stampText,
+          stampEnabled: clubs.stampEnabled,
         })
         .from(receipts)
         .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
@@ -71,6 +75,9 @@ export default async function BulkPrintPage({
         clubName: clubs.name,
         clubAddress: clubs.address,
         clubPhone: clubs.phone,
+        stampImageUrl: clubs.stampImageUrl,
+        stampText: clubs.stampText,
+        stampEnabled: clubs.stampEnabled,
       })
       .from(receipts)
       .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
@@ -95,6 +102,9 @@ export default async function BulkPrintPage({
         clubName: clubs.name,
         clubAddress: clubs.address,
         clubPhone: clubs.phone,
+        stampImageUrl: clubs.stampImageUrl,
+        stampText: clubs.stampText,
+        stampEnabled: clubs.stampEnabled,
       })
       .from(receipts)
       .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
@@ -327,19 +337,8 @@ function ReceiptPrintContent({ receipt }: { receipt: any }) {
               <div style={{ fontSize: '6.5pt', color: '#666' }}>TEL: {receipt.clubPhone}</div>
             )}
           </div>
-          {/* 印章スペース */}
-          <div style={{
-            width: '10mm',
-            height: '10mm',
-            border: '1pt solid #ccc',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '7pt',
-            color: '#ccc',
-            flexShrink: 0,
-          }}>印</div>
+          {/* 印章（電子印鑑） */}
+          <ReceiptStamp stamp={receipt} size="11mm" />
         </div>
       </div>
     </div>

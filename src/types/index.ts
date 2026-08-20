@@ -236,6 +236,10 @@ export interface Club {
   memo: string | null;
   is_active: boolean;
   is_system_club: boolean;
+  // 電子印鑑（領収書への押印）
+  stamp_image_url?: string | null;
+  stamp_text?: string | null;
+  stamp_enabled?: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

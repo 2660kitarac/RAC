@@ -5,6 +5,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
+import ReceiptStamp from '@/components/receipts/ReceiptStamp';
 
 export default async function ReceiptPrintPage({
   params,
@@ -41,6 +42,9 @@ export default async function ReceiptPrintPage({
       clubName: clubs.name,
       clubAddress: clubs.address,
       clubPhone: clubs.phone,
+      stampImageUrl: clubs.stampImageUrl,
+      stampText: clubs.stampText,
+      stampEnabled: clubs.stampEnabled,
     })
     .from(receipts)
     .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
@@ -105,11 +109,9 @@ export default async function ReceiptPrintPage({
             </div>
           </div>
 
-          {/* 印章スペース */}
+          {/* 印章（電子印鑑） */}
           <div className="flex justify-end mt-4">
-            <div className="w-16 h-16 border-2 border-gray-300 rounded-full flex items-center justify-center text-xs text-gray-300">
-              印
-            </div>
+            <ReceiptStamp stamp={receipt} size="64px" />
           </div>
         </div>
       </div>

@@ -28,6 +28,9 @@ export default async function Settings() {
         shortName: clubs.shortName,
         slug: clubs.slug,
         muFeePersonalBurden: clubs.muFeePersonalBurden,
+        stampImageUrl: clubs.stampImageUrl,
+        stampText: clubs.stampText,
+        stampEnabled: clubs.stampEnabled,
       },
     })
     .from(users)

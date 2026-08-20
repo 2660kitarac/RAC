@@ -23,6 +23,10 @@ export const clubs = pgTable('clubs', {
   isSystemClub: boolean('is_system_club').notNull().default(false),
   // MU費を個人負担にするか（true=個人負担→会計に計上しない、false=クラブ負担→会計に自動計上）
   muFeePersonalBurden: boolean('mu_fee_personal_burden').notNull().default(false),
+  // 電子印鑑（領収書への押印）
+  stampImageUrl: text('stamp_image_url'),
+  stampText: text('stamp_text'),
+  stampEnabled: boolean('stamp_enabled').notNull().default(false),
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),

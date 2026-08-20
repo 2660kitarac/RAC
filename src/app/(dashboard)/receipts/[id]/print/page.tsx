@@ -5,6 +5,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
+import ReceiptStamp from '@/components/receipts/ReceiptStamp';
 
 export const metadata = { title: '領収書印刷' };
 
@@ -32,6 +33,9 @@ export default async function AdminReceiptPrintPage({
       clubName: clubs.name,
       clubAddress: clubs.address,
       clubPhone: clubs.phone,
+      stampImageUrl: clubs.stampImageUrl,
+      stampText: clubs.stampText,
+      stampEnabled: clubs.stampEnabled,
     })
     .from(receipts)
     .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
@@ -193,9 +197,7 @@ function ReceiptContent({ receipt }: { receipt: any }) {
       </div>
 
       <div className="flex justify-end mt-4">
-        <div className="w-16 h-16 border-2 border-gray-300 rounded-full flex items-center justify-center text-xs text-gray-300">
-          印
-        </div>
+        <ReceiptStamp stamp={receipt} size="64px" />
       </div>
     </>
   );
@@ -257,19 +259,8 @@ function ReceiptPrintContent({ receipt }: { receipt: any }) {
               <div style={{ fontSize: '6.5pt', color: '#666' }}>TEL: {receipt.clubPhone}</div>
             )}
           </div>
-          {/* 印章スペース */}
-          <div style={{
-            width: '10mm',
-            height: '10mm',
-            border: '1pt solid #ccc',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '7pt',
-            color: '#ccc',
-            flexShrink: 0,
-          }}>印</div>
+          {/* 印章（電子印鑑） */}
+          <ReceiptStamp stamp={receipt} size="11mm" />
         </div>
       </div>
     </div>

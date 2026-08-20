@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import type { User, Club } from '@/types';
 import { USER_ROLE_LABELS } from '@/types';
 import { isClubAdmin } from '@/lib/hooks/useAuth';
-import { User as UserIcon, Building2, Lock } from 'lucide-react';
+import { User as UserIcon, Building2, Lock, Stamp } from 'lucide-react';
+import StampSettings from '@/components/settings/StampSettings';
 
 interface SettingsPageProps {
   profile: User;
@@ -126,6 +127,11 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
         {canManageClub && (
           <TabsTrigger value="club" className="flex items-center gap-1.5">
             <Building2 className="h-3.5 w-3.5" />クラブ設定
+          </TabsTrigger>
+        )}
+        {canManageClub && club && (
+          <TabsTrigger value="stamp" className="flex items-center gap-1.5">
+            <Stamp className="h-3.5 w-3.5" />電子印鑑
           </TabsTrigger>
         )}
         <TabsTrigger value="security" className="flex items-center gap-1.5">
@@ -279,6 +285,19 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+      )}
+
+      {/* 電子印鑑タブ */}
+      {canManageClub && club && (
+        <TabsContent value="stamp">
+          <StampSettings
+            clubId={club.id}
+            clubName={(club as any).short_name || (club as any).shortName || club.name || ''}
+            initialStampImageUrl={(club as any).stampImageUrl ?? null}
+            initialStampText={(club as any).stampText ?? null}
+            initialStampEnabled={(club as any).stampEnabled ?? false}
+          />
         </TabsContent>
       )}
 

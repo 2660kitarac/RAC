@@ -124,7 +124,71 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'クラブ設定を更新しました' });
     }
 
-    return NextResponse.json({ error: 'target パラメータが不正です（profile / password / club）' }, { status: 400 });
+    if (target === 'stamp') {
+      // 電子印鑑設定（クラブ管理者のみ・自クラブのみ）
+      const CLUB_MANAGER_ROLES = [
+        'system_owner', 'district_admin', 'district_representative', 'district_secretary',
+        'club_account', 'club_admin', 'president', 'secretary', 'treasurer',
+      ];
+      const role = session.user.role || '';
+      if (!CLUB_MANAGER_ROLES.includes(role)) {
+        return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+      }
+
+      const DISTRICT_ROLES = ['system_owner', 'district_admin', 'district_representative', 'district_secretary'];
+      const isDistrict = DISTRICT_ROLES.includes(role);
+      const targetClubId = data.clubId || session.user.clubId;
+      if (!targetClubId) {
+        return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
+      }
+      // 地区スタッフ以外は自クラブのみ変更可
+      if (!isDistrict && targetClubId !== session.user.clubId) {
+        return NextResponse.json({ error: '他クラブの設定は変更できません' }, { status: 403 });
+      }
+
+      const stampEnabled = !!data.stampEnabled;
+      const stampImageUrl: string | null = data.stampImageUrl ?? null;
+      const stampText: string | null = data.stampText ? String(data.stampText).trim() : null;
+
+      // 画像は data URL のみ許可（外部URL埋め込みによる情報漏洩・XSS を防ぐ）
+      if (stampImageUrl !== null) {
+        if (!/^data:image\/(png|jpeg|webp);base64,/.test(stampImageUrl)) {
+          return NextResponse.json(
+            { error: '印影画像の形式が不正です（PNG / JPEG / WebP のみ）' },
+            { status: 400 }
+          );
+        }
+        // 1MB 相当を上限とする
+        if (stampImageUrl.length > 1_400_000) {
+          return NextResponse.json(
+            { error: '印影画像が大きすぎます。より小さい画像をお試しください' },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (stampText !== null && stampText.length > 8) {
+        return NextResponse.json({ error: '印影文字は8文字以内で入力してください' }, { status: 400 });
+      }
+
+      if (stampEnabled && !stampImageUrl && !stampText) {
+        return NextResponse.json(
+          { error: '印影画像または印影文字のいずれかを設定してください' },
+          { status: 400 }
+        );
+      }
+
+      await db.update(clubs).set({
+        stampEnabled,
+        stampImageUrl,
+        stampText,
+        updatedAt: new Date().toISOString(),
+      } as any).where(eq(clubs.id, targetClubId));
+
+      return NextResponse.json({ success: true, message: '印鑑設定を更新しました' });
+    }
+
+    return NextResponse.json({ error: 'target パラメータが不正です（profile / password / club / stamp）' }, { status: 400 });
   } catch (error) {
     console.error('PATCH /api/settings error:', error);
     return NextResponse.json({ error: '設定の更新に失敗しました' }, { status: 500 });

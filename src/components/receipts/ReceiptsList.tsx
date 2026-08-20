@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-import { Plus, Download, X, AlertCircle, Layers, Printer, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { Plus, Download, X, Layers, Printer, ChevronDown, ChevronUp, CheckCircle2, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,14 +30,8 @@ interface ReceiptRow {
   cancelReason?: string | null;
   meetingId?: string | null;
   attendanceId?: string | null;
-}
-
-interface PendingAttendance {
-  id: string;
-  externalName?: string | null;
-  feeAmount?: number | null;
-  meetingId?: string | null;
-  receiptName?: string | null;
+  meetingTitle?: string | null;
+  meetingDate?: string | null;
 }
 
 interface BulkTarget {
@@ -51,16 +45,20 @@ interface BulkTarget {
 
 interface ReceiptsListProps {
   receipts: ReceiptRow[];
-  pendingAttendances: PendingAttendance[];
-  meetings: { id: string; title: string }[];
+  meetings: { id: string; title: string; date?: string | null }[];
   clubId: string;
   clubName: string;
   userRole: UserRole;
   totalCount?: number;
+  /** 表示範囲: recent=直近 / all=全期間 / meeting=例会ごと */
+  scope?: 'recent' | 'all' | 'meeting';
+  recentDays?: number;
+  activeMeetingId?: string;
 }
 
 export default function ReceiptsList({
-  receipts: init, pendingAttendances, meetings, clubId, clubName, userRole, totalCount
+  receipts: init, meetings, clubId, clubName, userRole, totalCount,
+  scope = 'recent', recentDays = 60, activeMeetingId = '',
 }: ReceiptsListProps) {
   const [receipts, setReceipts] = useState<ReceiptRow[]>(init);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -353,50 +351,83 @@ export default function ReceiptsList({
         </div>
       </div>
 
-      {/* 領収書発行待ち */}
-      {pendingAttendances.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <p className="text-sm font-medium text-yellow-700">
-                {pendingAttendances.length}件の領収書発行待ちがあります
-              </p>
-            </div>
-            <div className="space-y-1">
-              {pendingAttendances.slice(0, 5).map((a, i) => (
-                <div key={i} className="text-xs text-yellow-700 flex items-center gap-2">
-                  <span>・{String(a.externalName || '')}</span>
-                  {canManage && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-xs border-yellow-400 text-yellow-700 hover:bg-yellow-100"
-                      onClick={() => {
-                        setForm(prev => ({
-                          ...prev,
-                          receiptName: String(a.receiptName || a.externalName || ''),
-                          amount: String(a.feeAmount || 0),
-                          attendanceId: String(a.id),
-                          meetingId: String(a.meetingId || ''),
-                        }));
-                        setShowCreateDialog(true);
-                      }}
-                    >
-                      発行
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* 表示範囲フィルター（例会ごとの管理） */}
+      <Card>
+        <CardContent className="p-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CalendarDays className="h-4 w-4 text-gray-400" />
+            <span className="font-medium">表示範囲</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={activeMeetingId || '__none__'}
+              onValueChange={v => {
+                if (v === '__none__') router.push('/receipts');
+                else router.push(`/receipts?meeting_id=${v}`);
+              }}
+            >
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="例会を選択..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">例会で絞り込まない</SelectItem>
+                {meetings.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.date ? `${formatDate(m.date)} ` : ''}{m.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {scope !== 'meeting' && (
+              <>
+                <Button
+                  variant={scope === 'recent' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => router.push('/receipts')}
+                >
+                  直近{recentDays}日
+                </Button>
+                <Button
+                  variant={scope === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => router.push('/receipts?scope=all')}
+                >
+                  全期間
+                </Button>
+              </>
+            )}
+            {scope === 'meeting' && (
+              <Button variant="outline" size="sm" onClick={() => router.push('/receipts')}>
+                <X className="h-4 w-4" />絞り込みを解除
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 ml-auto">
+            {scope === 'meeting'
+              ? '選択した例会の領収書のみ表示中'
+              : scope === 'all'
+                ? '全期間の領収書を表示中'
+                : `直近${recentDays}日以内に発行した領収書を表示中（過去分は例会を選択して表示）`}
+          </p>
+        </CardContent>
+      </Card>
 
       {/* 一覧 */}
       {receipts.length === 0 ? (
         <div className="empty-state">
-          <p className="text-gray-500">領収書がありません</p>
+          <p className="text-gray-500">
+            {scope === 'meeting'
+              ? 'この例会の領収書はまだありません'
+              : scope === 'recent'
+                ? `直近${recentDays}日以内に発行した領収書はありません`
+                : '領収書がありません'}
+          </p>
+          {scope === 'recent' && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => router.push('/receipts?scope=all')}>
+              全期間から探す
+            </Button>
+          )}
         </div>
       ) : (
         <Card>
@@ -409,6 +440,9 @@ export default function ReceiptsList({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">宛名</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">金額</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">但し書き</th>
+                  {scope !== 'meeting' && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">関連例会</th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">発行日</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状態</th>
                   <th className="px-4 py-3" />
@@ -439,6 +473,21 @@ export default function ReceiptsList({
                     <td className="px-4 py-3 font-medium">{receipt.receiptName}</td>
                     <td className="px-4 py-3 text-right font-medium">{formatCurrency(receipt.amount)}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate">{receipt.description}</td>
+                    {scope !== 'meeting' && (
+                      <td className="px-4 py-3 text-gray-600 text-xs max-w-[180px] truncate">
+                        {receipt.meetingTitle ? (
+                          <button
+                            type="button"
+                            className="text-blue-600 hover:underline"
+                            onClick={e => { e.stopPropagation(); router.push(`/receipts?meeting_id=${receipt.meetingId}`); }}
+                          >
+                            {receipt.meetingTitle}
+                          </button>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-gray-600">{formatDate(receipt.issuedDate)}</td>
                     <td className="px-4 py-3">
                       <Badge className={statusColors[receipt.status] ?? 'bg-gray-100 text-gray-700'}>

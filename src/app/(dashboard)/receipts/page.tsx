@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs, receipts, meetings, attendances } from '@/lib/db/schema';
-import { eq, and, isNull, count, desc } from 'drizzle-orm';
+import { clubs, receipts, meetings } from '@/lib/db/schema';
+import { eq, and, isNull, count, desc, gte } from 'drizzle-orm';
 import ReceiptsList from '@/components/receipts/ReceiptsList';
 import { Pagination } from '@/components/ui/pagination';
 import type { UserRole } from '@/types';
@@ -11,10 +11,13 @@ export const metadata = { title: '領収書管理' };
 
 const PAGE_SIZE = 30;
 
+/** 直近何日分を既定表示にするか */
+const RECENT_DAYS = 60;
+
 export default async function ReceiptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; meeting_id?: string; scope?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
@@ -27,11 +30,25 @@ export default async function ReceiptsPage({
 
   const clubId = session.user.clubId;
 
-  const receiptWhere = clubId
-    ? and(eq(receipts.clubId, clubId), isNull(receipts.deletedAt))
-    : isNull(receipts.deletedAt);
+  // 表示範囲
+  //  - meeting_id 指定あり → その例会の領収書のみ（例会ごとの管理）
+  //  - scope=all         → 全期間（明示的に指定された場合のみ）
+  //  - 既定               → 直近 RECENT_DAYS 日以内に発行したもののみ
+  const meetingIdFilter = params.meeting_id || '';
+  const scope = meetingIdFilter ? 'meeting' : params.scope === 'all' ? 'all' : 'recent';
 
-  const [countResult, receiptsResult, meetingsResult, pendingResult] = await Promise.all([
+  const recentSince = new Date();
+  recentSince.setDate(recentSince.getDate() - RECENT_DAYS);
+  const recentSinceStr = recentSince.toISOString().split('T')[0];
+
+  const receiptWhere = and(
+    clubId ? eq(receipts.clubId, clubId) : undefined,
+    isNull(receipts.deletedAt),
+    meetingIdFilter ? eq(receipts.meetingId, meetingIdFilter) : undefined,
+    scope === 'recent' ? gte(receipts.issuedDate, recentSinceStr) : undefined,
+  );
+
+  const [countResult, receiptsResult, meetingsResult] = await Promise.all([
     db.select({ value: count() }).from(receipts).where(receiptWhere),
 
     // camelCase で返す（Drizzle ORM のデフォルト）
@@ -46,35 +63,23 @@ export default async function ReceiptsPage({
       cancelReason: receipts.cancelReason,
       meetingId: receipts.meetingId,
       attendanceId: receipts.attendanceId,
+      meetingTitle: meetings.title,
+      meetingDate: meetings.date,
     })
       .from(receipts)
+      .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
       .where(receiptWhere)
-      .orderBy(desc(receipts.createdAt))
+      .orderBy(desc(receipts.issuedDate), desc(receipts.createdAt))
       .limit(PAGE_SIZE)
       .offset(offset),
 
-    db.select({ id: meetings.id, title: meetings.title })
+    db.select({ id: meetings.id, title: meetings.title, date: meetings.date })
       .from(meetings)
       .where(clubId
         ? and(eq(meetings.clubId, clubId), isNull(meetings.deletedAt))
         : isNull(meetings.deletedAt))
       .orderBy(desc(meetings.date))
       .limit(100),
-
-    // 領収書発行待ち: camelCase で返す（clubId フィルタで自クラブ分のみ取得）
-    db.select({
-      id: attendances.id,
-      externalName: attendances.externalName,
-      feeAmount: attendances.feeAmount,
-      meetingId: attendances.meetingId,
-      receiptName: attendances.receiptName,
-    })
-      .from(attendances)
-      .where(and(
-        isNull(attendances.deletedAt),
-        clubId ? eq(attendances.clubId, clubId) : undefined,
-      ))
-      .limit(50),
   ]);
 
   // クラブ名取得
@@ -92,12 +97,14 @@ export default async function ReceiptsPage({
     <div className="space-y-4">
       <ReceiptsList
         receipts={receiptsResult as any}
-        pendingAttendances={pendingResult as any}
         meetings={meetingsResult}
         clubId={clubId || ''}
         clubName={clubName}
         userRole={(session.user.role || 'system_owner') as UserRole}
         totalCount={totalCount}
+        scope={scope as 'recent' | 'all' | 'meeting'}
+        recentDays={RECENT_DAYS}
+        activeMeetingId={meetingIdFilter}
       />
       <Pagination
         page={page}

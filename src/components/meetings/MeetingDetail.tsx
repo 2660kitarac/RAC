@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
-  Search, Download, ChevronUp, ChevronDown, Pencil, X
+  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -795,16 +795,28 @@ export default function MeetingDetail({
               large
             />
           </div>
-          {canFinance && (
-            <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
+            {canFinance && (
               <Link href={`/finance/transactions?meeting_id=${meeting.id}`}>
                 <Button variant="outline">
                   <DollarSign className="h-4 w-4" />
                   収支詳細を見る
                 </Button>
               </Link>
-            </div>
-          )}
+            )}
+            <Link href={`/receipts?meeting_id=${meeting.id}`}>
+              <Button variant="outline">
+                <Receipt className="h-4 w-4" />
+                この例会の領収書
+              </Button>
+            </Link>
+            <Link href={`/receipts/bulk-print?meetingId=${meeting.id}`} target="_blank">
+              <Button variant="outline">
+                <Printer className="h-4 w-4" />
+                領収書を一括印刷
+              </Button>
+            </Link>
+          </div>
         </TabsContent>
 
         {/* 報告書タブ */}
