@@ -3,8 +3,12 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { clubs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { isDistrictScope } from '@/lib/auth/tenant';
 
-const ADMIN_ROLES = ['system_owner', 'admin', 'district_admin'];
+// 注: 旧実装は存在しないロール 'admin' を含み、逆に district_representative /
+// district_secretary が漏れていたため、正規の判定関数へ統一する。
+const isClubEditor = (role: string | null | undefined, clubId: string | null | undefined, targetId: string) =>
+  isDistrictScope(role) || (!!clubId && clubId === targetId && role === 'club_account');
 
 // GET /api/clubs/[id]
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,11 +18,32 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
     const { id } = await params;
     const db = await getDbFromContext();
+
+    const isOwnClub = session.user.clubId === id;
+    const district = isDistrictScope(session.user.role);
+
+    // 自クラブ・地区スタッフは全項目、それ以外は公開情報のみに絞る
+    // （メールアドレス・電話・住所・担当者名・メモの横断的な収集を防ぐ）
     const result = await db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
     if (!result.length) return NextResponse.json({ error: 'クラブが見つかりません' }, { status: 404 });
 
-    return NextResponse.json(result[0]);
+    if (isOwnClub || district) {
+      return NextResponse.json(result[0]);
+    }
+
+    const c = result[0] as any;
+    return NextResponse.json({
+      id: c.id,
+      name: c.name,
+      shortName: c.shortName,
+      slug: c.slug,
+      type: c.type,
+      district: c.district,
+      area: c.area,
+      isActive: c.isActive,
+    });
   } catch (error) {
+    console.error('GET /api/clubs/[id] error:', error);
     return NextResponse.json({ error: 'クラブの取得に失敗しました' }, { status: 500 });
   }
 }
@@ -28,11 +53,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-    if (!ADMIN_ROLES.includes(session.user.role || '')) {
+
+    const { id } = await params;
+    if (!isClubEditor(session.user.role, session.user.clubId, id)) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    const { id } = await params;
     const db = await getDbFromContext();
     const body = await request.json();
 
@@ -46,6 +72,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('PATCH /api/clubs/[id] error:', error);
     return NextResponse.json({ error: 'クラブの更新に失敗しました' }, { status: 500 });
   }
 }
@@ -55,7 +82,8 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-    if (!ADMIN_ROLES.includes(session.user.role || '')) {
+    // クラブの削除は地区スタッフのみ
+    if (!isDistrictScope(session.user.role)) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
@@ -70,6 +98,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('DELETE /api/clubs/[id] error:', error);
     return NextResponse.json({ error: 'クラブの削除に失敗しました' }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings } from '@/lib/db/schema';
 import { eq, isNull, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
 
 export async function POST(
   _req: NextRequest,
@@ -12,6 +13,9 @@ export async function POST(
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const { id } = await params;
     const db = await getDbFromContext();
@@ -23,6 +27,11 @@ export async function POST(
       .limit(1);
 
     if (!orig) return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
+
+    // IDOR 対策: 他クラブの例会（会費設定・プログラム等）を複製できないようにする
+    if (!canMutateClubRecord(session.user, (orig as any).clubId)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const newId = randomUUID();
     const now = new Date().toISOString();
@@ -44,7 +53,8 @@ export async function POST(
     } as any);
 
     return NextResponse.json({ id: newId });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e) {
+    console.error('POST /api/meetings/[id]/copy error:', e);
+    return NextResponse.json({ error: '例会の複製に失敗しました' }, { status: 500 });
   }
 }
