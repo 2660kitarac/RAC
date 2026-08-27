@@ -362,3 +362,42 @@ RAC Cloud 全体の改善点・バグ検証を実施し、以下を修正しま�
 node scripts/test-tenant-isolation.mjs   # テナント分離・権限 25件
 node scripts/test-email-ratelimit.mjs    # メール制限・再送防止 22件
 ```
+
+## 締切後の遅延登録（2026-08-27 実装）
+
+例会の登録締切を過ぎても出席登録できるようにしました。締切自体は残し、締切後の登録は
+「遅延登録」としてフラグを立てて運営が識別できる方式です。
+
+### 締切ポリシー（例会ごとに設定）
+
+| モード | 締切後の登録 | 締切後の食事 | 用途 |
+|---|---|---|---|
+| `flexible`（既定） | ○ 受付 | ○ 受付 | 通常の例会。遅延登録として記録 |
+| `meal_strict` | ○ 受付 | × 不可 | 弁当の発注数を確定させたい例会 |
+| `strict` | × 不可 | × 不可 | 従来の挙動（人数厳守が必要な場合） |
+
+**ポリシーに関わらず登録を拒否する条件**
+- 例会の終了処理（クロージング）が完了している（`finished_at` が設定済み）→ 帳簿・領収書の保護
+- 例会ステータスが `open` 以外
+- 例会の開催日を過ぎている
+
+### データモデル
+
+- `meetings.deadline_policy` TEXT NOT NULL DEFAULT `'flexible'`
+- `attendances.is_late_registration` BOOLEAN NOT NULL DEFAULT FALSE
+- `attendances.registered_after_deadline_days` INTEGER（締切からの超過日数）
+
+既存の全例会は `flexible` に設定済み（マイグレーション 0010 適用済み）。
+
+### UI の変化
+
+- **会員（ダッシュボード）**: 締切後もボタンが押せる。赤いエラー表示 → 黄色の注意喚起に変更
+- **MU登録フォーム**: 締切後も送信可。遅延登録になることを事前に明示
+- **例会作成・編集**: 「締切後の登録の扱い」セレクタでポリシーを選択
+- **運営（参加者一覧・出席管理）**: 「遅延登録（+N日）」バッジと遅延人数の集計を表示
+
+### 判定ロジック
+
+`src/lib/meetings/deadline.ts` に集約（サーバー／クライアント共用）。
+日付は JST（Asia/Tokyo）基準で判定します。
+テスト: `node scripts/test-deadline-policy.mjs`（24ケース）
