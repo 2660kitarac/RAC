@@ -328,3 +328,37 @@ API: `PATCH /api/settings`（`{ target: 'stamp', stampEnabled, stampImageUrl, st
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: ⚙️ セットアップ待ち（新規アカウントで初期設定が必要）
 - **最終更新**: 2026-08-20
+
+## セキュリティ監査（2026-08-27）
+
+RAC Cloud 全体の改善点・バグ検証を実施し、以下を修正しました。
+
+### 修正した重大な脆弱性
+
+| # | 深刻度 | 内容 |
+|---|---|---|
+| 1 | 🔴 重大 | **参加者名簿の漏洩** — `/api/meetings/[id]/attendees-emails` は例会IDを指定するだけで他クラブ参加者の氏名・メールアドレスを全件取得できた |
+| 2 | 🔴 重大 | **マルチテナント分離の欠落（IDOR）** — 領収書・取引・年会費・寄付・例会・メールテンプレートの `[id]` ルートが `clubId` を検証せず、他クラブのレコードを ID 指定で閲覧・改ざん・削除できた |
+| 3 | 🔴 重大 | **clubId の無検証** — GET/POST 系 API 20本がクエリ／ボディの `clubId` をそのまま信頼し、他クラブのデータ参照や他クラブ名義での作成が可能だった |
+| 4 | 🔴 重大 | **ロール権限チェックの欠落** — 会計系 API に権限判定が無く、一般会員でも金額の改ざん・削除が可能だった |
+| 5 | 🔴 重大 | **メール送信APIの認証・レート制限欠落** — `/api/emails/send-registration-complete` は未認証で任意の宛先へ無制限に送信でき、スパム／フィッシング中継および Resend 送信枠の枯渇に悪用可能だった |
+| 6 | 🔴 高 | **Next.js 15 非互換** — 旧形式 `params`（6ファイル14ハンドラ）が実行時エラーになる状態だった |
+| 7 | 🟡 中 | **存在しないカラム参照** — `/reports` が DB・スキーマ双方に存在しない `meeting_reports.status` を参照し実行時SQLエラーになっていた |
+| 8 | 🟡 中 | **無効なロール定義** — `/api/clubs/[id]` の `ADMIN_ROLES` に存在しないロール `'admin'` が含まれ、逆に地区代表・地区幹事が漏れていた |
+| 9 | 🟡 中 | **内部情報の漏洩** — 例外メッセージ（`e.message`）をそのままレスポンスに返していた |
+
+### 対策方針
+
+- `src/lib/auth/tenant.ts` に権限判定を集約
+  - `resolveClubScope()` — クエリ／ボディの `clubId` は信頼せず自クラブへ強制。他クラブ要求は 403
+  - `canMutateClubRecord()` — 更新・削除前にレコードの `clubId` と突き合わせる所有検証
+  - `canManageFinance()` / `canManageClub()` — サーバー側のロール権限判定
+- 更新・削除クエリには `WHERE` に `clubId` 条件も付与（多重防御）
+- 登録完了メールは宛先をボディではなく `attendanceId` から DB 導出。登録直後15分以内のみ許可、同一IDへの再送拒否、IP単位レート制限
+
+### 検証
+
+```bash
+node scripts/test-tenant-isolation.mjs   # テナント分離・権限 25件
+node scripts/test-email-ratelimit.mjs    # メール制限・再送防止 22件
+```
