@@ -394,7 +394,19 @@ export default function MeetingDetail({
                   <InfoRow label="担当委員会" value={meeting.committee} />
                 )}
                 {meeting.registration_deadline && (
-                  <InfoRow label="登録締切" value={formatDate(meeting.registration_deadline)} />
+                  <>
+                    <InfoRow label="登録締切" value={formatDate(meeting.registration_deadline)} />
+                    <InfoRow
+                      label="締切後の登録"
+                      value={
+                        (meeting as any).deadline_policy === 'strict'
+                          ? '受け付けない（厳格）'
+                          : (meeting as any).deadline_policy === 'meal_strict'
+                            ? '受け付ける（食事は不可）'
+                            : '受け付ける（食事も可・遅延登録）'
+                      }
+                    />
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -521,6 +533,20 @@ export default function MeetingDetail({
               </p>
             </div>
           </div>
+
+          {/* 遅延登録のサマリー（存在する場合のみ） */}
+          {localAttendances.some(a => (a as any).is_late_registration) && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded shrink-0">遅延</span>
+              <p className="text-sm text-amber-800">
+                締切後に登録した参加者が
+                <span className="font-bold mx-1">
+                  {localAttendances.filter(a => (a as any).is_late_registration).length}名
+                </span>
+                います。席・食事の手配をご確認ください。
+              </p>
+            </div>
+          )}
 
           {/* 操作バー */}
           <div className="flex flex-wrap items-center gap-2">
@@ -696,6 +722,21 @@ export default function MeetingDetail({
                                 <span className="font-medium text-gray-900">{displayName}</span>
                                 {isExternal && (
                                   <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">外部</span>
+                                )}
+                                {a.is_late_registration && (
+                                  <span
+                                    className="text-xs bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded"
+                                    title={
+                                      a.registered_after_deadline_days
+                                        ? `締切から${a.registered_after_deadline_days}日後に登録`
+                                        : '締切後に登録'
+                                    }
+                                  >
+                                    遅延
+                                    {a.registered_after_deadline_days
+                                      ? `+${a.registered_after_deadline_days}d`
+                                      : ''}
+                                  </span>
                                 )}
                               </div>
                               {a.note && (

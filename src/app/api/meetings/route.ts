@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       title, meetingNumber, theme, date, startTime, endTime,
       venueName, venueAddress, committee, managerUserId,
       description, programDetail, registrationDeadline,
+      deadlinePolicy = 'flexible',
       feeRac = 0, feeRc = 0, feeObog = 0, feeGuest = 0, mealFee = 0,
       muRegistrationSlug, muRegistrationUrl, status = 'draft', isDistrictEvent = false,
       // 定員
@@ -76,6 +77,9 @@ export async function POST(request: NextRequest) {
       id, clubId, title, meetingNumber, theme, date, startTime, endTime,
       venueName, venueAddress, committee, managerUserId,
       description, programDetail, registrationDeadline,
+      deadlinePolicy: ['flexible', 'meal_strict', 'strict'].includes(deadlinePolicy)
+        ? deadlinePolicy
+        : 'flexible',
       feeRac, feeRc, feeObog, feeGuest, mealFee,
       muRegistrationSlug: muRegistrationSlug || null,
       muRegistrationUrl: muRegistrationUrl || null,

@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const allowed = ['title','meetingNumber','theme','date','startTime','endTime',
       'venueName','venueAddress','committee','managerUserId','description',
-      'programDetail','registrationDeadline','feeRac','feeRc','feeObog','feeGuest',
+      'programDetail','registrationDeadline','deadlinePolicy','feeRac','feeRc','feeObog','feeGuest',
       'mealFee','muRegistrationSlug','muRegistrationUrl','status','isDistrictEvent',
       // 定員
       'capacity',
@@ -90,6 +90,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const updateData: any = { updatedAt: new Date().toISOString() };
     for (const key of allowed) {
       if (key in body) updateData[key] = body[key];
+    }
+
+    // 締切ポリシーは許容値のみ受け付ける
+    if ('deadlinePolicy' in updateData &&
+        !['flexible', 'meal_strict', 'strict'].includes(updateData.deadlinePolicy)) {
+      updateData.deadlinePolicy = 'flexible';
     }
 
     await db.update(meetings)

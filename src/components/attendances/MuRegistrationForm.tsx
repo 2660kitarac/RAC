@@ -13,8 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2, UserX } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, AlertCircle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2, UserX } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
+import { evaluateDeadlineSnake } from '@/lib/meetings/deadline';
 
 // 役職の選択肢
 const POSITION_OPTIONS = [
@@ -71,6 +72,8 @@ type MeetingWithParty = Meeting & {
   program_detail?: string | null;
   committee?: string | null;
   registration_deadline?: string | null;
+  deadline_policy?: string | null;
+  finished_at?: string | null;
   capacity?: number | null;
   // 懇親会
   has_after_party?: boolean;
@@ -123,6 +126,9 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   );
 
   const hasAfterParty = !!(meeting.has_after_party);
+
+  // 締切・ステータスの判定（締切後でもポリシーによる遅延登録を認める）
+  const deadlineInfo = evaluateDeadlineSnake(meeting as any);
   const afterPartyFeeType = meeting.after_party_fee_type ?? 'fixed';
   const allowPartyOnly = meeting.after_party_allow_party_only ?? false;
 
@@ -585,6 +591,34 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
       {/* フォーム */}
       <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* 締切後の注意喛起（遅延登録）／登録不可の場合の表示 */}
+        {deadlineInfo.deadlinePassed && deadlineInfo.allowed && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                登録締切（{meeting.registration_deadline}）を過ぎています
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                このまま登録することはできますが、「遅延登録」として運営に通知されます。
+                {deadlineInfo.policy === 'meal_strict'
+                  ? '食事の手配はできませんのでご了承ください。'
+                  : '当日の席・食事の手配については運営からご連絡する場合があります。'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!deadlineInfo.allowed && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-red-800">現在この例会は登録を受け付けていません</p>
+              <p className="text-xs text-red-700 mt-1">{deadlineInfo.message}</p>
+            </div>
+          </div>
+        )}
+
         {/* ログイン済みバナー */}
         {loggedInUser ? (
           <>

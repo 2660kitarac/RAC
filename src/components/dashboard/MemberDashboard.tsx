@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { evaluateDeadline } from '@/lib/meetings/deadline';
 
 // ─── 型定義 ──────────────────────────────────────────────
 interface MyMeeting {
@@ -25,6 +26,8 @@ interface MyMeeting {
   venueAddress: string | null;
   status: string;
   registrationDeadline: string | null;
+  deadlinePolicy?: string | null;
+  finishedAt?: string | null;
   muRegistrationUrl: string | null;
   muRegistrationSlug: string | null;
   feeRac: number;
@@ -44,6 +47,7 @@ interface MyMeeting {
     id: string;
     participationType: string | null;
     note: string | null;
+    isLateRegistration?: boolean | null;
   } | null;
 }
 
@@ -95,9 +99,21 @@ function getDayLabel(dateStr: string) {
   return `（${DAYS_JA[d.getDay()]}）`;
 }
 
-function isDeadlinePassed(deadline: string | null) {
-  if (!deadline) return false;
-  return new Date().toISOString().split('T')[0] > deadline;
+/** 例会の登録可否・遅延登録判定（締切ポリシー対応） */
+function checkDeadline(meeting: {
+  registrationDeadline?: string | null;
+  deadlinePolicy?: string | null;
+  status?: string | null;
+  finishedAt?: string | null;
+  date?: string | null;
+}) {
+  return evaluateDeadline({
+    registrationDeadline: meeting.registrationDeadline ?? null,
+    deadlinePolicy: meeting.deadlinePolicy ?? null,
+    status: meeting.status ?? null,
+    finishedAt: meeting.finishedAt ?? null,
+    date: meeting.date ?? null,
+  });
 }
 
 // ─── MU URL コピーボタン ─────────────────────────────────
@@ -164,7 +180,7 @@ function AttendanceButtons({
   onNoteToggle: (meetingId: string) => void;
 }) {
   const myType = meeting.myAttendance?.participationType ?? null;
-  const deadlinePassed = isDeadlinePassed(meeting.registrationDeadline);
+  const deadlineInfo = checkDeadline(meeting);
   const isFull = meeting.capacity !== null && meeting.capacity <= 0; // countは別途
 
   const getFee = (type: 'meeting' | 'party') => {
@@ -187,14 +203,32 @@ function AttendanceButtons({
 
   return (
     <div className="space-y-2">
-      {deadlinePassed && (
-        <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          登録締切（{meeting.registrationDeadline}）が過ぎています
+      {/* 締切後でも登録可能（遅延登録）／不可の場合は理由を表示 */}
+      {deadlineInfo.deadlinePassed && deadlineInfo.allowed && (
+        <div className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>
+            <span className="font-medium">登録締切（{meeting.registrationDeadline}）を過ぎています。</span>
+            <br />
+            遅延登録として受け付けますが、運営の準備に影響するため次回は締切までにご登録ください。
+            {deadlineInfo.policy === 'meal_strict' && (
+              <>
+                <br />
+                <span className="font-medium">※食事の手配はできません。</span>
+              </>
+            )}
+          </span>
         </div>
       )}
 
-      {!deadlinePassed && (
+      {!deadlineInfo.allowed && (
+        <div className="flex items-start gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{deadlineInfo.message}</span>
+        </div>
+      )}
+
+      {deadlineInfo.allowed && (
         <>
           <div className="flex flex-wrap gap-2">
             {/* 例会のみ参加 */}
@@ -552,7 +586,7 @@ function YearlyScheduleCard({
     // meeting
     const myType = item.myAttendance?.participationType ?? null;
     const isOpen = item.status === 'open';
-    const deadlinePassed = isDeadlinePassed(item.registrationDeadline);
+    const deadlineInfo = checkDeadline(item);
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -595,9 +629,15 @@ function YearlyScheduleCard({
                   {myType === 'waitlist' && '⌛ 待機'}
                 </span>
               )}
-              {!myType && isOpen && !isPast && !deadlinePassed && (
-                <span className="shrink-0 text-xs px-2 py-0.5 rounded-full border border-orange-200 bg-orange-50 text-orange-600 font-medium">
-                  未回答
+              {!myType && isOpen && !isPast && deadlineInfo.allowed && (
+                <span
+                  className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
+                    deadlineInfo.deadlinePassed
+                      ? 'border-red-200 bg-red-50 text-red-600'
+                      : 'border-orange-200 bg-orange-50 text-orange-600'
+                  }`}
+                >
+                  {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
                 </span>
               )}
             </div>
@@ -757,15 +797,24 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
             id: data.id || '',
             participationType: finalType,
             note: noteInputs[meetingId] || null,
+            isLateRegistration: !!data.isLateRegistration,
           },
         };
       }));
 
-      toast.success(
+      const baseMessage =
         finalType === 'absent' ? '欠席を登録しました' :
         finalType === 'waitlist' ? 'キャンセル待ちで登録しました' :
-        `「${PARTICIPATION_LABELS[finalType]}」で登録しました 🎉`
-      );
+        `「${PARTICIPATION_LABELS[finalType]}」で登録しました 🎉`;
+
+      if (data.isLateRegistration) {
+        toast.warning(`${baseMessage}（遅延登録）`, {
+          description: '締切後の登録のため、運営が内容を確認します。次回は締切までにご登録ください。',
+          duration: 6000,
+        });
+      } else {
+        toast.success(baseMessage);
+      }
     } catch (err: any) {
       toast.error(err.message || '登録に失敗しました');
     } finally {

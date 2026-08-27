@@ -8,6 +8,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings, users } from '@/lib/db/schema';
 import { eq, and, isNull, gte, asc, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { evaluateDeadline } from '@/lib/meetings/deadline';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,6 +48,8 @@ export async function GET(request: NextRequest) {
         venueAddress: meetings.venueAddress,
         status: meetings.status,
         registrationDeadline: meetings.registrationDeadline,
+        deadlinePolicy: (meetings as any).deadlinePolicy,
+        finishedAt: (meetings as any).finishedAt,
         feeRac: meetings.feeRac,
         feeRc: meetings.feeRc,
         feeObog: meetings.feeObog,
@@ -138,17 +141,22 @@ export async function POST(request: NextRequest) {
 
     if (!meeting) return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
 
-    // 締切チェック
-    if (meeting.registrationDeadline) {
-      const today = new Date().toISOString().split('T')[0];
-      if (today > meeting.registrationDeadline) {
-        return NextResponse.json({ error: '登録締切日を過ぎています' }, { status: 400 });
-      }
-    }
+    // 締切・ステータス判定（ポリシー対応）
+    // 締切を過ぎていても deadlinePolicy が flexible / meal_strict なら
+    // 「遅延登録」として受け付ける。終了処理済み・開催日経過は常に拒否。
+    const deadlineCheck = evaluateDeadline({
+      registrationDeadline: meeting.registrationDeadline,
+      deadlinePolicy: (meeting as any).deadlinePolicy,
+      status: meeting.status,
+      finishedAt: (meeting as any).finishedAt,
+      date: meeting.date,
+    });
 
-    // ステータスチェック
-    if (meeting.status !== 'open') {
-      return NextResponse.json({ error: 'この例会は現在登録を受け付けていません' }, { status: 400 });
+    if (!deadlineCheck.allowed) {
+      return NextResponse.json({
+        error: deadlineCheck.message || '登録を受け付けられません',
+        reason: deadlineCheck.reason,
+      }, { status: 400 });
     }
 
     // 自分のユーザー情報取得
@@ -219,10 +227,22 @@ export async function POST(request: NextRequest) {
         feeAmount,
         note: note || null,
         attendanceStatus: participationType === 'absent' ? 'absent' : 'undecided',
+        // 遅延登録フラグは「一度立ったら消さない」＝運営が把握できるようにする
+        ...(deadlineCheck.isLate
+          ? {
+              isLateRegistration: true,
+              registeredAfterDeadlineDays: deadlineCheck.daysLate,
+            }
+          : {}),
         updatedAt: new Date().toISOString(),
       } as any).where(eq(attendances.id, existing[0].id));
 
-      return NextResponse.json({ id: existing[0].id, updated: true });
+      return NextResponse.json({
+        id: existing[0].id,
+        updated: true,
+        isLateRegistration: deadlineCheck.isLate || !!(existing[0] as any).isLateRegistration,
+        lateMessage: deadlineCheck.isLate ? deadlineCheck.message : undefined,
+      });
     } else {
       // 新規作成
       const id = randomUUID();
@@ -239,9 +259,18 @@ export async function POST(request: NextRequest) {
         paymentStatus: participationType === 'absent' ? 'exempt' : 'unpaid',
         note: note || null,
         registrationType: 'member',
+        isLateRegistration: deadlineCheck.isLate,
+        registeredAfterDeadlineDays: deadlineCheck.daysLate,
+        // 食事締切のみ厳格モードでは締切後の食事手配は不可
+        ...(deadlineCheck.mealAllowed ? {} : { mealRequired: false }),
       } as any);
 
-      return NextResponse.json({ id, created: true }, { status: 201 });
+      return NextResponse.json({
+        id,
+        created: true,
+        isLateRegistration: deadlineCheck.isLate,
+        lateMessage: deadlineCheck.isLate ? deadlineCheck.message : undefined,
+      }, { status: 201 });
     }
   } catch (error) {
     console.error('POST /api/my/attendance error:', error);

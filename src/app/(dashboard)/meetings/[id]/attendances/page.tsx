@@ -34,6 +34,8 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
       receiptName: attendances.receiptName,
       note: attendances.note,
       registeredAt: attendances.registeredAt,
+      isLateRegistration: (attendances as any).isLateRegistration,
+      registeredAfterDeadlineDays: (attendances as any).registeredAfterDeadlineDays,
       // users JOIN で会員名を取得（#issue1: userId あり会員の氏名が空欄になる問題を修正）
       userName: users.name,
       userEmail: users.email,
@@ -53,6 +55,8 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
     // AttendanceManagement が参照する両キー形式で提供
     externalName: a.externalName ?? a.userName ?? null,
     external_name: a.externalName ?? a.userName ?? null,
+    is_late_registration: (a as any).isLateRegistration ?? false,
+    registered_after_deadline_days: (a as any).registeredAfterDeadlineDays ?? null,
     user: a.userName ? { name: a.userName, email: a.userEmail } : undefined,
   }));
 

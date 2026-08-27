@@ -95,6 +95,11 @@ export const meetings = pgTable('meetings', {
   description: text('description'),
   programDetail: text('program_detail'),
   registrationDeadline: text('registration_deadline'),
+  // 締切後の登録の扱い
+  // 'flexible'    = 締切後も登録可（食事込み・遅延登録として記録）※既定
+  // 'meal_strict' = 締切後も登録可だが食事は不可
+  // 'strict'      = 締切後は登録不可（従来の挙動）
+  deadlinePolicy: text('deadline_policy').notNull().default('flexible'),
   feeRac: integer('fee_rac').notNull().default(0),
   feeRc: integer('fee_rc').notNull().default(0),
   feeObog: integer('fee_obog').notNull().default(0),
@@ -151,6 +156,10 @@ export const attendances = pgTable('attendances', {
   attendanceStatus: text('attendance_status').notNull().default('undecided'),
   registrationType: text('registration_type').notNull().default('member'),
   mealRequired: boolean('meal_required').notNull().default(false),
+  // 登録締切を過ぎてから登録された（遅延登録）
+  isLateRegistration: boolean('is_late_registration').notNull().default(false),
+  // 締切から何日超過して登録されたか（遅延登録のみ設定）
+  registeredAfterDeadlineDays: integer('registered_after_deadline_days'),
   feeAmount: integer('fee_amount').notNull().default(0),
   paymentStatus: text('payment_status').notNull().default('unpaid'),
   paymentMethod: text('payment_method'),

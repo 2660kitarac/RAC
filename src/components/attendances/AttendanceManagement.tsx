@@ -1208,6 +1208,19 @@ function ReceptionCard({
   const pType = a.participation_type || a.participationType || 'meeting_only';
   const totalFee = (a.fee_amount ?? a.feeAmount ?? 0) + (a.after_party_fee_amount || 0);
   const displayName = a.userName ?? a.user?.name ?? a.externalName ?? a.external_name ?? '—';
+  const isLate = !!(a.is_late_registration ?? a.isLateRegistration);
+  const lateDays = a.registered_after_deadline_days ?? a.registeredAfterDeadlineDays ?? null;
+
+  // 遅延登録バッジ（締切後に登録した参加者を識別）
+  const LateBadge = () =>
+    isLate ? (
+      <span
+        className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded ml-2 align-middle"
+        title={lateDays ? `締切から${lateDays}日後に登録` : '締切後に登録'}
+      >
+        遅延登録{lateDays ? `（+${lateDays}日）` : ''}
+      </span>
+    ) : null;
 
   if (pType === 'absent') {
     return (
@@ -1215,7 +1228,7 @@ function ReceptionCard({
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-bold text-gray-700">{displayName}</p>
+              <p className="font-bold text-gray-700">{displayName}<LateBadge /></p>
               <p className="text-sm text-gray-400">{a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}</p>
             </div>
             <Badge className="bg-red-100 text-red-700 text-xs">
@@ -1235,7 +1248,7 @@ function ReceptionCard({
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-bold text-gray-900">{displayName}</p>
+              <p className="font-bold text-gray-900">{displayName}<LateBadge /></p>
               <p className="text-sm text-gray-500">{a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}</p>
             </div>
             <Badge className="bg-yellow-100 text-yellow-700 text-xs">
@@ -1258,7 +1271,7 @@ function ReceptionCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="text-lg font-bold text-gray-900">{displayName}</p>
+            <p className="text-lg font-bold text-gray-900">{displayName}<LateBadge /></p>
             <p className="text-sm text-gray-500">
               {a.clubName || a.club_name} · {MEMBER_TYPE_LABELS[a.memberType || a.member_type]}
             </p>

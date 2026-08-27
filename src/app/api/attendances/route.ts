@@ -5,6 +5,7 @@ import { attendances, users, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { resolveClubScope } from '@/lib/auth/tenant';
+import { evaluateDeadline } from '@/lib/meetings/deadline';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
 // クラブアカウント → 自クラブの例会の出席情報のみ（clubIdクエリは無視され自クラブに強制）
@@ -138,6 +139,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'お名前は必須です' }, { status: 400 });
     }
 
+    // ---- 締切・ステータス判定（ポリシー対応）----
+    // MU登録（外部フォーム）にも同じルールを適用する。
+    // 運営側からの代理登録（認証済み）は締切判定をスキップし、遅延フラグのみ付与する。
+    const [meetingRow] = await db
+      .select({
+        registrationDeadline: meetings.registrationDeadline,
+        deadlinePolicy: (meetings as any).deadlinePolicy,
+        status: meetings.status,
+        finishedAt: (meetings as any).finishedAt,
+        date: meetings.date,
+      })
+      .from(meetings)
+      .where(and(eq(meetings.id, meetingId), isNull(meetings.deletedAt)))
+      .limit(1);
+
+    if (!meetingRow) {
+      return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
+    }
+
+    const deadlineCheck = evaluateDeadline(meetingRow as any);
+
+    if (isMuRegistration && !deadlineCheck.allowed) {
+      return NextResponse.json({
+        error: deadlineCheck.message || '登録を受け付けられません',
+        reason: deadlineCheck.reason,
+      }, { status: 400 });
+    }
+
     const id = randomUUID();
     await db.insert(attendances).values({
       id,
@@ -151,7 +180,9 @@ export async function POST(request: NextRequest) {
       memberType: memberType || 'RAC',
       attendanceStatus: attendanceStatus || 'undecided',
       registrationType: registrationType || 'member',
-      mealRequired: mealRequired ?? false,
+      mealRequired: deadlineCheck.mealAllowed ? (mealRequired ?? false) : false,
+      isLateRegistration: deadlineCheck.isLate,
+      registeredAfterDeadlineDays: deadlineCheck.daysLate,
       feeAmount: feeAmount ?? 0,
       paymentStatus: paymentStatus || 'unpaid',
       paymentMethod: paymentMethod || null,
@@ -163,7 +194,12 @@ export async function POST(request: NextRequest) {
       afterPartyFeeAmount: afterPartyFeeAmount ?? 0,
     } as any);
 
-    return NextResponse.json({ id, success: true }, { status: 201 });
+    return NextResponse.json({
+      id,
+      success: true,
+      isLateRegistration: deadlineCheck.isLate,
+      lateMessage: deadlineCheck.isLate ? deadlineCheck.message : undefined,
+    }, { status: 201 });
   } catch (error) {
     console.error('POST /api/attendances error:', error);
     return NextResponse.json({ error: '出席登録に失敗しました' }, { status: 500 });

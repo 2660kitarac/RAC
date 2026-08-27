@@ -32,6 +32,7 @@ const meetingSchema = z.object({
   description: z.string().optional(),
   program_detail: z.string().optional(),
   registration_deadline: z.string().optional(),
+  deadline_policy: z.enum(['flexible', 'meal_strict', 'strict']).default('flexible'),
   fee_rac: z.string().default('0'),
   fee_rc: z.string().default('0'),
   fee_obog: z.string().default('0'),
@@ -105,6 +106,7 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
       description: meeting?.description || '',
       program_detail: meeting?.program_detail || '',
       registration_deadline: meeting?.registration_deadline || '',
+      deadline_policy: (((meeting as any)?.deadline_policy) as MeetingFormData['deadline_policy']) || 'flexible',
       fee_rac: meeting?.fee_rac?.toString() || '0',
       fee_rc: meeting?.fee_rc?.toString() || '0',
       fee_obog: meeting?.fee_obog?.toString() || '0',
@@ -158,6 +160,7 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
         description: data.description || null,
         programDetail: data.program_detail || null,
         registrationDeadline: data.registration_deadline || null,
+        deadlinePolicy: data.deadline_policy || 'flexible',
         feeRac: parseInt(data.fee_rac) || 0,
         feeRc: parseInt(data.fee_rc) || 0,
         feeObog: parseInt(data.fee_obog) || 0,
@@ -350,6 +353,31 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
                   className="mt-1"
                 />
               </div>
+            </div>
+
+            {/* 締切後の登録の扱い */}
+            <div className="form-group">
+              <Label>締切後の登録の扱い</Label>
+              <Select
+                onValueChange={v => setValue('deadline_policy', v as MeetingFormData['deadline_policy'])}
+                defaultValue={watch('deadline_policy') || 'flexible'}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="flexible">柔軟（締切後も登録可・食事も受付）</SelectItem>
+                  <SelectItem value="meal_strict">食事締切のみ厳格（登録はOK・食事は不可）</SelectItem>
+                  <SelectItem value="strict">厳格（締切後は登録不可）</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                {watch('deadline_policy') === 'strict'
+                  ? '締切を過ぎると会員は出席登録できなくなります。'
+                  : watch('deadline_policy') === 'meal_strict'
+                    ? '締切後も出席登録できますが、食事の手配は受け付けません。遅延登録として記録されます。'
+                    : '締切後も出席登録を受け付けます（食事も含む）。遅延登録として記録され、一覧で識別できます。※例会の終了処理後はいずれの場合も登録できません。'}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

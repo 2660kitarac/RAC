@@ -102,6 +102,24 @@ export const MEETING_STATUS_COLORS: Record<MeetingStatus, string> = {
 };
 
 // ============================================================
+// 登録締切ポリシー（締切後の登録の扱い）
+// ============================================================
+
+export type DeadlinePolicy = 'flexible' | 'meal_strict' | 'strict';
+
+export const DEADLINE_POLICY_LABELS: Record<DeadlinePolicy, string> = {
+  flexible: '柔軟（締切後も登録可）',
+  meal_strict: '食事締切のみ厳格',
+  strict: '厳格（締切後は登録不可）',
+};
+
+export const DEADLINE_POLICY_DESCRIPTIONS: Record<DeadlinePolicy, string> = {
+  flexible: '締切後も出席登録を受け付けます。食事も含めて受付し、「遅延登録」として記録されます。',
+  meal_strict: '締切後も出席登録を受け付けますが、食事の手配は締切までの登録分のみとなります。',
+  strict: '締切を過ぎると出席登録できません（従来の挙動）。',
+};
+
+// ============================================================
 // 出席ステータス
 // ============================================================
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'early_leave' | 'makeup' | 'undecided';
@@ -287,6 +305,7 @@ export interface Meeting {
   description: string | null;
   program_detail: string | null;
   registration_deadline: string | null;
+  deadline_policy?: DeadlinePolicy;
   fee_rac: number;
   fee_rc: number;
   fee_obog: number;
