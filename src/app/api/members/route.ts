@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull, like, or } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 
@@ -14,7 +15,10 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
     const search = url.searchParams.get('search') || '';
     const role = url.searchParams.get('role') || '';
     const isActive = url.searchParams.get('isActive');
@@ -70,7 +74,11 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const id = randomUUID();
-    const clubId = body.clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, body.clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = writeScope.clubId;
+    if (!clubId) return NextResponse.json({ error: '所属クラブが特定できません' }, { status: 400 });
 
     await db.insert(users).values({
       id, clubId, name, nameKana, email, phone, role, memberType,

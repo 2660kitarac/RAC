@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { emails, emailRecipients } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // POST /api/emails/send - メール手動送信
@@ -30,7 +31,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '送信先を1件以上指定してください' }, { status: 400 });
     }
 
-    const resolvedClubId = clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = writeScope.clubId;
+    if (!resolvedClubId) return NextResponse.json({ error: '所属クラブが特定できません' }, { status: 400 });
     const ccJson = ccEmails?.length ? JSON.stringify(ccEmails) : null;
     const bccJson = bccEmails?.length ? JSON.stringify(bccEmails) : null;
 

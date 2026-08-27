@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { receipts, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { resolveClubScope, canManageFinance } from '@/lib/auth/tenant';
 
 // GET /api/receipts?clubId=xxx&meetingId=xxx&status=issued
 export async function GET(request: NextRequest) {
@@ -13,7 +14,10 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
     const meetingId = url.searchParams.get('meetingId');
     const status = url.searchParams.get('status');
 
@@ -70,11 +74,18 @@ export async function POST(request: NextRequest) {
       receiptName, amount, description, issuedDate, pdfUrl,
     } = body;
 
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
+
     if (!receiptName || !amount || !issuedDate) {
       return NextResponse.json({ error: 'receiptName, amount, issuedDate は必須です' }, { status: 400 });
     }
 
-    const resolvedClubId = clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での発行を防ぐ）
+    const postScope = resolveClubScope(session.user, clubId);
+    if (postScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = postScope.clubId;
     if (!resolvedClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
 
     // receiptNumberが未指定の場合、自動採番（YYYYMMDD-XXXX形式）

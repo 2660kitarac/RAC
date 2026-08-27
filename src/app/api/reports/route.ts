@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetingReports } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { resolveClubScope, canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
 
 // GET /api/reports?meetingId=xxx&clubId=xxx
 export async function GET(request: NextRequest) {
@@ -14,7 +15,11 @@ export async function GET(request: NextRequest) {
     const db = await getDbFromContext();
     const url = new URL(request.url);
     const meetingId = url.searchParams.get('meetingId');
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
 
     const conditions = and(
       isNull(meetingReports.deletedAt),
@@ -50,13 +55,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'meetingId と title は必須です' }, { status: 400 });
     }
 
-    const resolvedClubId = clubId || session.user.clubId;
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
+
+    // ボディの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, clubId);
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = scope.clubId;
     if (!resolvedClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
 
     // 既存の報告書があれば更新
-    const existing = await db.select({ id: meetingReports.id }).from(meetingReports)
+    const existing = await db
+      .select({ id: meetingReports.id, clubId: meetingReports.clubId })
+      .from(meetingReports)
       .where(and(eq(meetingReports.meetingId, meetingId), isNull(meetingReports.deletedAt)))
       .limit(1);
+
+    // 他クラブの報告書を meetingId 指定で上書きされないよう所有検証する
+    if (existing.length && !canMutateClubRecord(session.user, existing[0].clubId)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     if (existing.length) {
       await db.update(meetingReports).set({

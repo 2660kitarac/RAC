@@ -229,18 +229,15 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
       }
 
       // 登録完了メール送信（失敗しても続行）
-      await fetch('/api/emails/send-registration-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meetingId: meeting.id,
-          name: data.name,
-          email: data.email,
-          feeAmount: totalFee,
-          mealRequired: data.meal_required,
-          participationType: data.participation_type,
-        }),
-      }).catch(() => {});
+      // 宛先・氏名・金額はサーバー側で出席レコードから導出するため
+      // ここでは attendanceId のみを渡す（任意宛先への送信を防ぐ）
+      if (resData?.id) {
+        await fetch('/api/emails/send-registration-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attendanceId: resData.id }),
+        }).catch(() => {});
+      }
 
       setRegistrationData({
         name: data.name,

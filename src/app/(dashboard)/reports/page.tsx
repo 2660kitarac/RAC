@@ -20,8 +20,9 @@ export default async function ReportsPage() {
     .select({
       id: meetingReports.id,
       meetingId: meetingReports.meetingId,
-      status: meetingReports.status,
+      participantsCount: meetingReports.participantsCount,
       createdAt: meetingReports.createdAt,
+      updatedAt: meetingReports.updatedAt,
       meetingTitle: meetings.title,
       meetingDate: meetings.date,
       meetingNumber: meetings.meetingNumber,
@@ -35,17 +36,6 @@ export default async function ReportsPage() {
       )
     )
     .orderBy(desc(meetingReports.createdAt));
-
-  const STATUS_LABELS: Record<string, string> = {
-    draft: '下書き',
-    submitted: '提出済',
-    approved: '承認済',
-  };
-  const STATUS_COLORS: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-600',
-    submitted: 'bg-blue-100 text-blue-700',
-    approved: 'bg-green-100 text-green-700',
-  };
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
@@ -74,7 +64,7 @@ export default async function ReportsPage() {
                 <tr>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">例会名</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">開催日</th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-600">ステータス</th>
+                  <th className="text-center py-3 px-4 font-medium text-gray-600">参加人数</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">作成日</th>
                   <th className="text-center py-3 px-4 font-medium text-gray-600">操作</th>
                 </tr>
@@ -91,10 +81,8 @@ export default async function ReportsPage() {
                     <td className="py-3 px-4 text-gray-600">
                       {r.meetingDate ? formatDate(r.meetingDate) : '—'}
                     </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status ?? 'draft']}`}>
-                        {STATUS_LABELS[r.status ?? 'draft']}
-                      </span>
+                    <td className="py-3 px-4 text-center text-gray-700">
+                      {r.participantsCount ?? 0}名
                     </td>
                     <td className="py-3 px-4 text-gray-500 text-xs">{formatDate(r.createdAt)}</td>
                     <td className="py-3 px-4 text-center">
@@ -119,8 +107,8 @@ export default async function ReportsPage() {
                       {r.meetingDate ? formatDate(r.meetingDate) : ''}
                     </p>
                   </div>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status ?? 'draft']}`}>
-                    {STATUS_LABELS[r.status ?? 'draft']}
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+                    {r.participantsCount ?? 0}名
                   </span>
                 </div>
                 <Link href={`/meetings/${r.meetingId}/report`}

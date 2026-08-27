@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 
@@ -14,7 +15,10 @@ export async function GET(request: NextRequest) {
 
     // 自クラブ以外を見るには管理者権限が必要
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
     const role = url.searchParams.get('role');
     const isActive = url.searchParams.get('isActive');
 
@@ -78,7 +82,10 @@ export async function POST(request: NextRequest) {
 
     // club_admin / president は自クラブにのみ作成可
     const isTopAdmin = ['system_owner', 'district_admin', 'admin'].includes(session.user.role || '');
-    const targetClubId = clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const targetClubId = writeScope.clubId;
     if (!isTopAdmin && targetClubId !== session.user.clubId) {
       return NextResponse.json({ error: '他クラブへの登録は権限がありません' }, { status: 403 });
     }

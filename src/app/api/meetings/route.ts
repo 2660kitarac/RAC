@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, users } from '@/lib/db/schema';
 import { eq, and, isNull, desc, gte, lte } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // GET /api/meetings - 例会一覧
@@ -13,7 +14,10 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
     const status = url.searchParams.get('status');
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
@@ -61,7 +65,11 @@ export async function POST(request: NextRequest) {
 
     if (!title || !date) return NextResponse.json({ error: 'タイトルと日付は必須です' }, { status: 400 });
 
-    const clubId = body.clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, body.clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = writeScope.clubId;
+    if (!clubId) return NextResponse.json({ error: '所属クラブが特定できません' }, { status: 400 });
     const id = randomUUID();
 
     await db.insert(meetings).values({

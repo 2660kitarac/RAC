@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { users, meetings, attendances, annualFees } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 
 function toCSV(headers: string[], rows: Record<string, unknown>[]): string {
   const bom = '\uFEFF';
@@ -26,7 +27,10 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const type = url.searchParams.get('type');
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
 
     let csvContent = '';
     let filename = 'export';

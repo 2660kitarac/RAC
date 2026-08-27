@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { receipts, attendances, annualFees, users, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 /**
@@ -49,7 +50,10 @@ export async function POST(request: NextRequest) {
       skipExisting = true,
     } = body;
 
-    const resolvedClubId = body.clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, body.clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = writeScope.clubId;
     if (!resolvedClubId) {
       return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
     }

@@ -3,12 +3,14 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { districtEvents, users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { isDistrictStaff } from '@/lib/hooks/useAuth';
+import { isDistrictScope } from '@/lib/auth/tenant';
+
+type RouteContext = { params: Promise<{ id: string }> };
 
 // PATCH /api/district/[id] - 地区行事更新
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
     const session = await auth();
@@ -23,10 +25,11 @@ export async function PATCH(
       .where(and(eq(users.id, session.user.id!), isNull(users.deletedAt)))
       .then((r: any[]) => r[0]);
 
-    if (!isDistrictStaff((profile?.role || 'member') as any)) {
+    if (!isDistrictScope(profile?.role || 'member')) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const {
       title, eventType, date, startTime, endTime,
@@ -42,7 +45,7 @@ export async function PATCH(
     const existing = await db
       .select({ id: districtEvents.id })
       .from(districtEvents)
-      .where(and(eq(districtEvents.id, params.id), isNull(districtEvents.deletedAt)))
+      .where(and(eq(districtEvents.id, id), isNull(districtEvents.deletedAt)))
       .then((r: any[]) => r[0]);
 
     if (!existing) {
@@ -66,7 +69,7 @@ export async function PATCH(
         isJointMeeting: isJointMeeting ?? false,
         updatedAt: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
       })
-      .where(eq(districtEvents.id, params.id));
+      .where(eq(districtEvents.id, id));
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -78,7 +81,7 @@ export async function PATCH(
 // DELETE /api/district/[id] - 地区行事削除（論理削除）
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
     const session = await auth();
@@ -93,14 +96,15 @@ export async function DELETE(
       .where(and(eq(users.id, session.user.id!), isNull(users.deletedAt)))
       .then((r: any[]) => r[0]);
 
-    if (!isDistrictStaff((profile?.role || 'member') as any)) {
+    if (!isDistrictScope(profile?.role || 'member')) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
+    const { id } = await params;
     const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
     await db.update(districtEvents)
       .set({ deletedAt: now, updatedAt: now })
-      .where(and(eq(districtEvents.id, params.id), isNull(districtEvents.deletedAt)));
+      .where(and(eq(districtEvents.id, id), isNull(districtEvents.deletedAt)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

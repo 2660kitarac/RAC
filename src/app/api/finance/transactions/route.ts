@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { transactions } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte } from 'drizzle-orm';
+import { resolveClubScope } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // GET /api/finance/transactions?clubId=xxx&type=income&from=2024-01-01&to=2024-12-31
@@ -13,7 +14,10 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const clubId = url.searchParams.get('clubId') || session.user.clubId;
+    // クエリの clubId は信頼しない（IDOR 対策）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const clubId = scope.clubId;
     const transactionType = url.searchParams.get('type');
     const category = url.searchParams.get('category');
     const from = url.searchParams.get('from');
@@ -57,7 +61,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'transactionType, category, transactionDate は必須です' }, { status: 400 });
     }
 
-    const resolvedClubId = clubId || session.user.clubId;
+    // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
+    const writeScope = resolveClubScope(session.user, clubId);
+    if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = writeScope.clubId;
     if (!resolvedClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
 
     const id = randomUUID();

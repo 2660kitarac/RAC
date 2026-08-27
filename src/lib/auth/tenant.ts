@@ -81,3 +81,47 @@ export function canMutateClubRecord(
   if (!sessionClubId || !recordClubId) return false;
   return sessionClubId === recordClubId;
 }
+
+/* ============================================================
+ * ロール別の操作権限（サーバー側判定）
+ *
+ * @/lib/hooks/useAuth は 'use client' のため API Route からは
+ * 使えない。API Route / Server Component からは以下を使う。
+ * ============================================================ */
+
+/** 会計（取引・年会費・寄付・領収書）を操作できるロール */
+const FINANCE_MANAGER_ROLES = [
+  'system_owner',
+  'district_admin',
+  'district_representative',
+  'district_secretary',
+  'club_account',
+  'club_admin',
+  'president',
+  'treasurer',
+] as const;
+
+/** クラブ運営（例会・メールテンプレート等）を操作できるロール */
+const CLUB_MANAGER_ROLES = [
+  'system_owner',
+  'district_admin',
+  'district_representative',
+  'district_secretary',
+  'club_account',
+  'club_admin',
+  'president',
+  'secretary',
+  'treasurer',
+] as const;
+
+/** 会計操作権限があるか */
+export function canManageFinance(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return (FINANCE_MANAGER_ROLES as readonly string[]).includes(role);
+}
+
+/** クラブ運営操作権限があるか */
+export function canManageClub(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return (CLUB_MANAGER_ROLES as readonly string[]).includes(role);
+}
