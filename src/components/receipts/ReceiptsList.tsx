@@ -23,6 +23,7 @@ interface ReceiptRow {
   id: string;
   receiptNumber: string;
   receiptName: string;
+  receiptClubName?: string | null;
   amount: number;
   description: string;
   issuedDate: string;
@@ -37,6 +38,7 @@ interface ReceiptRow {
 interface BulkTarget {
   id: string;
   name: string;
+  clubName?: string;
   amount: number;
   isClubMember?: boolean;
   alreadyIssued?: boolean;
@@ -76,6 +78,7 @@ export default function ReceiptsList({
   const [bulkIssuedDate, setBulkIssuedDate] = useState(new Date().toISOString().split('T')[0]);
   const [bulkDescription, setBulkDescription] = useState('');
   const [bulkTargets, setBulkTargets] = useState<BulkTarget[]>([]);
+  const [bulkClubNames, setBulkClubNames] = useState<Record<string, string>>({});
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -107,6 +110,7 @@ export default function ReceiptsList({
 
       const targets: BulkTarget[] = data.targets || [];
       setBulkTargets(targets);
+      setBulkClubNames(Object.fromEntries(targets.map(t => [t.id, t.clubName || ''])));
       setBulkSelected(new Set(targets.filter(t => !t.alreadyIssued).map(t => t.id)));
       setBulkStep('preview');
     } catch (e) {
@@ -136,6 +140,7 @@ export default function ReceiptsList({
           description: bulkDescription || undefined,
           targetIds: selectedIds,
           skipExisting: false,
+          clubNameOverrides: bulkMode === 'external' ? bulkClubNames : undefined,
         }),
       });
       const data = await res.json();
@@ -165,6 +170,7 @@ export default function ReceiptsList({
   const resetBulkDialog = () => {
     setBulkStep('config');
     setBulkTargets([]);
+    setBulkClubNames({});
     setBulkSelected(new Set());
     setBulkResult(null);
     setBulkCreatedIds([]);
@@ -175,6 +181,7 @@ export default function ReceiptsList({
   // ── 単票発行フォーム ──
   const [form, setForm] = useState({
     receiptName: '',
+    receiptClubName: '',
     amount: '',
     description: 'ローターアクトクラブ例会登録料として',
     issuedDate: new Date().toISOString().split('T')[0],
@@ -197,6 +204,7 @@ export default function ReceiptsList({
           meetingId: form.meetingId || null,
           attendanceId: form.attendanceId || null,
           receiptName: form.receiptName,
+          receiptClubName: form.receiptClubName || undefined,
           amount: parseInt(form.amount),
           description: form.description,
           issuedDate: form.issuedDate,
@@ -210,6 +218,7 @@ export default function ReceiptsList({
         id: data.id,
         receiptNumber: data.receiptNumber,
         receiptName: form.receiptName,
+        receiptClubName: form.receiptClubName || null,
         amount: parseInt(form.amount),
         description: form.description,
         issuedDate: form.issuedDate,
@@ -222,6 +231,7 @@ export default function ReceiptsList({
       setShowCreateDialog(false);
       setForm({
         receiptName: '',
+        receiptClubName: '',
         amount: '',
         description: 'ローターアクトクラブ例会登録料として',
         issuedDate: new Date().toISOString().split('T')[0],
@@ -557,7 +567,12 @@ export default function ReceiptsList({
           <div className="space-y-3 py-2">
             <div className="form-group">
               <Label required>宛名</Label>
-              <Input value={form.receiptName} onChange={e => setForm({...form, receiptName: e.target.value})} placeholder="〇〇クラブ 御中" className="mt-1" />
+              <Input value={form.receiptName} onChange={e => setForm({...form, receiptName: e.target.value})} placeholder="山田 太郎" className="mt-1" />
+            </div>
+            <div className="form-group">
+              <Label>クラブ名（任意）</Label>
+              <Input value={form.receiptClubName} onChange={e => setForm({...form, receiptClubName: e.target.value})} placeholder="〇〇ローターアクトクラブ" className="mt-1" />
+              <p className="text-xs text-gray-500 mt-1">印刷時に宛名の上に表示されます（他クラブからの参加者向け）</p>
             </div>
             <div className="form-group">
               <Label required>金額（円）</Label>
@@ -743,6 +758,15 @@ export default function ReceiptsList({
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
+                        {bulkMode === 'external' && (
+                          <Input
+                            value={bulkClubNames[t.id] ?? ''}
+                            onChange={e => setBulkClubNames(prev => ({ ...prev, [t.id]: e.target.value }))}
+                            onClick={e => e.preventDefault()}
+                            placeholder="クラブ名（任意）"
+                            className="mt-1 h-7 text-xs"
+                          />
+                        )}
                         {t.alreadyIssued && (
                           <p className="text-xs text-amber-600">発行済み</p>
                         )}

@@ -45,6 +45,7 @@ export default async function BulkPrintPage({
           id: receipts.id,
           receiptNumber: receipts.receiptNumber,
           receiptName: receipts.receiptName,
+          receiptClubName: receipts.receiptClubName,
           amount: receipts.amount,
           description: receipts.description,
           issuedDate: receipts.issuedDate,
@@ -263,6 +264,9 @@ function ReceiptCardScreen({ receipt }: { receipt: any }) {
       <div className="flex items-start justify-between mb-2">
         <div>
           <p className="text-xs text-gray-400">No. {receipt.receiptNumber}</p>
+          {receipt.receiptClubName && (
+            <p className="text-sm font-bold text-gray-700">{receipt.receiptClubName}</p>
+          )}
           <p className="text-lg font-bold text-gray-900">{receipt.receiptName} 様</p>
         </div>
         <p className="text-2xl font-bold text-gray-900">¥{receipt.amount.toLocaleString()}</p>
@@ -300,6 +304,9 @@ function ReceiptPrintContent({ receipt }: { receipt: any }) {
 
       {/* 宛名 */}
       <div style={{ borderBottom: '1.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm' }}>
+        {receipt.receiptClubName && (
+          <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{receipt.receiptClubName}</div>
+        )}
         <span style={{ fontSize: '11pt', fontWeight: 'bold' }}>{receipt.receiptName}</span>
         <span style={{ fontSize: '9pt' }}> 様</span>
       </div>

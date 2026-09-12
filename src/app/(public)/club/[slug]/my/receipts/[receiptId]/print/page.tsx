@@ -34,6 +34,7 @@ export default async function ReceiptPrintPage({
       id: receipts.id,
       receiptNumber: receipts.receiptNumber,
       receiptName: receipts.receiptName,
+      receiptClubName: receipts.receiptClubName,
       amount: receipts.amount,
       description: receipts.description,
       issuedDate: receipts.issuedDate,
@@ -76,6 +77,9 @@ export default async function ReceiptPrintPage({
 
           {/* 宛名 */}
           <div className="border-b-2 border-gray-900 pb-2 mb-6">
+            {receipt.receiptClubName && (
+              <p className="text-sm font-bold text-gray-700">{receipt.receiptClubName}</p>
+            )}
             <p className="text-xl font-bold text-gray-900">{receipt.receiptName} 様</p>
           </div>
 

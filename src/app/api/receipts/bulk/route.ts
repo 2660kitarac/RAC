@@ -23,6 +23,7 @@ import { randomUUID } from 'crypto';
  *   description?: string,     // 但し書き（省略時はモードに応じたデフォルト）
  *   targetIds?: string[],     // 対象を絞る場合（attendance_id / annual_fee_id）
  *   skipExisting?: boolean,   // 既存の発行済み領収書をスキップ（デフォルト:true）
+ *   clubNameOverrides?: Record<string, string>, // mode=external 時、attendanceId ごとのクラブ名上書き
  * }
  *
  * レスポンス:
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       description,
       targetIds,
       skipExisting = true,
+      clubNameOverrides,
     } = body;
 
     const resolvedClubId = body.clubId || session.user.clubId;
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
         id: attendances.id,
         externalName: attendances.externalName,
         receiptName: attendances.receiptName,
+        clubName: attendances.clubName,
         feeAmount: attendances.feeAmount,
         userId: attendances.userId,
       }).from(attendances).where(attendanceCondition);
@@ -139,6 +142,11 @@ export async function POST(request: NextRequest) {
         }
 
         const name = att.receiptName || att.externalName || '（不明）';
+        // クラブ名は外部参加者（mode=external）のみ扱う。個別上書き（空欄への変更も含む）があれば優先し、なければ受付時の訪問クラブ名を使う
+        const hasOverride = !!clubNameOverrides && att.id in clubNameOverrides;
+        const receiptClubName = mode === 'external'
+          ? ((hasOverride ? clubNameOverrides[att.id] : att.clubName) || null)
+          : null;
         const receiptNumber = `${issuedDate.replace(/-/g, '')}-${randomUUID().substring(0, 4).toUpperCase()}`;
         const id = randomUUID();
 
@@ -150,6 +158,7 @@ export async function POST(request: NextRequest) {
           transactionId: null,
           receiptNumber,
           receiptName: name,
+          receiptClubName,
           amount: att.feeAmount,
           description: defaultDesc,
           issuedDate,
@@ -310,6 +319,7 @@ export async function GET(request: NextRequest) {
         id: attendances.id,
         externalName: attendances.externalName,
         receiptName: attendances.receiptName,
+        clubName: attendances.clubName,
         feeAmount: attendances.feeAmount,
         userId: attendances.userId,
         userName: users.name,
@@ -332,6 +342,7 @@ export async function GET(request: NextRequest) {
         targets: results.map(a => ({
           id: a.id,
           name: a.receiptName || a.externalName || a.userName || '（不明）',
+          clubName: mode === 'external' ? (a.clubName || '') : undefined,
           amount: a.feeAmount,
           isClubMember: !!a.userId,
           alreadyIssued: existingAttendanceIds.has(a.id),

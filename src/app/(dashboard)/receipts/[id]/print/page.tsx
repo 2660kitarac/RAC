@@ -25,6 +25,7 @@ export default async function AdminReceiptPrintPage({
       id: receipts.id,
       receiptNumber: receipts.receiptNumber,
       receiptName: receipts.receiptName,
+      receiptClubName: receipts.receiptClubName,
       amount: receipts.amount,
       description: receipts.description,
       issuedDate: receipts.issuedDate,
@@ -166,6 +167,9 @@ function ReceiptContent({ receipt }: { receipt: any }) {
       <p className="text-center text-xs text-gray-400 mb-6">No. {receipt.receiptNumber}</p>
 
       <div className="border-b-2 border-gray-900 pb-2 mb-6">
+        {receipt.receiptClubName && (
+          <p className="text-sm font-bold text-gray-700">{receipt.receiptClubName}</p>
+        )}
         <p className="text-xl font-bold text-gray-900">{receipt.receiptName} 様</p>
       </div>
 
@@ -222,6 +226,9 @@ function ReceiptPrintContent({ receipt }: { receipt: any }) {
 
       {/* 宛名 */}
       <div style={{ borderBottom: '1.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm' }}>
+        {receipt.receiptClubName && (
+          <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{receipt.receiptClubName}</div>
+        )}
         <span style={{ fontSize: '11pt', fontWeight: 'bold' }}>{receipt.receiptName}</span>
         <span style={{ fontSize: '9pt' }}> 様</span>
       </div>

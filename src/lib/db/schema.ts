@@ -219,6 +219,8 @@ export const receipts = pgTable('receipts', {
   transactionId: text('transaction_id'),
   receiptNumber: text('receipt_number').notNull(),
   receiptName: text('receipt_name').notNull(),
+  // 宛名のクラブ名（外部参加者の訪問クラブ名。印刷時に氏名の上に表示）
+  receiptClubName: text('receipt_club_name'),
   amount: integer('amount').notNull().default(0),
   description: text('description').notNull().default(''),
   issuedDate: text('issued_date').notNull(),
