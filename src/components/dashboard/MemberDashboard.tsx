@@ -527,6 +527,9 @@ function ScheduleItemRow({
   onNoteChange: (meetingId: string, val: string) => void;
   onNoteToggle: (meetingId: string) => void;
 }) {
+  // 早期returnより前で無条件に呼ぶ（Rules of Hooks: フックを分岐の中に置かない）
+  const [expanded, setExpanded] = useState(false);
+
   const isPast = item.date < today;
   const dateObj = new Date(item.date + 'T00:00:00');
   const month = dateObj.getMonth() + 1;
@@ -576,7 +579,6 @@ function ScheduleItemRow({
   const myType = item.myAttendance?.participationType ?? null;
   const isOpen = item.status === 'open';
   const deadlineInfo = checkDeadline(item);
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div
@@ -708,6 +710,8 @@ function YearlyScheduleCard({
   const futureItems = allItems.filter(item => item.date >= today);
   const pastItems = allItems.filter(item => item.date < today).reverse(); // 新しい順
 
+  const rowProps = { today, memberType, submitting, noteInputs, noteOpen, onRegister, onNoteChange, onNoteToggle };
+
   return (
     <Card className="border-0 shadow-md">
       <CardHeader className="pb-3">
@@ -723,18 +727,7 @@ function YearlyScheduleCard({
         )}
 
         {futureItems.map(item => (
-          <ScheduleItemRow
-            key={`${item.kind}-${item.id}`}
-            item={item}
-            today={today}
-            memberType={memberType}
-            submitting={submitting}
-            noteInputs={noteInputs}
-            noteOpen={noteOpen}
-            onRegister={onRegister}
-            onNoteChange={onNoteChange}
-            onNoteToggle={onNoteToggle}
-          />
+          <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
         ))}
 
         {/* 過去の例会（折りたたみ） */}
@@ -750,18 +743,7 @@ function YearlyScheduleCard({
             {showPast && (
               <div className="space-y-2 mt-2">
                 {pastItems.map(item => (
-                  <ScheduleItemRow
-                    key={`${item.kind}-${item.id}`}
-                    item={item}
-                    today={today}
-                    memberType={memberType}
-                    submitting={submitting}
-                    noteInputs={noteInputs}
-                    noteOpen={noteOpen}
-                    onRegister={onRegister}
-                    onNoteChange={onNoteChange}
-                    onNoteToggle={onNoteToggle}
-                  />
+                  <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
                 ))}
               </div>
             )}
