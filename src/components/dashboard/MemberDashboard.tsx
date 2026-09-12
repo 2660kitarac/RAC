@@ -502,6 +502,180 @@ function AttendanceStatsCard({ stats }: { stats: Stats }) {
   );
 }
 
+// ─── 年間スケジュール：1件分の行 ───────────────────────────
+// futureItems/pastItems の .map() から呼ばれる独立コンポーネント。
+// フック（useState）を持つため、通常関数として.map()内で呼び出してはならない
+// （呼び出すとレンダーごとにフック呼び出し回数が変わりReactエラーになる）。
+function ScheduleItemRow({
+  item,
+  today,
+  memberType,
+  submitting,
+  noteInputs,
+  noteOpen,
+  onRegister,
+  onNoteChange,
+  onNoteToggle,
+}: {
+  item: ScheduleItem;
+  today: string;
+  memberType: string;
+  submitting: string | null;
+  noteInputs: Record<string, string>;
+  noteOpen: Record<string, boolean>;
+  onRegister: (meetingId: string, type: string) => void;
+  onNoteChange: (meetingId: string, val: string) => void;
+  onNoteToggle: (meetingId: string) => void;
+}) {
+  // 早期returnより前で無条件に呼ぶ（Rules of Hooks: フックを分岐の中に置かない）
+  const [expanded, setExpanded] = useState(false);
+
+  const isPast = item.date < today;
+  const dateObj = new Date(item.date + 'T00:00:00');
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+  const dayOfWeek = DAYS_JA[dateObj.getDay()];
+  const isSun = dateObj.getDay() === 0;
+  const isSat = dateObj.getDay() === 6;
+
+  if (item.kind === 'district_event') {
+    return (
+      <div
+        className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
+          isPast ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-amber-50 border-amber-200'
+        }`}
+      >
+        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${isPast ? 'bg-gray-100' : 'bg-amber-100'}`}>
+          <p className="text-xs text-gray-500">{month}月</p>
+          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
+            {day}
+          </p>
+          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
+        </div>
+        <div className="flex-1 min-w-0 py-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-medium">
+              地区行事
+            </span>
+            {item.isAwardTarget && (
+              <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Star className="h-2.5 w-2.5" />表彰
+              </span>
+            )}
+            <span className="text-xs text-gray-500">{item.eventType}</span>
+          </div>
+          <p className="font-semibold text-gray-900 text-sm mt-0.5 truncate">{item.title}</p>
+          {item.venueName && (
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+              <MapPin className="h-3 w-3" />{item.venueName}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // meeting
+  const myType = item.myAttendance?.participationType ?? null;
+  const isOpen = item.status === 'open';
+  const deadlineInfo = checkDeadline(item);
+
+  return (
+    <div
+      className={`rounded-xl border transition-all ${
+        isPast
+          ? 'bg-gray-50 border-gray-100'
+          : isOpen
+          ? 'bg-white border-blue-200 shadow-sm'
+          : 'bg-white border-gray-200'
+      }`}
+    >
+      <div
+        className="flex items-start gap-3 px-4 py-3 cursor-pointer"
+        onClick={() => !isPast && setExpanded(e => !e)}
+      >
+        {/* 日付バッジ */}
+        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${
+          isPast ? 'bg-gray-100' : isOpen ? 'bg-blue-100' : 'bg-gray-100'
+        }`}>
+          <p className="text-xs text-gray-500">{month}月</p>
+          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
+            {day}
+          </p>
+          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
+        </div>
+
+        <div className="flex-1 min-w-0 py-0.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className={`font-semibold text-sm truncate ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
+              {item.title}
+            </p>
+            {/* 出欠バッジ */}
+            {myType && (
+              <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${PARTICIPATION_COLORS[myType]}`}>
+                {myType === 'meeting_only' && '✓ 参加'}
+                {myType === 'meeting_and_party' && '✓ ＋懇'}
+                {myType === 'absent' && '✗ 欠席'}
+                {myType === 'waitlist' && '⌛ 待機'}
+              </span>
+            )}
+            {!myType && isOpen && !isPast && deadlineInfo.allowed && (
+              <span
+                className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
+                  deadlineInfo.deadlinePassed
+                    ? 'border-red-200 bg-red-50 text-red-600'
+                    : 'border-orange-200 bg-orange-50 text-orange-600'
+                }`}
+              >
+                {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+            {item.startTime && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Clock className="h-3 w-3" />{item.startTime.substring(0, 5)}
+              </span>
+            )}
+            {item.venueName && (
+              <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[180px]">
+                <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {!isPast && isOpen && (
+          <div className="shrink-0 text-gray-300">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        )}
+      </div>
+
+      {/* 展開：出欠登録 + MU URL */}
+      {!isPast && expanded && (
+        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-gray-100">
+          {isOpen && (
+            <div className="pt-3">
+              <AttendanceButtons
+                meeting={item}
+                memberType={memberType}
+                submitting={submitting}
+                noteInputs={noteInputs}
+                noteOpen={noteOpen}
+                onRegister={onRegister}
+                onNoteChange={onNoteChange}
+                onNoteToggle={onNoteToggle}
+              />
+            </div>
+          )}
+          <MuShareButton url={item.muRegistrationUrl} slug={item.muRegistrationSlug} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── 年間スケジュール ─────────────────────────────────────
 function YearlyScheduleCard({
   meetings,
@@ -536,155 +710,7 @@ function YearlyScheduleCard({
   const futureItems = allItems.filter(item => item.date >= today);
   const pastItems = allItems.filter(item => item.date < today).reverse(); // 新しい順
 
-  const renderItem = (item: ScheduleItem) => {
-    const isPast = item.date < today;
-    const dateObj = new Date(item.date + 'T00:00:00');
-    const month = dateObj.getMonth() + 1;
-    const day = dateObj.getDate();
-    const dayOfWeek = DAYS_JA[dateObj.getDay()];
-    const isSun = dateObj.getDay() === 0;
-    const isSat = dateObj.getDay() === 6;
-
-    if (item.kind === 'district_event') {
-      return (
-        <div
-          key={`de-${item.id}`}
-          className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
-            isPast ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-amber-50 border-amber-200'
-          }`}
-        >
-          <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${isPast ? 'bg-gray-100' : 'bg-amber-100'}`}>
-            <p className="text-xs text-gray-500">{month}月</p>
-            <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-              {day}
-            </p>
-            <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-          </div>
-          <div className="flex-1 min-w-0 py-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                地区行事
-              </span>
-              {item.isAwardTarget && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Star className="h-2.5 w-2.5" />表彰
-                </span>
-              )}
-              <span className="text-xs text-gray-500">{item.eventType}</span>
-            </div>
-            <p className="font-semibold text-gray-900 text-sm mt-0.5 truncate">{item.title}</p>
-            {item.venueName && (
-              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                <MapPin className="h-3 w-3" />{item.venueName}
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // meeting
-    const myType = item.myAttendance?.participationType ?? null;
-    const isOpen = item.status === 'open';
-    const deadlineInfo = checkDeadline(item);
-    const [expanded, setExpanded] = useState(false);
-
-    return (
-      <div
-        key={`m-${item.id}`}
-        className={`rounded-xl border transition-all ${
-          isPast
-            ? 'bg-gray-50 border-gray-100'
-            : isOpen
-            ? 'bg-white border-blue-200 shadow-sm'
-            : 'bg-white border-gray-200'
-        }`}
-      >
-        <div
-          className="flex items-start gap-3 px-4 py-3 cursor-pointer"
-          onClick={() => !isPast && setExpanded(e => !e)}
-        >
-          {/* 日付バッジ */}
-          <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${
-            isPast ? 'bg-gray-100' : isOpen ? 'bg-blue-100' : 'bg-gray-100'
-          }`}>
-            <p className="text-xs text-gray-500">{month}月</p>
-            <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-              {day}
-            </p>
-            <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-          </div>
-
-          <div className="flex-1 min-w-0 py-0.5">
-            <div className="flex items-start justify-between gap-2">
-              <p className={`font-semibold text-sm truncate ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-                {item.title}
-              </p>
-              {/* 出欠バッジ */}
-              {myType && (
-                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${PARTICIPATION_COLORS[myType]}`}>
-                  {myType === 'meeting_only' && '✓ 参加'}
-                  {myType === 'meeting_and_party' && '✓ ＋懇'}
-                  {myType === 'absent' && '✗ 欠席'}
-                  {myType === 'waitlist' && '⌛ 待機'}
-                </span>
-              )}
-              {!myType && isOpen && !isPast && deadlineInfo.allowed && (
-                <span
-                  className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
-                    deadlineInfo.deadlinePassed
-                      ? 'border-red-200 bg-red-50 text-red-600'
-                      : 'border-orange-200 bg-orange-50 text-orange-600'
-                  }`}
-                >
-                  {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-              {item.startTime && (
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />{item.startTime.substring(0, 5)}
-                </span>
-              )}
-              {item.venueName && (
-                <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[180px]">
-                  <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {!isPast && isOpen && (
-            <div className="shrink-0 text-gray-300">
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </div>
-          )}
-        </div>
-
-        {/* 展開：出欠登録 + MU URL */}
-        {!isPast && expanded && (
-          <div className="px-4 pb-4 pt-0 space-y-3 border-t border-gray-100">
-            {isOpen && (
-              <div className="pt-3">
-                <AttendanceButtons
-                  meeting={item}
-                  memberType={memberType}
-                  submitting={submitting}
-                  noteInputs={noteInputs}
-                  noteOpen={noteOpen}
-                  onRegister={onRegister}
-                  onNoteChange={onNoteChange}
-                  onNoteToggle={onNoteToggle}
-                />
-              </div>
-            )}
-            <MuShareButton url={item.muRegistrationUrl} slug={item.muRegistrationSlug} />
-          </div>
-        )}
-      </div>
-    );
-  };
+  const rowProps = { today, memberType, submitting, noteInputs, noteOpen, onRegister, onNoteChange, onNoteToggle };
 
   return (
     <Card className="border-0 shadow-md">
@@ -700,7 +726,9 @@ function YearlyScheduleCard({
           <p className="text-sm text-gray-400 py-8 text-center">予定が登録されていません</p>
         )}
 
-        {futureItems.map(renderItem)}
+        {futureItems.map(item => (
+          <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
+        ))}
 
         {/* 過去の例会（折りたたみ） */}
         {pastItems.length > 0 && (
@@ -714,7 +742,9 @@ function YearlyScheduleCard({
             </button>
             {showPast && (
               <div className="space-y-2 mt-2">
-                {pastItems.map(renderItem)}
+                {pastItems.map(item => (
+                  <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
+                ))}
               </div>
             )}
           </div>
