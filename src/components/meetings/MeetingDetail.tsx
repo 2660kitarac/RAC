@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
+import { isOwnClubAttendance } from '@/lib/meetings/own-club';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
@@ -287,8 +288,17 @@ export default function MeetingDetail({
   };
 
   // 自クラブの会員か（MU登録・他クラブ・ゲストは「MU・ビジター」）
+  // MU登録フォームから登録した自クラブ会員も「自クラブ」に入れる（所属クラブで判定）
+  const ownClubCtx = {
+    id: (meeting as any).club_id,
+    name: (meeting as any).club_name,
+    shortName: (meeting as any).club_short_name,
+  };
   const isOwnClub = (a: any) =>
-    !!a.user_id && a.registration_type !== 'mu' && a.user_club_id === (meeting as any).club_id;
+    isOwnClubAttendance(
+      { userId: a.user_id, userClubId: a.user_club_id, clubId: a.attendance_club_id, clubName: a.club_name },
+      ownClubCtx,
+    );
   const ownCount = localAttendances.filter(isOwnClub).length;
   const muCount = localAttendances.length - ownCount;
 

@@ -27,6 +27,7 @@ import {
   type ResumeVisitor,
   type VisitorCategory,
 } from './types';
+import { isOwnClubAttendance, normalizePersonName } from '@/lib/meetings/own-club';
 import {
   extractPosition,
   fiscalYearLabel,
@@ -112,7 +113,7 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
 
   // ---- クラブ ----
   const [club] = await db
-    .select({ id: clubs.id, name: clubs.name, district: clubs.district })
+    .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName, district: clubs.district })
     .from(clubs)
     .where(eq(clubs.id, meeting.clubId))
     .limit(1);
@@ -234,6 +235,7 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
     id: string;
     userId: string | null;
     externalName: string | null;
+    clubId: string | null;
     clubName: string | null;
     memberType: string | null;
     registrationType: string | null;
@@ -248,6 +250,7 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
       id: attendances.id,
       userId: attendances.userId,
       externalName: attendances.externalName,
+      clubId: attendances.clubId,
       clubName: attendances.clubName,
       memberType: attendances.memberType,
       registrationType: attendances.registrationType,
@@ -263,9 +266,11 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
     .where(and(eq(attendances.meetingId, meeting.id), isNull(attendances.deletedAt)))
     .orderBy(asc(attendances.registeredAt));
 
+  // 自クラブの会員の登録か（MU登録フォーム経由・ログインなしの登録でも、所属クラブで判定する）
   // 名簿に載るのは自クラブの RAC 会員だけ。自クラブの OB・OG 等はビジター（その他）に回す
+  const ownClub = { id: meeting.clubId, name: club?.name ?? null, shortName: club?.shortName ?? null };
   const isOwnMember = (a: (typeof attendanceRows)[number]) =>
-    !!a.userId && a.userClubId === meeting.clubId && a.registrationType !== 'mu' && a.memberType === 'RAC';
+    isOwnClubAttendance(a, ownClub) && (!a.memberType || a.memberType === 'RAC');
 
   // ---- ビジター紹介 ----
   const overrides = data.visitorOverrides ?? {};
@@ -357,6 +362,13 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
   const attendanceByUser = new Map(
     attendanceRows.filter(a => a.userId).map(a => [a.userId as string, a]),
   );
+  // ログインせずに登録した自クラブ会員は、氏名で名簿の会員と結び付けて出欠に反映する
+  const memberIdByName = new Map(memberRows.map(u => [normalizePersonName(u.name), u.id]));
+  for (const a of attendanceRows) {
+    if (a.userId || !isOwnMember(a)) continue;
+    const uid = memberIdByName.get(normalizePersonName(a.externalName));
+    if (uid && !attendanceByUser.has(uid)) attendanceByUser.set(uid, a);
+  }
   const markOverrides = data.memberMarkOverrides ?? {};
 
   const members: ResumeMember[] = memberRows

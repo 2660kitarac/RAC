@@ -23,6 +23,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       externalEmail:    attendances.externalEmail,
       externalPhone:    attendances.externalPhone,
       clubName:         attendances.clubName,
+      clubId:           attendances.clubId,
       memberType:       attendances.memberType,
       attendanceStatus: attendances.attendanceStatus,
       registrationType: attendances.registrationType,
@@ -52,6 +53,13 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
   const meetingRaw = meetingResult[0];
   if (!meetingRaw) notFound();
 
+  // 自クラブ判定（クラブ名だけで登録された人の照合）に使うクラブ名
+  const [meetingClub] = await db
+    .select({ name: clubs.name, shortName: clubs.shortName })
+    .from(clubs)
+    .where(eq(clubs.id, meetingRaw.clubId))
+    .limit(1);
+
   // Drizzle ORM は camelCase でSELECT結果を返すが、
   // MeetingDetail / Meeting型 は snake_case を期待するためマッピング
   const meeting = {
@@ -78,6 +86,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     updated_at:            meetingRaw.updatedAt,
     deleted_at:            meetingRaw.deletedAt,
     club_id:               meetingRaw.clubId,
+    club_name:             meetingClub?.name ?? null,
+    club_short_name:       meetingClub?.shortName ?? null,
     manager_user_id:       meetingRaw.managerUserId,
     own_club_fee:          meetingRaw.ownClubFee ?? null,
     // 例会終了（クロージング）情報
@@ -114,6 +124,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     user_name:         a.userName,
     user_email:        a.userEmail,
     user_club_id:      a.userClubId,
+    // 登録時に選ばれた所属クラブ（自クラブ判定に使う）
+    attendance_club_id: a.clubId,
     // 氏名の並び替えに使う読みがな（会員のみ）
     user_name_kana:    a.userNameKana,
   }));
