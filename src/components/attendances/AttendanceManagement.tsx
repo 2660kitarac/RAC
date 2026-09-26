@@ -310,6 +310,8 @@ export default function AttendanceManagement({
               external_phone: editForm.externalPhone,
               clubName: editForm.clubName,
               club_name: editForm.clubName,
+              // 編集後は入力したクラブ名をそのまま表示する（再読み込みで表記がそろう）
+              display_club_name: editForm.clubName || (a as any).display_club_name,
               memberType: editForm.memberType,
               member_type: editForm.memberType,
               note: editForm.note,
@@ -360,7 +362,7 @@ export default function AttendanceManagement({
   const filtered = useMemo(() => {
     let result = attendances.filter(a => {
       const name = getName(a as any);
-      const club = (a as any).clubName || (a as any).club_name || '';
+      const club = (a as any).display_club_name || (a as any).clubName || (a as any).club_name || '';
       const matchSearch = !searchQuery ||
         name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         club.toLowerCase().includes(searchQuery.toLowerCase());
@@ -382,8 +384,8 @@ export default function AttendanceManagement({
             vb = getName(b);
             break;
           case 'club':
-            va = a.clubName || a.club_name || '';
-            vb = b.clubName || b.club_name || '';
+            va = a.display_club_name || a.clubName || a.club_name || '';
+            vb = b.display_club_name || b.clubName || b.club_name || '';
             break;
           case 'memberType':
             va = MEMBER_TYPE_LABELS[a.memberType || a.member_type] || '';
@@ -508,7 +510,7 @@ export default function AttendanceManagement({
   const exportCSV = () => {
     const csvData = filtered.map(a => ({
       '氏名': getName(a as any),
-      '所属クラブ': (a as any).clubName || (a as any).club_name || '',
+      '所属クラブ': (a as any).display_club_name || (a as any).clubName || (a as any).club_name || '',
       '区分': MEMBER_TYPE_LABELS[(a as any).memberType || (a as any).member_type] || '',
       '参加形態': PARTICIPATION_LABELS[(a as any).participation_type || (a as any).participationType || 'meeting_only'] || '',
       '出席状況': ATTENDANCE_STATUS_LABELS[(a as any).attendanceStatus || (a as any).attendance_status] || '',
@@ -737,7 +739,7 @@ export default function AttendanceManagement({
                           {/* 所属 */}
                           <td className="px-4 py-3" data-label="所属">
                             <p className="text-xs text-gray-500">
-                              {a.clubName || a.club_name || '—'}
+                              {a.display_club_name || a.clubName || a.club_name || '—'}
                             </p>
                           </td>
                           {/* 区分 */}

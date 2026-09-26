@@ -48,3 +48,16 @@ export function isOwnClubAttendance(a: AttendanceClubInfo, club: OwnClubContext)
   if (!n) return false;
   return [club.name, club.shortName].some(c => c && normalizeClubName(c) === n);
 }
+
+/**
+ * 一覧の「所属」欄に出すクラブ名
+ * 自クラブの会員は登録経路にかかわらず同じ表記（略称があれば略称）にそろえる。
+ * 他クラブは登録時のクラブ名 → 会員アカウントの所属クラブ名の順に使う。
+ */
+export function displayAffiliation(
+  a: AttendanceClubInfo & { userClubName?: string | null; userClubShortName?: string | null },
+  club: OwnClubContext,
+): string {
+  if (isOwnClubAttendance(a, club)) return (club.shortName || club.name || '').trim();
+  return (a.clubName?.trim() || a.userClubShortName || a.userClubName || '').trim();
+}

@@ -87,7 +87,7 @@ function compareBy(key: SortKey, a: any, b: any): number {
       // 会員は読みがなで五十音順に並べる（ビジターは氏名のまま）
       return text(a.user_name_kana || a.display_name).localeCompare(text(b.user_name_kana || b.display_name), 'ja');
     case 'club':
-      return text(a.club_name).localeCompare(text(b.club_name), 'ja');
+      return text(a.display_club_name ?? a.club_name).localeCompare(text(b.display_club_name ?? b.club_name), 'ja');
     case 'type':
       return rank(TYPE_ORDER, a.member_type) - rank(TYPE_ORDER, b.member_type);
     case 'participation':
@@ -191,6 +191,8 @@ export default function MeetingDetail({
               externalPhone: editForm.externalPhone,
               club_name: editForm.clubName,
               clubName: editForm.clubName,
+              // 編集後は入力したクラブ名をそのまま表示する（再読み込みで表記がそろう）
+              display_club_name: editForm.clubName || a.display_club_name,
               member_type: editForm.memberType,
               memberType: editForm.memberType,
               note: editForm.note,
@@ -270,7 +272,7 @@ export default function MeetingDetail({
       ['氏名', '所属', '区分', '参加形式', '出席状況', '支払状況', '登録料', '備考'],
       ...attendances.map(a => [
         (a as any).display_name || (a as any).user_name || (a as any).external_name || '',
-        (a as any).club_name || '',
+        (a as any).display_club_name || (a as any).club_name || '',
         MEMBER_TYPE_LABELS[(a as any).member_type] || (a as any).member_type || '',
         PARTICIPATION_TYPE_LABELS[(a as any).participation_type || 'meeting_only'] || '',
         ATTENDANCE_STATUS_LABELS[(a as any).attendance_status] || '',
@@ -306,7 +308,7 @@ export default function MeetingDetail({
   const filteredAttendances = localAttendances
     .filter(a => {
       const name = (a as any).display_name || (a as any).user_name || (a as any).external_name || '';
-      const club = (a as any).club_name || '';
+      const club = (a as any).display_club_name || (a as any).club_name || '';
       const matchName = !nameSearch || name.includes(nameSearch) || club.includes(nameSearch);
       const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter;
       const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter;
@@ -889,7 +891,7 @@ export default function MeetingDetail({
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                             </td>
-                            <td className="px-3 py-2.5 text-gray-600 text-xs" data-label="所属">{a.club_name || '-'}</td>
+                            <td className="px-3 py-2.5 text-gray-600 text-xs" data-label="所属">{a.display_club_name || a.club_name || '-'}</td>
                             <td className="px-3 py-2.5" data-label="区分">
                               <Badge variant="secondary" className="text-xs">
                                 {MEMBER_TYPE_LABELS[a.member_type] || a.member_type || '-'}

@@ -1,7 +1,8 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { meetings, attendances, users } from '@/lib/db/schema';
+import { meetings, attendances, users, clubs } from '@/lib/db/schema';
+import { displayAffiliation } from '@/lib/meetings/own-club';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import AttendanceManagement from '@/components/attendances/AttendanceManagement';
 
@@ -22,6 +23,7 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
       externalEmail: attendances.externalEmail,
       externalPhone: attendances.externalPhone,
       clubName: attendances.clubName,
+      clubId: attendances.clubId,
       memberType: attendances.memberType,
       attendanceStatus: attendances.attendanceStatus,
       registrationType: attendances.registrationType,
@@ -39,15 +41,27 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
       // users JOIN で会員名を取得（#issue1: userId あり会員の氏名が空欄になる問題を修正）
       userName: users.name,
       userEmail: users.email,
+      userClubId: users.clubId,
+      userClubName: clubs.name,
+      userClubShortName: clubs.shortName,
     })
       .from(attendances)
       .leftJoin(users, eq(attendances.userId, users.id))
+      .leftJoin(clubs, eq(users.clubId, clubs.id))
       .where(and(eq(attendances.meetingId, id), isNull(attendances.deletedAt)))
       .orderBy(asc(attendances.registeredAt)),
   ]);
 
   const meeting = meetingResult[0];
   if (!meeting) notFound();
+
+  // 「所属」欄の表記をそろえるため、例会のクラブ名を取得する
+  const [meetingClub] = await db
+    .select({ name: clubs.name, shortName: clubs.shortName })
+    .from(clubs)
+    .where(eq(clubs.id, meeting.clubId))
+    .limit(1);
+  const ownClub = { id: meeting.clubId, name: meetingClub?.name ?? null, shortName: meetingClub?.shortName ?? null };
 
   // externalName 優先、なければ users.name にフォールバック（display_name と同じ優先順位）
   const attendanceList = attendancesResult.map(a => ({
@@ -58,6 +72,8 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
     is_late_registration: (a as any).isLateRegistration ?? false,
     registered_after_deadline_days: (a as any).registeredAfterDeadlineDays ?? null,
     user: a.userName ? { name: a.userName, email: a.userEmail } : undefined,
+    // 一覧の「所属」表示用（自クラブ会員は登録経路にかかわらず同じ表記）
+    display_club_name: displayAffiliation(a, ownClub),
   }));
 
   return (
