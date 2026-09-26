@@ -5,6 +5,7 @@
  * 一般会員にも表示するため、返却項目は最小限に絞る。
  * メールアドレス・電話番号・費用・支払情報・備考・領収書情報は絶対に返さない。
  */
+import { isOwnClubAttendance } from '@/lib/meetings/own-club';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
@@ -64,6 +65,12 @@ export async function GET(
       .where(and(eq(meetings.id, id), isNull(meetings.deletedAt)))
       .limit(1);
     if (!meeting) return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
+    const [meetingClub] = await db
+      .select({ name: clubs.name, shortName: clubs.shortName })
+      .from(clubs)
+      .where(eq(clubs.id, meeting.clubId))
+      .limit(1);
+    const ownClub = { id: meeting.clubId, name: meetingClub?.name ?? null, shortName: meetingClub?.shortName ?? null };
 
     // 閲覧権限：自クラブの例会のみ（地区スタッフは全クラブ閲覧可）
     // clubId はログイン情報ではなく、いまの users テーブルの値で判定する
@@ -90,6 +97,7 @@ export async function GET(
         userId: attendances.userId,
         externalName: attendances.externalName,
         attendanceClubName: attendances.clubName,
+        attendanceClubId: attendances.clubId,
         memberType: attendances.memberType,
         registrationType: attendances.registrationType,
         participationType: attendances.participationType,
@@ -120,8 +128,12 @@ export async function GET(
       if (r.attendanceStatus === 'absent') continue; // 例会後に欠席と確定した人も除外
 
       const name = r.externalName ?? r.userName ?? '（氏名未登録）';
+      // MU登録フォームから登録した自クラブ会員も「自クラブ」に入れる（所属クラブで判定）
       const isOwnClubMember =
-        !!r.userId && r.userClubId === meeting.clubId && r.registrationType !== 'mu';
+        isOwnClubAttendance(
+          { userId: r.userId, userClubId: r.userClubId, clubId: r.attendanceClubId, clubName: r.attendanceClubName },
+          ownClub,
+        ) && (!r.memberType || r.memberType === 'RAC');
 
       if (isOwnClubMember) {
         members.push({
