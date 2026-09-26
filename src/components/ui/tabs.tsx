@@ -13,7 +13,9 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500',
+      // スマホ：はみ出したタブは横スクロールで辿れるようにする
+      'flex w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-md bg-gray-100 p-1 text-gray-500',
+      'md:inline-flex md:w-auto md:h-10 md:justify-center md:gap-0 md:overflow-visible',
       className
     )}
     {...props}
@@ -28,7 +30,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm',
+      'inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-sm px-3 py-2 text-sm font-medium md:py-1.5 ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm',
       className
     )}
     {...props}

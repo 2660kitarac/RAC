@@ -652,7 +652,8 @@ export default function MeetingDetail({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  {/* スマホではカード表示に切り替える（.rac-table） */}
+                  <table className="w-full text-sm rac-table">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
                         <th className="px-2 py-2.5 w-8">
@@ -705,7 +706,7 @@ export default function MeetingDetail({
                             idx % 2 === 1 ? 'bg-gray-50/40 hover:bg-blue-50/30' :
                             'hover:bg-blue-50/30'
                           }`}>
-                            <td className="px-2 py-2.5">
+                            <td className="px-2 py-2.5" data-label="選択">
                               <input
                                 type="checkbox"
                                 className="rounded border-gray-300 text-blue-600"
@@ -717,7 +718,7 @@ export default function MeetingDetail({
                                 }}
                               />
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5" data-cell="primary">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-medium text-gray-900">{displayName}</span>
                                 {isExternal && (
@@ -743,7 +744,7 @@ export default function MeetingDetail({
                                 <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[160px]" title={a.note}>{a.note}</p>
                               )}
                             </td>
-                            <td className="px-2 py-2.5">
+                            <td className="px-2 py-2.5" data-cell="actions">
                               <button
                                 onClick={() => openEditModal(a)}
                                 title="参加者情報を編集"
@@ -752,19 +753,19 @@ export default function MeetingDetail({
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                             </td>
-                            <td className="px-3 py-2.5 text-gray-600 text-xs">{a.club_name || '-'}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 text-gray-600 text-xs" data-label="所属">{a.club_name || '-'}</td>
+                            <td className="px-3 py-2.5" data-label="区分">
                               <Badge variant="secondary" className="text-xs">
                                 {MEMBER_TYPE_LABELS[a.member_type] || a.member_type || '-'}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5" data-label="参加形式">
                               <Badge className={`text-xs ${participationColor[a.participation_type || 'meeting_only'] || 'bg-gray-100 text-gray-500'}`}>
                                 {PARTICIPATION_TYPE_LABELS[a.participation_type || 'meeting_only'] || '-'}
                               </Badge>
                             </td>
                             {/* 出席ステータス インライン変更 */}
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-2" data-label="出席">
                               <select
                                 value={a.attendance_status || 'undecided'}
                                 disabled={isUpdating}
@@ -781,7 +782,7 @@ export default function MeetingDetail({
                               </select>
                             </td>
                             {/* 支払ステータス インライン変更 */}
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-2" data-label="支払">
                               <select
                                 value={a.payment_status || 'unpaid'}
                                 disabled={isUpdating}
@@ -797,7 +798,7 @@ export default function MeetingDetail({
                                 <option value="exempt">免除</option>
                               </select>
                             </td>
-                            <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums">
+                            <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums" data-label="登録料">
                               {formatCurrency(a.fee_amount ?? 0)}
                             </td>
                           </tr>
@@ -811,7 +812,7 @@ export default function MeetingDetail({
                           <td colSpan={8} className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
                             合計 {filteredAttendances.length}名
                           </td>
-                          <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums">
+                          <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums" data-label="合計金額">
                             {formatCurrency(filteredAttendances.reduce((s, a) => s + ((a as any).fee_amount ?? 0), 0))}
                           </td>
                         </tr>

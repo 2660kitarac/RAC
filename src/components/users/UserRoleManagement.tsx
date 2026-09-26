@@ -164,7 +164,7 @@ export default function UserRoleManagement({
           ) : (
             <>
               {/* デスクトップ */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
@@ -220,7 +220,7 @@ export default function UserRoleManagement({
               </div>
 
               {/* モバイル */}
-              <div className="sm:hidden space-y-3">
+              <div className="md:hidden space-y-3">
                 {filtered.map(u => (
                   <div key={u.id} className={`border rounded-lg p-4 space-y-2 ${u.id === currentUserId ? 'border-yellow-200 bg-yellow-50/50' : ''}`}>
                     <div className="flex items-start justify-between">

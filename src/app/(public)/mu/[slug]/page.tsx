@@ -93,11 +93,11 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
 
   if (meeting.status === 'cancelled') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center px-3 py-8 sm:p-4">
         <div className="text-center max-w-md">
           <div className="text-5xl mb-4">😔</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">この例会は中止になりました</h1>
-          <p className="text-gray-600">{meeting.title}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">この例会は中止になりました</h1>
+          <p className="text-gray-600 break-words">{meeting.title}</p>
         </div>
       </div>
     );
@@ -105,11 +105,11 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
 
   if (meeting.status === 'finished' || meeting.status === 'closed') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center px-3 py-8 sm:p-4">
         <div className="text-center max-w-md">
           <div className="text-5xl mb-4">🔒</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">登録受付は終了しました</h1>
-          <p className="text-gray-600">{meeting.title}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">登録受付は終了しました</h1>
+          <p className="text-gray-600 break-words">{meeting.title}</p>
         </div>
       </div>
     );

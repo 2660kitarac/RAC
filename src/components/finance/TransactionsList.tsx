@@ -241,7 +241,8 @@ export default function TransactionsList({
       {/* 一覧テーブル */}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          {/* スマホでは1行=1カード表示（.rac-table） */}
+          <table className="w-full text-sm rac-table">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日付</th>
@@ -261,23 +262,23 @@ export default function TransactionsList({
                 </tr>
               ) : transactions.map(t => (
                 <tr key={t.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{t.transaction_date}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap" data-cell="primary">{t.transaction_date}</td>
+                  <td className="px-4 py-3" data-label="種別">
                     <Badge className={t.transaction_type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
                       {t.transaction_type === 'income' ? '収入' : '支出'}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{t.category}</td>
-                  <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${t.transaction_type === 'income' ? 'text-green-700' : 'text-red-700'}`}>
+                  <td className="px-4 py-3 text-gray-700" data-label="カテゴリ">{t.category}</td>
+                  <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${t.transaction_type === 'income' ? 'text-green-700' : 'text-red-700'}`} data-label="金額">
                     {t.transaction_type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-sm">
+                  <td className="px-4 py-3 text-gray-600 text-sm" data-label="支払者/支払先">
                     {t.transaction_type === 'income'
                       ? (t.payer_name || <span className="text-gray-300">—</span>)
                       : (t.payee_name || <span className="text-gray-300">—</span>)
                     }
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-gray-500 text-xs" data-cell="block" data-label="内容・備考">
                     {(t as any).meeting?.title && (
                       <span className="text-blue-600 mr-2">{(t as any).meeting.title}</span>
                     )}
@@ -288,12 +289,12 @@ export default function TransactionsList({
             </tbody>
             <tfoot className="bg-gray-50 border-t">
               <tr>
-                <td colSpan={3} className="px-4 py-2 font-medium text-gray-700">
+                <td colSpan={3} className="px-4 py-2 font-medium text-gray-700" data-label="表示件数">
                   表示中 {pagination.totalCount > 0
                     ? `${(pagination.page - 1) * pagination.pageSize + 1}〜${Math.min(pagination.page * pagination.pageSize, pagination.totalCount)}`
                     : '0'}件
                 </td>
-                <td className="px-4 py-2 text-right font-bold text-gray-900">
+                <td className="px-4 py-2 text-right font-bold text-gray-900 whitespace-nowrap" data-label="差引合計">
                   {formatCurrency(
                     transactions.filter(t => t.transaction_type === 'income').reduce((s, t) => s + t.amount, 0) -
                     transactions.filter(t => t.transaction_type === 'expense').reduce((s, t) => s + t.amount, 0)

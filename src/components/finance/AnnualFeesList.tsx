@@ -425,8 +425,8 @@ export default function AnnualFeesList({
           ) : (
             <>
               {/* デスクトップ表示 */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 px-3 font-medium text-gray-600">氏名</th>
@@ -443,14 +443,14 @@ export default function AnnualFeesList({
                   <tbody>
                     {filteredFees.map((fee) => (
                       <tr key={fee.id} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-3">
+                        <td className="py-3 px-3" data-cell="primary">
                           <div className="font-medium text-gray-800">{fee.user?.name ?? '—'}</div>
                           <div className="text-xs text-gray-400">{fee.user?.email ?? ''}</div>
                         </td>
-                        <td className="py-3 px-3 text-right font-mono">
+                        <td className="py-3 px-3 text-right font-mono whitespace-nowrap" data-label="金額">
                           {formatCurrency(fee.amount)}
                         </td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-center" data-label="支払状況">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                               PAYMENT_STATUS_COLORS[fee.payment_status]
@@ -459,20 +459,21 @@ export default function AnnualFeesList({
                             {PAYMENT_STATUS_LABELS[fee.payment_status]}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-gray-600">
+                        <td className="py-3 px-3 text-gray-600" data-label="支払方法">
                           {fee.payment_method
                             ? (PAYMENT_METHOD_LABELS as Record<string, string>)[fee.payment_method] ??
                               fee.payment_method
                             : '—'}
                         </td>
-                        <td className="py-3 px-3 text-gray-600">
+                        <td className="py-3 px-3 text-gray-600" data-label="支払日">
                           {fee.paid_at ? formatDate(fee.paid_at) : '—'}
                         </td>
-                        <td className="py-3 px-3 text-gray-500 text-xs max-w-[12rem] truncate">
+                        {/* スマホ表示では全文を折り返す（max-w はPC以上のみ） */}
+                        <td className="py-3 px-3 text-gray-500 text-xs max-w-none md:max-w-[12rem] md:truncate" data-cell="block" data-label="メモ">
                           {fee.note ?? ''}
                         </td>
                         {canEdit && (
-                          <td className="py-3 px-3 text-center">
+                          <td className="py-3 px-3 text-center" data-cell="actions">
                             <Button
                               size="sm"
                               variant={
@@ -492,7 +493,7 @@ export default function AnnualFeesList({
               </div>
 
               {/* モバイル表示 */}
-              <div className="sm:hidden space-y-3">
+              <div className="md:hidden space-y-3">
                 {filteredFees.map((fee) => (
                   <div
                     key={fee.id}

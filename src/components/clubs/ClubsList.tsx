@@ -231,7 +231,7 @@ export default function ClubsList({ clubs: initialClubs, zones, currentClubId, u
           ) : (
             <>
               {/* デスクトップ */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
@@ -297,7 +297,7 @@ export default function ClubsList({ clubs: initialClubs, zones, currentClubId, u
               </div>
 
               {/* モバイル */}
-              <div className="sm:hidden space-y-3">
+              <div className="md:hidden space-y-3">
                 {filtered.map(club => (
                   <div key={club.id} className={`border rounded-lg p-4 space-y-2 ${club.id === currentClubId ? 'border-blue-300 bg-blue-50/40' : ''}`}>
                     <div className="flex items-start justify-between">

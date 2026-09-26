@@ -318,7 +318,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-lg border-0">
-          <CardContent className="pt-8 pb-6 text-center">
+          <CardContent className="px-4 pt-8 pb-6 text-center sm:px-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
@@ -333,17 +333,18 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             </p>
 
             <div className="bg-gray-50 rounded-lg p-4 text-left space-y-2 mb-6">
-              <div className="flex justify-between text-sm">
+              {/* スマホでは項目名と値を縦積みにして折り返す */}
+              <div className="flex flex-col text-sm sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">例会名</span>
-                <span className="font-medium">{meeting.title}</span>
+                <span className="font-medium break-words">{meeting.title}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex flex-col text-sm sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">開催日</span>
                 <span className="font-medium">{formatDate(meeting.date)}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex flex-col text-sm sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">参加形態</span>
-                <span className="font-medium">{participationLabel[registrationData.participationType] ?? registrationData.participationType}</span>
+                <span className="font-medium break-words">{participationLabel[registrationData.participationType] ?? registrationData.participationType}</span>
               </div>
               {registrationData.feeAmount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -368,7 +369,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             </div>
 
             <p className="text-xs text-gray-500">
-              確認メールを {registrationData.email} へ送信しました。
+              確認メールを <span className="break-all">{registrationData.email}</span> へ送信しました。
             </p>
             <p className="text-xs text-gray-400 mt-1">
               当日の受付でお名前をお伝えください。
@@ -392,10 +393,10 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <div className="bg-blue-600 text-white py-8 px-4">
+      <div className="bg-blue-600 text-white px-4 py-6 sm:py-8">
         <div className="max-w-2xl mx-auto">
           <p className="text-blue-200 text-sm mb-1">{meeting.club?.name}</p>
-          <h1 className="text-2xl font-bold mb-3">{meeting.title}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-3 break-words">{meeting.title}</h1>
           {meeting.theme && (
             <p className="text-blue-100 text-sm">テーマ: {meeting.theme}</p>
           )}
@@ -590,7 +591,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
       </div>
 
       {/* フォーム */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         {/* 締切後の注意喛起（遅延登録）／登録不可の場合の表示 */}
         {deadlineInfo.deadlinePassed && deadlineInfo.allowed && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
@@ -710,13 +711,13 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
           {/* 参加者情報 */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Users className="h-4 w-4 text-blue-500" />
                 参加者情報
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="form-group">
                   <Label htmlFor="name" required>お名前</Label>
@@ -724,6 +725,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                     id="name"
                     {...register('name')}
                     placeholder="山田 太郎"
+                    autoComplete="name"
                     error={errors.name?.message}
                     className="mt-1"
                     readOnly={!!loggedInUser && !isAdminRole(loggedInUser.role)}
@@ -837,15 +839,19 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
           {/* 連絡先情報 */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
               <CardTitle className="text-base">連絡先情報</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="form-group">
                 <Label htmlFor="email" required>メールアドレス</Label>
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoComplete="email"
                   {...register('email')}
                   placeholder="example@racclub.jp"
                   error={errors.email?.message}
@@ -859,6 +865,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                 <Input
                   id="phone"
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   {...register('phone')}
                   placeholder="090-0000-0000"
                   className="mt-1"
@@ -870,13 +878,13 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           {/* 参加形態（懇親会がある場合のみ表示） */}
           {hasAfterParty && (
             <Card className="border-purple-200">
-              <CardHeader className="pb-3">
+              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <PartyPopper className="h-4 w-4 text-purple-500" />
                   参加形態
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
                 {[
                   {
                     value: 'meeting_only',
@@ -905,7 +913,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                 ].filter(o => o.show).map(option => (
                   <label
                     key={option.value}
-                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    className={`flex items-start gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors sm:gap-3 ${
                       participationType === option.value
                         ? 'border-purple-500 bg-purple-50'
                         : 'border-gray-200 hover:border-purple-200 hover:bg-gray-50'
@@ -916,12 +924,13 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                       value={option.value}
                       checked={participationType === option.value}
                       onChange={() => setValue('participation_type', option.value as any)}
-                      className="mt-0.5 text-purple-600 focus:ring-purple-500"
+                      className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600 focus:ring-purple-500"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      {/* スマホではラベルの下に金額チップを並べる（横にはみ出さない） */}
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                         <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:flex-shrink-0 sm:justify-end">
                           {option.meetingFeeVal > 0 && (
                             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">例会 {formatCurrency(option.meetingFeeVal)}</span>
                           )}
@@ -950,17 +959,17 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
           {/* オプション */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
               <CardTitle className="text-base">オプション</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
               {meeting.meal_fee > 0 && participationType !== 'party_only' && (
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <input
                     type="checkbox"
                     id="meal_required"
                     {...register('meal_required')}
-                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="w-5 h-5 flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <label htmlFor="meal_required" className="text-sm text-gray-700 cursor-pointer">
                     お弁当を希望する（{formatCurrency(meeting.meal_fee)}）
@@ -973,7 +982,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                   type="checkbox"
                   id="receipt_required"
                   {...register('receipt_required')}
-                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="w-5 h-5 flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <label htmlFor="receipt_required" className="text-sm text-gray-700 cursor-pointer">
                   領収書を希望する
@@ -981,7 +990,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
               </div>
 
               {receiptRequired && (
-                <div className="space-y-3 pl-8">
+                <div className="space-y-3 pl-4 sm:pl-8">
                   <div className="form-group">
                     <Label>領収書宛名</Label>
                     <Select
@@ -1015,10 +1024,10 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
           {/* 備考 */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
               <CardTitle className="text-base">備考</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
               <Textarea
                 {...register('note')}
                 placeholder="アレルギーや連絡事項など"

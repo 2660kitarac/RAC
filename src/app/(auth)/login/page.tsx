@@ -54,23 +54,26 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
             <span className="text-white font-bold text-2xl">R</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">RAC Cloud</h1>
-          <p className="text-gray-500 mt-1">ローターアクトクラブ運営システム</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">RAC Cloud</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">ローターアクトクラブ運営システム</p>
         </div>
 
         <Card className="shadow-xl border-0">
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-xl">ログイン</CardTitle>
             <CardDescription>メールアドレスとパスワードでログインしてください</CardDescription>
           </CardHeader>
           
           <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="form-group">
                 <Label htmlFor="email" required>メールアドレス</Label>
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="example@racclub.jp"
@@ -91,12 +94,13 @@ export default function LoginPage() {
                     placeholder="パスワードを入力"
                     required
                     autoComplete="current-password"
-                    className="pr-10"
+                    className="pr-11"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 flex h-11 w-11 sm:h-10 sm:w-10 items-center justify-center text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -113,7 +117,7 @@ export default function LoginPage() {
               </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-4 p-4 pt-0 sm:p-6 sm:pt-0">
               <Button
                 type="submit"
                 loading={loading}

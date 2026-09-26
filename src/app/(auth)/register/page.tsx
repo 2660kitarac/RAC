@@ -126,7 +126,7 @@ export default function RegisterPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <Card className="shadow-xl border-0">
-            <CardContent className="pt-8 pb-8 text-center">
+            <CardContent className="px-4 pt-8 pb-8 text-center sm:px-6">
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center">
                   <Clock className="h-10 w-10 text-amber-500" />
@@ -160,7 +160,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              <Link href="/login">
+              <Link href="/login" className="block w-full">
                 <Button className="w-full" size="lg">
                   ログインページへ
                 </Button>
@@ -184,13 +184,13 @@ export default function RegisterPage() {
         </div>
 
         {/* ステップインジケーター */}
-        <div className="flex items-center justify-center mb-6 gap-2">
+        <div className="flex items-center justify-center mb-6 gap-1 sm:gap-2">
           {STEP_LABELS.map((label, i) => {
             const s = (i + 1) as Step;
             const active = s === step;
             const done = s < step;
             return (
-              <div key={s} className="flex items-center gap-2">
+              <div key={s} className="flex items-center gap-1 sm:gap-2">
                 <div className="flex flex-col items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
                     done ? 'bg-blue-600 text-white' :
@@ -199,12 +199,12 @@ export default function RegisterPage() {
                   }`}>
                     {done ? '✓' : s}
                   </div>
-                  <span className={`text-xs mt-1 whitespace-nowrap ${active ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                  <span className={`text-[11px] sm:text-xs mt-1 whitespace-nowrap ${active ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
                     {label}
                   </span>
                 </div>
                 {i < STEP_LABELS.length - 1 && (
-                  <div className={`w-8 h-0.5 mb-4 ${done ? 'bg-blue-600' : 'bg-gray-200'}`} />
+                  <div className={`w-3 sm:w-8 h-0.5 mb-4 ${done ? 'bg-blue-600' : 'bg-gray-200'}`} />
                 )}
               </div>
             );
@@ -215,11 +215,11 @@ export default function RegisterPage() {
           {/* Step 1 */}
           {step === 1 && (
             <>
-              <CardHeader>
+              <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg">アカウント情報</CardTitle>
                 <CardDescription>ログインに使用するメールアドレスとパスワードを設定してください</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="form-group">
                   <Label htmlFor="email" required>メールアドレス</Label>
                   <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@racclub.jp" autoComplete="email" className="mt-1" />
@@ -233,7 +233,7 @@ export default function RegisterPage() {
                   <Input id="confirmPassword" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="パスワードを再入力" autoComplete="new-password" className="mt-1" />
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-3">
+              <CardFooter className="flex flex-col gap-3 p-4 pt-0 sm:p-6 sm:pt-0">
                 <Button onClick={handleNext} className="w-full" size="lg">
                   次へ <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -248,17 +248,18 @@ export default function RegisterPage() {
           {/* Step 2 */}
           {step === 2 && (
             <>
-              <CardHeader>
+              <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg">個人情報</CardTitle>
                 <CardDescription>例会運営・会員管理に使用します</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="form-group col-span-2 sm:col-span-1">
+              <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+                {/* スマホでは1フィールド1行、sm以上で2列 */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+                  <div className="form-group">
                     <Label htmlFor="name" required>お名前</Label>
-                    <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" className="mt-1" />
+                    <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="山田 太郎" autoComplete="name" className="mt-1" />
                   </div>
-                  <div className="form-group col-span-2 sm:col-span-1">
+                  <div className="form-group">
                     <Label htmlFor="nameKana">フリガナ</Label>
                     <Input id="nameKana" value={nameKana} onChange={e => setNameKana(e.target.value)} placeholder="ヤマダ タロウ" className="mt-1" />
                   </div>
@@ -289,20 +290,21 @@ export default function RegisterPage() {
 
                 <div className="form-group">
                   <Label htmlFor="birthDate">生年月日</Label>
-                  <Input id="birthDate" type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="mt-1" />
+                  <Input id="birthDate" type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} autoComplete="bday" className="mt-1" />
                 </div>
                 <div className="form-group">
                   <Label htmlFor="phone" required>電話番号</Label>
-                  <Input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="090-0000-0000" className="mt-1" />
+                  <Input id="phone" type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="090-0000-0000" autoComplete="tel" className="mt-1" />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="form-group col-span-1">
+                {/* スマホでは1フィールド1行、sm以上で郵便番号1:住所2 */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
+                  <div className="form-group sm:col-span-1">
                     <Label htmlFor="addressZip">郵便番号</Label>
-                    <Input id="addressZip" value={addressZip} onChange={e => setAddressZip(e.target.value)} placeholder="530-0001" className="mt-1" />
+                    <Input id="addressZip" value={addressZip} onChange={e => setAddressZip(e.target.value)} placeholder="530-0001" inputMode="numeric" autoComplete="postal-code" className="mt-1" />
                   </div>
-                  <div className="form-group col-span-2">
+                  <div className="form-group sm:col-span-2">
                     <Label htmlFor="address">住所</Label>
-                    <Input id="address" value={address} onChange={e => setAddress(e.target.value)} placeholder="大阪府大阪市北区..." className="mt-1" />
+                    <Input id="address" value={address} onChange={e => setAddress(e.target.value)} placeholder="大阪府大阪市北区..." autoComplete="street-address" className="mt-1" />
                   </div>
                 </div>
                 <div className="form-group">
@@ -310,11 +312,11 @@ export default function RegisterPage() {
                   <Input id="occupation" value={occupation} onChange={e => setOccupation(e.target.value)} placeholder="〇〇株式会社 / 〇〇大学" className="mt-1" />
                 </div>
               </CardContent>
-              <CardFooter className="flex gap-3">
-                <Button variant="outline" onClick={handleBack} className="flex-1">
+              <CardFooter className="flex flex-col-reverse gap-2 p-4 pt-0 sm:flex-row sm:gap-3 sm:p-6 sm:pt-0">
+                <Button variant="outline" onClick={handleBack} className="w-full sm:flex-1">
                   <ChevronLeft className="h-4 w-4 mr-1" /> 戻る
                 </Button>
-                <Button onClick={handleNext} className="flex-1">
+                <Button onClick={handleNext} className="w-full sm:flex-1">
                   次へ <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </CardFooter>
@@ -324,11 +326,11 @@ export default function RegisterPage() {
           {/* Step 3 */}
           {step === 3 && (
             <>
-              <CardHeader>
+              <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg">例会・健康情報</CardTitle>
                 <CardDescription>例会での食事手配・緊急時対応に使用します</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="form-group">
                   <Label htmlFor="allergy">食物アレルギー</Label>
                   <Input id="allergy" value={allergy} onChange={e => setAllergy(e.target.value)} placeholder="例: 卵、小麦、えび（ない場合は空欄）" className="mt-1" />
@@ -347,7 +349,7 @@ export default function RegisterPage() {
                     </div>
                     <div className="form-group">
                       <Label htmlFor="emergencyContactPhone">緊急連絡先 電話番号</Label>
-                      <Input id="emergencyContactPhone" type="tel" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(e.target.value)} placeholder="090-0000-0000" className="mt-1" />
+                      <Input id="emergencyContactPhone" type="tel" inputMode="tel" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(e.target.value)} placeholder="090-0000-0000" className="mt-1" />
                     </div>
                   </div>
                 </div>
@@ -369,11 +371,11 @@ export default function RegisterPage() {
                   {allergy && <p className="text-blue-700"><span className="text-blue-500">アレルギー:</span> {allergy}</p>}
                 </div>
               </CardContent>
-              <CardFooter className="flex gap-3">
-                <Button variant="outline" onClick={handleBack} className="flex-1">
+              <CardFooter className="flex flex-col-reverse gap-2 p-4 pt-0 sm:flex-row sm:gap-3 sm:p-6 sm:pt-0">
+                <Button variant="outline" onClick={handleBack} className="w-full sm:flex-1">
                   <ChevronLeft className="h-4 w-4 mr-1" /> 戻る
                 </Button>
-                <Button onClick={handleRegister} loading={loading} className="flex-1" size="lg">
+                <Button onClick={handleRegister} loading={loading} className="w-full sm:flex-1" size="lg">
                   登録する
                 </Button>
               </CardFooter>

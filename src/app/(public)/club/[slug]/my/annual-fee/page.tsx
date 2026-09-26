@@ -54,17 +54,17 @@ export default async function MyAnnualFeePage({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={`/club/${slug}/dashboard`} className="p-1.5 rounded-full hover:bg-gray-100">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-2 flex items-center gap-2">
+          <Link href={`/club/${slug}/dashboard`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100" aria-label="戻る">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2 truncate">
             <CreditCard className="h-4 w-4 text-yellow-600" /> 年会費
           </h1>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 space-y-3 pb-safe">
         {fees.length === 0 ? (
           <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
             <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -83,26 +83,26 @@ export default async function MyAnnualFeePage({
                   </div>
                 )}
                 <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="text-lg font-bold text-gray-900">{fee.fiscalYear}年度</p>
                       <p className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(fee.amount)}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex-shrink-0 text-right">
                       {isPaid ? (
                         <div className="flex items-center gap-1.5 text-green-600">
                           <CheckCircle className="h-5 w-5" />
-                          <span className="font-semibold text-sm">支払済</span>
+                          <span className="font-semibold text-sm whitespace-nowrap">支払済</span>
                         </div>
                       ) : isExempt ? (
                         <div className="flex items-center gap-1.5 text-blue-600">
                           <CheckCircle className="h-5 w-5" />
-                          <span className="font-semibold text-sm">免除</span>
+                          <span className="font-semibold text-sm whitespace-nowrap">免除</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-yellow-600">
                           <Clock className="h-5 w-5" />
-                          <span className="font-semibold text-sm">未納</span>
+                          <span className="font-semibold text-sm whitespace-nowrap">未納</span>
                         </div>
                       )}
                     </div>

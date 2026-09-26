@@ -100,15 +100,40 @@
     min-width: 44px;
   }
 
-  @media (max-width: 768px) {
-    button, a, [role="button"] {
+  /* スマホではタップ対象を44px以上に。
+     本文中のリンクまで巨大化しないよう、ボタンとして使う要素に限定する。 */
+  @media (max-width: 767px) {
+    button:not(.tap-auto),
+    [role="button"]:not(.tap-auto),
+    a.btn:not(.tap-auto),
+    a[data-tap="button"]:not(.tap-auto) {
       min-height: 44px;
-      min-width: 44px;
     }
+
+    /* 入力欄はスマホでは16px。これ未満だとiPhoneが勝手に画面を拡大する。
+       PC側の見た目を変えないよう、Tailwindのクラスではなくここで指定する。 */
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+    select,
+    textarea,
+    [role='combobox'] {
+      font-size: 16px;
+    }
+
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.tap-auto),
+    select:not(.tap-auto),
+    [role='combobox']:not(.tap-auto) {
+      min-height: 44px;
+    }
+
   }
 }
 
 @layer utilities {
+  /* iPhoneの下端（ホームバー）にボタンが隠れないようにする */
+  .pb-safe {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .text-ellipsis-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -141,6 +166,185 @@
     }
   }
 }
+
+/* =========================================================
+   スマホ用 表→カード表示（.rac-table）
+   768px未満では、1行を1枚のカードとして縦に並べる。
+   各 <td> に data-label="列名" を付けると、値の前に項目名が出る。
+   data-cell="primary" は見出し行、data-cell="actions" は操作ボタン行。
+   横スクロールさせたい表（表彰マトリクスなど）には .rac-table を付けない。
+   ========================================================= */
+@media (max-width: 767px) {
+  .rac-table {
+    display: block;
+    width: 100%;
+    border-collapse: separate;
+  }
+
+  .rac-table thead {
+    display: none;
+  }
+
+  .rac-table tbody,
+  .rac-table tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  .rac-table tbody tr,
+  .rac-table tfoot tr {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 0 0 0.625rem;
+    padding: 0.75rem 0.875rem;
+    background: #fff;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  .rac-table tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  /* 並び順：見出しを一番上、操作ボタンを一番下に固定する */
+  .rac-table td[data-cell="primary"] {
+    order: -1;
+  }
+
+  .rac-table td[data-cell="actions"] {
+    order: 99;
+  }
+
+  .rac-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.25rem 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+  }
+
+  .rac-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    color: rgb(107 114 128);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.6;
+    text-align: left;
+  }
+
+  /* 項目名を持たないセル（空セル・colspanの案内行など）はそのまま */
+  .rac-table td:not([data-label])::before,
+  .rac-table td[data-label=""]::before {
+    content: none;
+  }
+
+  /* 見出しセル：項目名を出さず、1行を大きく左寄せで見せる */
+  .rac-table td[data-cell="primary"] {
+    display: block;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid rgb(243 244 246);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .rac-table td[data-cell="primary"]::before {
+    content: none;
+  }
+
+  /* 操作ボタン：カード下部に横並びで置く */
+  .rac-table td[data-cell="actions"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.625rem;
+    margin-top: 0.25rem;
+    border-top: 1px solid rgb(243 244 246);
+  }
+
+  .rac-table td[data-cell="actions"]::before {
+    content: none;
+  }
+
+  /* 全幅で見せたいセル（メモ・説明など） */
+  .rac-table td[data-cell="block"] {
+    display: block;
+    text-align: left;
+  }
+
+  .rac-table td[data-cell="block"]::before {
+    display: block;
+    margin-bottom: 0.125rem;
+  }
+
+  /* 案内文だけの行（データ0件・読み込み中）はカード枠を外す */
+  .rac-table td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .rac-table td[colspan]::before {
+    content: none;
+  }
+
+  /* セル内の折り返しと、右寄せ要素の配置を整える */
+  .rac-table td > * {
+    min-width: 0;
+  }
+
+  .rac-table td .whitespace-nowrap {
+    white-space: normal;
+  }
+
+  .rac-table td.hidden,
+  .rac-table th.hidden {
+    display: none;
+  }
+
+  /* 中身が空のセルは、項目名だけ残らないようカードから省く */
+  .rac-table td:empty {
+    display: none;
+  }
+}
+
+/* =========================================================
+   スマホ全般の基本調整
+   ========================================================= */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* hidden にすると body がスクロール枠になり、配下の sticky が効かなくなる */
+  overflow-x: clip;
+}
+
+/* 横に長い表・図は、その要素の中だけで横スクロールさせる */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* タブなど横並びが多い列は、スマホでは横スクロール＋スクロールバー非表示 */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 
 /* =========================================================
    印刷共通リセット（レイアウトシェルの解除）
@@ -188,4 +392,26 @@
   .fixed {
     position: static !important;
   }
+}
+
+@media print {
+  .rac-table { display: table !important; }
+  .rac-table thead { display: table-header-group !important; }
+  .rac-table tbody { display: table-row-group !important; }
+  .rac-table tbody tr { display: table-row !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+  .rac-table td { display: table-cell !important; text-align: left !important; }
+  .rac-table td::before { content: none !important; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(12px); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-sheet-up {
+  animation: sheet-up 0.18s ease-out;
+}
+
+@media (min-width: 640px) {
+  .animate-sheet-up { animation: none; }
 }

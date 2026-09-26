@@ -679,7 +679,8 @@ export default function AttendanceManagement({
           ) : (
             <Card>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                {/* スマホ（768px未満）では .rac-table により1行=1カード表示になる */}
+                <table className="w-full text-sm rac-table">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8">
@@ -704,7 +705,7 @@ export default function AttendanceManagement({
                       return (
                         <tr key={a.id} className={`hover:bg-gray-50 transition-colors ${pType === 'absent' ? 'opacity-50' : ''}`}>
                           {/* 操作列（編集・削除） */}
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-3" data-cell="actions">
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
@@ -727,26 +728,26 @@ export default function AttendanceManagement({
                             </div>
                           </td>
                           {/* 氏名 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-cell="primary">
                             <p className="font-medium">{displayName}</p>
                             {(a.receiptRequired || a.receipt_required) && (
                               <span className="text-xs text-blue-600">領収書希望</span>
                             )}
                           </td>
                           {/* 所属 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="所属">
                             <p className="text-xs text-gray-500">
                               {a.clubName || a.club_name || '—'}
                             </p>
                           </td>
                           {/* 区分 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="区分">
                             <Badge variant="secondary" className="text-xs">
                               {MEMBER_TYPE_LABELS[a.memberType || a.member_type] || a.memberType || a.member_type}
                             </Badge>
                           </td>
                           {/* 参加形態 — インライン Select */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="参加形態">
                             {ptEditId === a.id ? (
                               <Select
                                 value={pType}
@@ -777,7 +778,7 @@ export default function AttendanceManagement({
                             )}
                           </td>
                           {/* 出席確認 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="出席">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
                             ) : (
@@ -785,7 +786,7 @@ export default function AttendanceManagement({
                                 value={a.attendanceStatus || a.attendance_status || 'undecided'}
                                 onValueChange={v => updateAttendanceStatus(a.id, v as AttendanceStatus)}
                               >
-                                <SelectTrigger className={`h-8 text-xs w-28 ${ATTENDANCE_STATUS_COLORS[a.attendanceStatus || a.attendance_status] || ''}`}>
+                                <SelectTrigger className={`h-8 text-xs w-full md:w-28 ${ATTENDANCE_STATUS_COLORS[a.attendanceStatus || a.attendance_status] || ''}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -797,7 +798,7 @@ export default function AttendanceManagement({
                             )}
                           </td>
                           {/* 支払 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="支払">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
                             ) : (
@@ -805,7 +806,7 @@ export default function AttendanceManagement({
                                 value={a.paymentStatus || a.payment_status || 'unpaid'}
                                 onValueChange={v => updatePaymentStatus(a.id, v as PaymentStatus)}
                               >
-                                <SelectTrigger className={`h-8 text-xs w-28 ${PAYMENT_STATUS_COLORS[a.paymentStatus || a.payment_status] || ''}`}>
+                                <SelectTrigger className={`h-8 text-xs w-full md:w-28 ${PAYMENT_STATUS_COLORS[a.paymentStatus || a.payment_status] || ''}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -817,7 +818,7 @@ export default function AttendanceManagement({
                             )}
                           </td>
                           {/* 登録料 */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" data-label="登録料">
                             {pType === 'absent' ? (
                               <span className="text-xs text-gray-400">-</span>
                             ) : feeEditId === a.id ? (
@@ -859,7 +860,7 @@ export default function AttendanceManagement({
                             )}
                           </td>
                           {/* メモ */}
-                          <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-500 max-w-32">
+                          <td className="px-4 py-3 text-xs text-gray-500 md:max-w-32" data-cell="block" data-label="メモ">
                             {a.note && <span title={a.note}>{a.note.length > 20 ? a.note.substring(0, 20) + '…' : a.note}</span>}
                           </td>
                         </tr>
@@ -875,7 +876,7 @@ export default function AttendanceManagement({
                         }).length}名
                         {stats.waitlist > 0 && ` / キャンセル待ち ${stats.waitlist}名`}
                       </td>
-                      <td className="px-4 py-2 font-bold text-gray-900">
+                      <td className="px-4 py-2 font-bold text-gray-900" data-label="合計">
                         {formatCurrency(filtered.reduce((sum, a) => {
                           const pt = (a as any).participation_type || (a as any).participationType;
                           if (pt === 'absent') return sum;

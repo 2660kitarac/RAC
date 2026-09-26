@@ -73,17 +73,17 @@ export default function DashboardContent({
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           ダッシュボード
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-500 text-sm mt-1 break-words">
           {user.club?.name || 'RAC Cloud'} の管理画面
         </p>
       </div>
 
-      {/* サマリーカード */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* サマリーカード（スマホは2列、lg以上で4列） */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <SummaryCard
           title="会員数"
           value={`${totalMembers}名`}
@@ -181,7 +181,7 @@ export default function DashboardContent({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 次回例会 */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
             <CardTitle className="text-base">次回例会</CardTitle>
             <Link href="/meetings">
               <Button variant="ghost" size="sm" className="text-xs">
@@ -192,14 +192,14 @@ export default function DashboardContent({
           <CardContent>
             {nextMeeting ? (
               <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{nextMeeting.title}</h3>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-900 break-words">{nextMeeting.title}</h3>
                     {nextMeeting.theme && (
                       <p className="text-sm text-gray-500 mt-0.5">テーマ: {nextMeeting.theme}</p>
                     )}
                   </div>
-                  <Badge className={MEETING_STATUS_COLORS[nextMeeting.status]}>
+                  <Badge className={`shrink-0 ${MEETING_STATUS_COLORS[nextMeeting.status]}`}>
                     {MEETING_STATUS_LABELS[nextMeeting.status]}
                   </Badge>
                 </div>
@@ -246,7 +246,7 @@ export default function DashboardContent({
 
         {/* 直近の例会一覧 */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
             <CardTitle className="text-base">直近の例会</CardTitle>
             <Link href="/meetings">
               <Button variant="ghost" size="sm" className="text-xs">
@@ -261,20 +261,20 @@ export default function DashboardContent({
                   <Link
                     key={meeting.id}
                     href={`/meetings/${meeting.id}`}
-                    className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between px-4 sm:px-6 py-3 hover:bg-gray-50 transition-colors"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{meeting.title}</p>
                       <p className="text-xs text-gray-500">{formatDate(meeting.date)}</p>
                     </div>
-                    <Badge className={MEETING_STATUS_COLORS[meeting.status]} >
+                    <Badge className={`shrink-0 ${MEETING_STATUS_COLORS[meeting.status]}`}>
                       {MEETING_STATUS_LABELS[meeting.status]}
                     </Badge>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 px-6">
+              <div className="text-center py-6 px-4 sm:px-6">
                 <p className="text-gray-500 text-sm">例会がありません</p>
               </div>
             )}
@@ -283,7 +283,7 @@ export default function DashboardContent({
 
         {/* 最近のMU登録 */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
             <CardTitle className="text-base">最近のMU登録</CardTitle>
             <Link href="/attendances">
               <Button variant="ghost" size="sm" className="text-xs">
@@ -297,24 +297,24 @@ export default function DashboardContent({
                 {recentMuRegistrations.map(attendance => (
                   <div
                     key={attendance.id}
-                    className="flex items-center justify-between px-6 py-3"
+                    className="flex items-center justify-between px-4 sm:px-6 py-3"
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">
                         {attendance.external_name || '名前なし'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 truncate">
                         {(attendance as any).meeting?.title} · {formatDate(attendance.registered_at)}
                       </p>
                     </div>
-                    <Badge variant={attendance.payment_status === 'paid' ? 'success' : 'warning'}>
+                    <Badge className="shrink-0" variant={attendance.payment_status === 'paid' ? 'success' : 'warning'}>
                       {attendance.payment_status === 'paid' ? '支払済' : '未払い'}
                     </Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 px-6">
+              <div className="text-center py-6 px-4 sm:px-6">
                 <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 text-sm">MU登録はありません</p>
               </div>
@@ -324,7 +324,7 @@ export default function DashboardContent({
 
         {/* 最近のメール送信 */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
             <CardTitle className="text-base">メール送信履歴</CardTitle>
             <Link href="/emails/history">
               <Button variant="ghost" size="sm" className="text-xs">
@@ -338,7 +338,7 @@ export default function DashboardContent({
                 {recentEmails.map(email => (
                   <div
                     key={email.id}
-                    className="flex items-center justify-between px-6 py-3"
+                    className="flex items-center justify-between px-4 sm:px-6 py-3"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{email.subject}</p>
@@ -359,7 +359,7 @@ export default function DashboardContent({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 px-6">
+              <div className="text-center py-6 px-4 sm:px-6">
                 <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 text-sm">送信履歴はありません</p>
               </div>
@@ -403,14 +403,15 @@ function SummaryCard({
   return (
     <Link href={href}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
-        <CardContent className="p-4">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
             <div className={`p-2 rounded-lg ${iconBg}`}>
               <Icon className={`h-5 w-5 ${iconColor}`} />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mb-1">{title}</p>
-          <p className="text-xl font-bold text-gray-900 truncate">{value}</p>
+          <p className="text-xs text-gray-500 mb-1 truncate">{title}</p>
+          {/* スマホでは金額が切れないよう1段小さく表示し、数字は等幅に揃える */}
+          <p className="text-lg sm:text-xl font-bold text-gray-900 tabular-nums truncate">{value}</p>
         </CardContent>
       </Card>
     </Link>
@@ -439,11 +440,12 @@ function AlertCard({
 
   return (
     <Link href={href}>
-      <div className={`flex items-center gap-3 p-4 rounded-lg border ${colors[variant]} hover:opacity-80 transition-opacity cursor-pointer`}>
+      <div className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border ${colors[variant]} hover:opacity-80 transition-opacity cursor-pointer`}>
         <AlertCircle className={`h-5 w-5 flex-shrink-0 ${iconColors[variant]}`} />
-        <div>
+        {/* 長い説明文が横にはみ出さないよう折り返す */}
+        <div className="min-w-0 flex-1">
           <p className="font-medium text-sm">{title}</p>
-          <p className="text-xs opacity-75 mt-0.5">{description}</p>
+          <p className="text-xs opacity-75 mt-0.5 break-words">{description}</p>
         </div>
         <ArrowRight className="h-4 w-4 ml-auto flex-shrink-0" />
       </div>
