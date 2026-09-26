@@ -311,6 +311,21 @@
     display: none;
   }
 
+  /* 区切り見出し行（例：自クラブ／MU・ビジター）はカードにせず見出しとして出す */
+  .rac-table tbody tr.rac-section {
+    margin: 0.75rem 0 0.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .rac-table tbody tr.rac-section td {
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+
   /* 中身が空のセルは、項目名だけ残らないようカードから省く */
   .rac-table td:empty {
     display: none;

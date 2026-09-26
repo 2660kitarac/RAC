@@ -39,6 +39,8 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       // users JOIN
       userName:         users.name,
       userEmail:        users.email,
+      userClubId:       users.clubId,
+      userNameKana:     users.nameKana,
     })
       .from(attendances)
       .leftJoin(users, eq(attendances.userId, users.id))
@@ -111,6 +113,9 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     display_name:      a.externalName ?? a.userName ?? '（名前なし）',
     user_name:         a.userName,
     user_email:        a.userEmail,
+    user_club_id:      a.userClubId,
+    // 氏名の並び替えに使う読みがな（会員のみ）
+    user_name_kana:    a.userNameKana,
   }));
 
   const stats = {

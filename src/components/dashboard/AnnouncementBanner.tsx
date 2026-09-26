@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {
-  UserCheck, AlertCircle, Receipt, Calendar, CreditCard,
+  UserCheck, AlertCircle, Calendar, CreditCard,
   Clock, Bell, ChevronRight, CheckCircle, MapPin
 } from 'lucide-react';
 
@@ -38,7 +38,6 @@ export default function AnnouncementBanner({
   userRole,
   pendingMembersCount,
   unpaidAnnualFees,
-  unissuedReceipts,
   nextMeeting,
   memberAnnualFeeStatus,
   pendingMuVisits = 0,
@@ -97,18 +96,8 @@ export default function AnnouncementBanner({
       });
     }
 
-    // 4. 未発行領収書
-    if (unissuedReceipts > 0) {
-      announcements.push({
-        id: 'unissued-receipts',
-        type: 'info',
-        icon: Receipt,
-        title: `未発行の領収書が ${unissuedReceipts}件 あります`,
-        description: '支払い済みで領収書がまだ発行されていない件があります。',
-        href: '/receipts',
-        linkText: '領収書を発行する',
-      });
-    }
+    // 4. 未発行領収書のお知らせは出さない
+    //    （領収書は希望者にだけ任意で発行する運用のため、未発行は「対応漏れ」ではない）
 
     // 5. 未精算MU訪問
     if (pendingMuVisits > 0) {
