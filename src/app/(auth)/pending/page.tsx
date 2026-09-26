@@ -31,7 +31,8 @@ export default async function PendingPage() {
           <h1 className="text-2xl font-bold text-gray-900">RAC Cloud</h1>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        {/* スマホでは内側余白を詰めて360pxでも窮屈にならないようにする */}
+        <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8">
           <div className="flex justify-center mb-5">
             <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center">
               <Clock className="h-10 w-10 text-amber-500" />
@@ -50,9 +51,9 @@ export default async function PendingPage() {
           <div className="space-y-3 mb-6">
             <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-green-800">登録完了</p>
-                <p className="text-xs text-green-600 mt-0.5">
+                <p className="text-xs text-green-600 mt-0.5 break-all">
                   {session.user.email} で登録されました
                 </p>
               </div>
@@ -87,7 +88,7 @@ export default async function PendingPage() {
           >
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full min-h-11 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               ログアウト

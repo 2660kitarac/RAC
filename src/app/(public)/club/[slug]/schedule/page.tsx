@@ -118,18 +118,18 @@ export default async function SchedulePage({
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={`/club/${slug}/dashboard`} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-2 flex items-center gap-2">
+          <Link href={`/club/${slug}/dashboard`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors" aria-label="戻る">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
-          <h1 className="text-base font-bold text-gray-900">例会スケジュール</h1>
+          <h1 className="text-base font-bold text-gray-900 truncate">例会スケジュール</h1>
         </div>
 
         {/* タブ */}
-        <div className="max-w-lg mx-auto px-4 pb-0 flex border-t">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 pb-0 flex overflow-x-auto scrollbar-none border-t">
           <Link
             href={`/club/${slug}/schedule?tab=own`}
-            className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+            className={`flex-shrink-0 flex-1 min-w-[7.5rem] py-3 text-sm font-medium text-center border-b-2 transition-colors ${
               tab === 'own'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -140,7 +140,7 @@ export default async function SchedulePage({
           </Link>
           <Link
             href={`/club/${slug}/schedule?tab=other`}
-            className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+            className={`flex-shrink-0 flex-1 min-w-[7.5rem] py-3 text-sm font-medium text-center border-b-2 transition-colors ${
               tab === 'other'
                 ? 'border-purple-600 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -152,7 +152,7 @@ export default async function SchedulePage({
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 space-y-3 pb-safe">
         {tab === 'own' ? (
           // 自クラブ: 今後→過去の順で表示
           <>
@@ -230,7 +230,7 @@ function MeetingCard({
           <p className="text-xs font-medium text-purple-600 mb-1">{clubLabel}</p>
         )}
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-gray-900 text-sm flex-1 min-w-0 truncate">{m.title}</p>
+          <p className="font-semibold text-gray-900 text-sm flex-1 min-w-0 break-words">{m.title}</p>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
             MEETING_STATUS_COLORS[m.status as keyof typeof MEETING_STATUS_COLORS] || 'bg-gray-100 text-gray-600'
           }`}>
@@ -260,7 +260,8 @@ function MeetingCard({
           <div className="mt-3">
             <Link
               href={`/mu/${m.muRegistrationSlug}`}
-              className={`block w-full text-center text-white text-sm font-medium py-2 rounded-lg transition-colors ${
+              data-tap="button"
+              className={`block w-full text-center text-white text-sm font-medium py-3 rounded-lg transition-colors ${
                 tab === 'other' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
               }`}
             >

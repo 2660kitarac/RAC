@@ -368,7 +368,8 @@ export default function ReceiptsList({
             <CalendarDays className="h-4 w-4 text-gray-400" />
             <span className="font-medium">表示範囲</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          {/* スマホでは縦積み、sm以上は従来の横並び */}
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <Select
               value={activeMeetingId || '__none__'}
               onValueChange={v => {
@@ -376,7 +377,7 @@ export default function ReceiptsList({
                 else router.push(`/receipts?meeting_id=${v}`);
               }}
             >
-              <SelectTrigger className="w-[280px]">
+              <SelectTrigger className="w-full sm:w-[280px]">
                 <SelectValue placeholder="例会を選択..." />
               </SelectTrigger>
               <SelectContent>
@@ -389,29 +390,32 @@ export default function ReceiptsList({
               </SelectContent>
             </Select>
 
-            {scope !== 'meeting' && (
-              <>
-                <Button
-                  variant={scope === 'recent' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => router.push('/receipts')}
-                >
-                  直近{recentDays}日
+            {/* ボタン類はスマホでも横並びのまま */}
+            <div className="flex flex-wrap items-center gap-2">
+              {scope !== 'meeting' && (
+                <>
+                  <Button
+                    variant={scope === 'recent' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => router.push('/receipts')}
+                  >
+                    直近{recentDays}日
+                  </Button>
+                  <Button
+                    variant={scope === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => router.push('/receipts?scope=all')}
+                  >
+                    全期間
+                  </Button>
+                </>
+              )}
+              {scope === 'meeting' && (
+                <Button variant="outline" size="sm" onClick={() => router.push('/receipts')}>
+                  <X className="h-4 w-4" />絞り込みを解除
                 </Button>
-                <Button
-                  variant={scope === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => router.push('/receipts?scope=all')}
-                >
-                  全期間
-                </Button>
-              </>
-            )}
-            {scope === 'meeting' && (
-              <Button variant="outline" size="sm" onClick={() => router.push('/receipts')}>
-                <X className="h-4 w-4" />絞り込みを解除
-              </Button>
-            )}
+              )}
+            </div>
           </div>
           <p className="text-xs text-gray-400 ml-auto">
             {scope === 'meeting'
@@ -442,7 +446,8 @@ export default function ReceiptsList({
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* スマホではカード表示（.rac-table） */}
+            <table className="w-full text-sm rac-table">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   {printSelectMode && <th className="px-3 py-3 w-8" />}
@@ -467,7 +472,7 @@ export default function ReceiptsList({
                     style={printSelectMode && receipt.status === 'issued' ? { cursor: 'pointer' } : undefined}
                   >
                     {printSelectMode && (
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3" data-label="">
                         {receipt.status === 'issued' && (
                           <input
                             type="checkbox"
@@ -479,12 +484,12 @@ export default function ReceiptsList({
                         )}
                       </td>
                     )}
-                    <td className="px-4 py-3 font-mono text-sm text-blue-600">{receipt.receiptNumber}</td>
-                    <td className="px-4 py-3 font-medium">{receipt.receiptName}</td>
-                    <td className="px-4 py-3 text-right font-medium">{formatCurrency(receipt.amount)}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate">{receipt.description}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-blue-600" data-label="領収書番号">{receipt.receiptNumber}</td>
+                    <td className="px-4 py-3 font-medium" data-cell="primary">{receipt.receiptName}</td>
+                    <td className="px-4 py-3 text-right font-medium" data-label="金額">{formatCurrency(receipt.amount)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs max-w-none md:max-w-[200px] md:truncate" data-cell="block" data-label="但し書き">{receipt.description}</td>
                     {scope !== 'meeting' && (
-                      <td className="px-4 py-3 text-gray-600 text-xs max-w-[180px] truncate">
+                      <td className="px-4 py-3 text-gray-600 text-xs max-w-none md:max-w-[180px] md:truncate" data-label="関連例会">
                         {receipt.meetingTitle ? (
                           <button
                             type="button"
@@ -498,13 +503,13 @@ export default function ReceiptsList({
                         )}
                       </td>
                     )}
-                    <td className="px-4 py-3 text-gray-600">{formatDate(receipt.issuedDate)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-gray-600" data-label="発行日">{formatDate(receipt.issuedDate)}</td>
+                    <td className="px-4 py-3" data-label="状態">
                       <Badge className={statusColors[receipt.status] ?? 'bg-gray-100 text-gray-700'}>
                         {RECEIPT_STATUS_LABELS[receipt.status as keyof typeof RECEIPT_STATUS_LABELS] ?? receipt.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" data-cell="actions">
                       <div className="flex items-center gap-1">
                         {receipt.status === 'issued' && !printSelectMode && (
                           <Button

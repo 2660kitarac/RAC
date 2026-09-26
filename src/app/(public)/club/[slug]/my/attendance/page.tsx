@@ -132,17 +132,17 @@ export default async function MyAttendancePage({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={`/club/${slug}/dashboard`} className="p-1.5 rounded-full hover:bg-gray-100">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-2 flex items-center gap-2">
+          <Link href={`/club/${slug}/dashboard`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100" aria-label="戻る">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2 truncate">
             <History className="h-4 w-4 text-green-600" /> MU・出席履歴
           </h1>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 space-y-4 pb-safe">
 
         {/* 今後の参加予定 */}
         <div>
@@ -166,15 +166,15 @@ export default async function MyAttendancePage({
             {myMuVisits.length > 0 && (
               <div className="bg-white rounded-xl border divide-y overflow-hidden mt-3">
                 {myMuVisits.map((v) => (
-                  <div key={v.id} className="p-3 flex items-center justify-between">
+                  <div key={v.id} className="p-3 flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{v.visitedClubName}</p>
+                      <p className="text-sm font-medium text-gray-900 break-words">{v.visitedClubName}</p>
                       <p className="text-xs text-gray-500">{formatDate(v.visitDate)}</p>
-                      {v.note && <p className="text-xs text-gray-400 truncate">{v.note}</p>}
+                      {v.note && <p className="text-xs text-gray-400 break-words">{v.note}</p>}
                     </div>
-                    <div className="text-right ml-3">
+                    <div className="flex-shrink-0 text-right">
                       <p className="text-sm font-mono text-gray-800">{formatCurrency(v.feeAmount)}</p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      <span className={`inline-block whitespace-nowrap text-xs px-1.5 py-0.5 rounded-full ${
                         v.settlementStatus === 'settled' ? 'bg-green-100 text-green-700' :
                         v.settlementStatus === 'personal' ? 'bg-blue-100 text-blue-700' :
                         'bg-yellow-100 text-yellow-700'
@@ -191,7 +191,7 @@ export default async function MyAttendancePage({
         )}
 
         {/* サマリー */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <div className="bg-white rounded-xl border p-3 text-center">
             <p className="text-xs text-gray-500">総件数</p>
             <p className="text-xl font-bold text-gray-800">{muCount}</p>
@@ -221,19 +221,19 @@ export default async function MyAttendancePage({
         ) : (
           <div className="bg-white rounded-xl border divide-y overflow-hidden">
             {muHistory.map((a) => (
-              <div key={a.id} className="p-4 flex items-center justify-between">
+              <div key={a.id} className="p-4 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-purple-600 font-medium">
+                  <p className="text-xs text-purple-600 font-medium break-words">
                     {a.clubShortName || a.clubName}
                   </p>
-                  <p className="text-sm font-medium text-gray-900 truncate">{a.meetingTitle || '—'}</p>
+                  <p className="text-sm font-medium text-gray-900 break-words">{a.meetingTitle || '—'}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {a.meetingDate ? formatDate(a.meetingDate) : '—'}
                   </p>
                 </div>
-                <div className="text-right ml-3">
+                <div className="flex-shrink-0 text-right">
                   <p className="text-sm font-mono text-gray-800">{formatCurrency(a.feeAmount)}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  <span className={`inline-block whitespace-nowrap text-xs px-1.5 py-0.5 rounded-full ${
                     a.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
                     a.paymentStatus === 'exempt' ? 'bg-blue-100 text-blue-700' :
                     'bg-yellow-100 text-yellow-700'

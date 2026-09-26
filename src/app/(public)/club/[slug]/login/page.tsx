@@ -47,7 +47,7 @@ export default function ClubLoginPage() {
         </Link>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center px-3 py-4 sm:p-4 pb-safe">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl mb-4 shadow-lg">
@@ -57,11 +57,12 @@ export default function ClubLoginPage() {
             <p className="text-blue-200 text-sm mt-1">RAC Cloud</p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="form-group">
                 <Label htmlFor="email" required>メールアドレス</Label>
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                <Input id="email" type="email" inputMode="email" autoCapitalize="none" spellCheck={false}
+                  value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="example@racclub.jp" autoComplete="email" required className="mt-1" />
               </div>
               <div className="form-group">

@@ -107,7 +107,7 @@ export default async function DistrictInstagramPage() {
       ) : (
         <div className="bg-white border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm rac-table">
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">クラブ</th>
@@ -121,20 +121,20 @@ export default async function DistrictInstagramPage() {
               <tbody>
                 {posts.map((p: any) => (
                   <tr key={p.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{p.club_short_name ?? p.club_name ?? '—'}</td>
-                    <td className="py-3 px-4 text-gray-600 text-xs">{p.meeting_title ?? '—'}</td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 font-medium" data-cell="primary">{p.club_short_name ?? p.club_name ?? '—'}</td>
+                    <td className="py-3 px-4 text-gray-600 text-xs" data-label="例会">{p.meeting_title ?? '—'}</td>
+                    <td className="py-3 px-4 text-center" data-label="種別">
                       <span className="text-xs bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded">
                         {POST_TYPE_LABELS[p.post_type] ?? p.post_type}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 text-center" data-label="ステータス">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[p.status] ?? ''}`}>
                         {STATUS_LABELS[p.status] ?? p.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono">{p.score ?? 0}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 text-right font-mono" data-label="スコア">{p.score ?? 0}</td>
+                    <td className="py-3 px-4" data-label="投稿URL">
                       {p.post_url ? (
                         <a href={p.post_url} target="_blank" rel="noopener noreferrer"
                           className="text-blue-600 hover:underline text-xs">

@@ -141,14 +141,15 @@ function MuShareButton({ url, slug }: { url: string | null; slug: string | null 
         <p className="text-sm font-medium text-blue-800">友達・家族を誘う</p>
       </div>
       <p className="text-xs text-blue-600 mb-2">このURLを送ると、MUから直接申込できます</p>
-      <div className="flex gap-2">
+      {/* スマホではURL欄とコピーボタンを縦に積む */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 min-w-0 bg-white rounded-lg px-3 py-2 border border-blue-200">
           <p className="text-xs text-gray-600 truncate font-mono">{shareUrl}</p>
         </div>
         <Button
           size="sm"
           variant={copied ? 'default' : 'outline'}
-          className={`shrink-0 gap-1.5 text-xs transition-all ${copied ? 'bg-green-500 hover:bg-green-600 border-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
+          className={`w-full sm:w-auto shrink-0 justify-center gap-1.5 text-xs transition-all ${copied ? 'bg-green-500 hover:bg-green-600 border-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
           onClick={handleCopy}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -354,13 +355,14 @@ function NextMeetingCard({
   return (
     <Card className="overflow-hidden border-0 shadow-md">
       {/* ヘッダー帯 */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 text-white">
-        <div className="flex items-center justify-between gap-2">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 sm:px-5 py-4 text-white">
+        {/* バッジが増えても横にはみ出さないよう折り返す */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 opacity-90" />
             <span className="font-semibold text-base">次の例会</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {myType && (
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${PARTICIPATION_COLORS[myType]} bg-white/90`}>
                 {myType === 'meeting_only' && <CheckCircle className="h-3 w-3 inline mr-1" />}
@@ -377,7 +379,7 @@ function NextMeetingCard({
             )}
           </div>
         </div>
-        <p className="mt-2 text-xl font-bold leading-tight">{meeting.title}</p>
+        <p className="mt-2 text-lg sm:text-xl font-bold leading-tight break-words">{meeting.title}</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-blue-100">
           <span className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />
@@ -397,18 +399,19 @@ function NextMeetingCard({
       <CardContent className="p-4 space-y-4">
         {/* 場所・地図 */}
         {(meeting.venueName || meeting.venueAddress) && (
-          <div className="flex items-start justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-gray-800">{meeting.venueName}</p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800 break-words">{meeting.venueName}</p>
               {meeting.venueAddress && (
-                <p className="text-xs text-gray-500 mt-0.5">{meeting.venueAddress}</p>
+                <p className="text-xs text-gray-500 mt-0.5 break-words">{meeting.venueAddress}</p>
               )}
             </div>
             <a
               href={`https://maps.google.com/maps?q=${mapQuery}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-white border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+              data-tap="button"
+              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-white border border-blue-200 rounded-lg px-3 py-2 sm:py-1.5 hover:bg-blue-50 transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               地図
@@ -457,14 +460,14 @@ function AttendanceStatsCard({ stats }: { stats: Stats }) {
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs text-gray-500">参加率</p>
-            <p className={`text-3xl font-bold ${color}`}>
+            <p className={`text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
               {stats.attendanceRate !== null ? `${stats.attendanceRate}%` : '—'}
               <span className="text-lg ml-1">{stats.attendanceRate !== null ? emoji : ''}</span>
             </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-500">参加回数</p>
-            <p className="text-xl font-bold text-gray-800">
+            <p className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums">
               {stats.attendedCount}
               <span className="text-sm font-normal text-gray-500"> / {stats.pastMeetings}回</span>
             </p>
@@ -490,11 +493,11 @@ function AttendanceStatsCard({ stats }: { stats: Stats }) {
         <div className="grid grid-cols-2 gap-2 pt-1">
           <div className="bg-blue-50 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-blue-600">年度例会数</p>
-            <p className="font-bold text-blue-800">{stats.totalMeetings}回</p>
+            <p className="font-bold text-blue-800 tabular-nums">{stats.totalMeetings}回</p>
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-gray-500">残り例会数</p>
-            <p className="font-bold text-gray-700">{stats.totalMeetings - stats.pastMeetings}回</p>
+            <p className="font-bold text-gray-700 tabular-nums">{stats.totalMeetings - stats.pastMeetings}回</p>
           </div>
         </div>
       </CardContent>
@@ -564,7 +567,7 @@ function ScheduleItemRow({
             )}
             <span className="text-xs text-gray-500">{item.eventType}</span>
           </div>
-          <p className="font-semibold text-gray-900 text-sm mt-0.5 truncate">{item.title}</p>
+          <p className="font-semibold text-gray-900 text-sm mt-0.5 break-words">{item.title}</p>
           {item.venueName && (
             <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
               <MapPin className="h-3 w-3" />{item.venueName}
@@ -638,7 +641,7 @@ function ScheduleItemRow({
               </span>
             )}
             {item.venueName && (
-              <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[180px]">
+              <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[60%] sm:max-w-[180px]">
                 <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
               </span>
             )}
@@ -879,12 +882,12 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
   return (
     <div className="space-y-5">
       {/* グリーティング */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words">
             こんにちは、{userName.split(' ')[0]}さん 👋
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <p className="text-sm text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <Building2 className="h-3.5 w-3.5" />
             {meta?.clubName || clubName}
             {memberType && (
@@ -918,7 +921,7 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
       )}
 
       {/* 参加率 + 年間スケジュール（2カラム on md+） */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
         {/* 参加率（左 1/3） */}
         {stats && (
           <div className="md:col-span-1">

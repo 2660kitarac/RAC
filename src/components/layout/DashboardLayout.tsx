@@ -16,7 +16,7 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-50" data-app-shell>
+    <div className="flex h-[100dvh] bg-gray-50" data-app-shell>
       {/* デスクトップサイドバー */}
       <div className="hidden lg:flex lg:flex-shrink-0 print:hidden" data-app-chrome>
         <div className="w-64">
@@ -31,11 +31,12 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
             className="fixed inset-0 bg-black/50"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="relative flex flex-col w-72 h-full bg-white shadow-xl">
+          <div className="relative flex h-full w-[85%] max-w-xs flex-col bg-white shadow-xl">
             <div className="absolute right-4 top-4">
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                aria-label="メニューを閉じる"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -49,27 +50,36 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
       <div className="flex-1 flex flex-col overflow-hidden" data-app-body>
         {/* トップバー */}
         <header
-          className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0 print:hidden"
+          className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top,0px))] flex-shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 pt-[env(safe-area-inset-top,0px)] sm:h-[calc(4rem+env(safe-area-inset-top,0px))] sm:px-4 print:hidden"
           data-app-chrome
         >
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            aria-label="メニューを開く"
+            className="lg:hidden -ml-1 inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-6 w-6" />
           </button>
-          
-          <div className="flex-1 lg:flex-none" />
 
-          <div className="flex items-center gap-3">
+          {/* スマホ：今どのクラブで使っているかを見せる */}
+          <div className="min-w-0 flex-1 lg:flex-none">
+            <p className="truncate text-sm font-semibold text-gray-900 lg:hidden">
+              {user?.club?.name || 'RAC Cloud'}
+            </p>
+          </div>
+
+          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
             {/* 通知ベル */}
-            <button className="relative p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100">
+            <button
+              aria-label="お知らせ"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 sm:h-10 sm:w-10"
+            >
               <Bell className="h-5 w-5" />
             </button>
-            
+
             {/* ユーザーアバター（モバイル） */}
-            <div className="lg:hidden w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-semibold text-sm">
+            <div className="lg:hidden flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+              <span className="text-sm font-semibold text-blue-600">
                 {user?.name?.charAt(0) || 'U'}
               </span>
             </div>
@@ -78,7 +88,10 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
 
         {/* ページコンテンツ */}
         <main className="flex-1 overflow-y-auto" data-app-main>
-          <div className="p-4 md:p-6 max-w-7xl mx-auto" data-app-content>
+          <div
+            className="mx-auto max-w-7xl px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:p-4 md:p-6"
+            data-app-content
+          >
             {children}
           </div>
         </main>

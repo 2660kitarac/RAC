@@ -233,11 +233,12 @@ export default function MemberAttendanceCard({ memberType }: MemberAttendanceCar
           const partyFee = getFee(meeting, 'party');
 
           return (
-            <div key={meeting.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
+            <div key={meeting.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 space-y-3">
               {/* 例会ヘッダー */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{meeting.title}</p>
+                  {/* スマホでは長い例会名を折り返して全文見せる */}
+                  <p className="font-semibold text-gray-900 break-words">{meeting.title}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
@@ -251,7 +252,7 @@ export default function MemberAttendanceCard({ memberType }: MemberAttendanceCar
                       </span>
                     )}
                     {meeting.capacity && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 tabular-nums">
                         <Users className="h-3 w-3" />
                         {meeting.currentCount}/{meeting.capacity}名
                       </span>
@@ -299,6 +300,7 @@ export default function MemberAttendanceCard({ memberType }: MemberAttendanceCar
               {/* 登録ボタン群 */}
               {deadlineInfo.allowed && (
                 <div className="space-y-2">
+                  {/* 出欠ボタン：スマホでは折り返して縦に積まれる */}
                   <div className="flex flex-wrap gap-2">
                     {/* 例会のみ参加 */}
                     <button

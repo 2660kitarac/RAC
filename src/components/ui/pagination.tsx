@@ -42,15 +42,20 @@ export function Pagination({ page, totalPages, totalCount, pageSize, className }
   else if (totalPages > 1) pageNumbers.push(totalPages);
 
   return (
-    <div className={cn('flex items-center justify-between px-2 py-3', className)}>
-      <p className="text-sm text-gray-500">
+    <div
+      className={cn(
+        'flex flex-col gap-2 px-2 py-3 sm:flex-row sm:items-center sm:justify-between',
+        className
+      )}
+    >
+      <p className="text-center text-xs text-gray-500 sm:text-left sm:text-sm">
         {totalCount}件中 {start}〜{end}件を表示
       </p>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center gap-1">
         <button
           onClick={() => goToPage(1)}
           disabled={page === 1}
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="hidden sm:inline-flex p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
           title="最初のページ"
         >
           <ChevronsLeft className="h-4 w-4" />
@@ -58,7 +63,7 @@ export function Pagination({ page, totalPages, totalCount, pageSize, className }
         <button
           onClick={() => goToPage(page - 1)}
           disabled={page === 1}
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="inline-flex h-10 w-10 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed sm:h-8 sm:w-8"
           title="前のページ"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -66,16 +71,16 @@ export function Pagination({ page, totalPages, totalCount, pageSize, className }
 
         {pageNumbers.map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-sm">…</span>
+            <span key={`ellipsis-${i}`} className="hidden px-2 text-gray-400 text-sm sm:inline">…</span>
           ) : (
             <button
               key={p}
               onClick={() => goToPage(p as number)}
               className={cn(
-                'w-8 h-8 rounded text-sm font-medium',
+                'h-10 w-10 rounded text-sm font-medium sm:h-8 sm:w-8',
                 page === p
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  : 'hidden text-gray-700 hover:bg-gray-100 sm:inline-block'
               )}
             >
               {p}
@@ -86,7 +91,7 @@ export function Pagination({ page, totalPages, totalCount, pageSize, className }
         <button
           onClick={() => goToPage(page + 1)}
           disabled={page === totalPages}
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="inline-flex h-10 w-10 items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed sm:h-8 sm:w-8"
           title="次のページ"
         >
           <ChevronRight className="h-4 w-4" />
@@ -94,7 +99,7 @@ export function Pagination({ page, totalPages, totalCount, pageSize, className }
         <button
           onClick={() => goToPage(totalPages)}
           disabled={page === totalPages}
-          className="p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="hidden sm:inline-flex p-1.5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
           title="最後のページ"
         >
           <ChevronsRight className="h-4 w-4" />

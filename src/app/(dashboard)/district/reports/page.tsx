@@ -87,8 +87,9 @@ export default async function DistrictReportsPage() {
         </div>
       ) : (
         <div className="bg-white border rounded-xl overflow-hidden">
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
+          {/* スマホ用のカード表示が無かったため、表を常に表示し .rac-table でカード化する */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm rac-table">
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="text-left py-3 px-4 font-medium text-gray-600">クラブ名</th>
@@ -102,16 +103,16 @@ export default async function DistrictReportsPage() {
               <tbody>
                 {reports.map((r: any) => (
                   <tr key={r.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{r.club_short_name ?? r.club_name ?? '—'}</td>
-                    <td className="py-3 px-4">{r.title}</td>
-                    <td className="py-3 px-4 text-gray-500 text-xs">{r.report_type}</td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 font-medium" data-cell="primary">{r.club_short_name ?? r.club_name ?? '—'}</td>
+                    <td className="py-3 px-4" data-cell="block" data-label="タイトル">{r.title}</td>
+                    <td className="py-3 px-4 text-gray-500 text-xs" data-label="種別">{r.report_type}</td>
+                    <td className="py-3 px-4 text-center" data-label="ステータス">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status] ?? ''}`}>
                         {STATUS_LABELS[r.status] ?? r.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-xs text-gray-500">{r.deadline ? formatDate(r.deadline) : '—'}</td>
-                    <td className="py-3 px-4 text-xs text-gray-500">{r.submitted_at ? formatDate(r.submitted_at) : '—'}</td>
+                    <td className="py-3 px-4 text-xs text-gray-500" data-label="締切">{r.deadline ? formatDate(r.deadline) : '—'}</td>
+                    <td className="py-3 px-4 text-xs text-gray-500" data-label="提出日">{r.submitted_at ? formatDate(r.submitted_at) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

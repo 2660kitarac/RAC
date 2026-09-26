@@ -192,11 +192,12 @@ export default function AwardsDashboard({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {/* クラブ×項目の得点マトリクスはカード化せず、そのまま横スクロールさせる（クラブ名列は固定） */}
+          <div className="overflow-x-auto scroll-x">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-2 font-medium text-gray-600 sticky left-0 bg-white min-w-[8rem]">クラブ</th>
+                  <th className="text-left py-2 px-2 font-medium text-gray-600 sticky left-0 bg-white z-10 min-w-[8rem]">クラブ</th>
                   <th className="text-center py-2 px-2 font-medium text-gray-600 min-w-[4rem]">合計</th>
                   {scoreItems.map(item => (
                     <th key={item.code} className="text-center py-2 px-1 font-medium text-gray-600 min-w-[5rem]" title={item.description ?? ''}>
@@ -209,7 +210,7 @@ export default function AwardsDashboard({
               <tbody>
                 {rankedClubs.map(({ club, total }, rank) => (
                   <tr key={club.id} className="border-b hover:bg-gray-50">
-                    <td className="py-2 px-2 sticky left-0 bg-white">
+                    <td className="py-2 px-2 sticky left-0 bg-white z-10">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-xs font-bold ${rank === 0 ? 'text-yellow-500' : rank === 1 ? 'text-gray-400' : rank === 2 ? 'text-amber-600' : 'text-gray-300'}`}>
                           {rank + 1}

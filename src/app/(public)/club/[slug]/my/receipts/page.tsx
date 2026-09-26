@@ -81,18 +81,18 @@ export default async function MyReceiptsPage({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={`/club/${slug}/dashboard`} className="p-1.5 rounded-full hover:bg-gray-100">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-2 flex items-center gap-2">
+          <Link href={`/club/${slug}/dashboard`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100" aria-label="戻る">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2 truncate">
             <Receipt className="h-4 w-4 text-purple-600" /> 領収書
           </h1>
-          <span className="ml-auto text-xs text-gray-400">{receiptsCount}件</span>
+          <span className="ml-auto flex-shrink-0 text-xs text-gray-400">{receiptsCount}件</span>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 space-y-3 pb-safe">
         {receiptList.length === 0 ? (
           <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
             <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -106,12 +106,12 @@ export default async function MyReceiptsPage({
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-mono text-gray-400">{r.receiptNumber}</p>
-                      <p className="text-sm font-semibold text-gray-900 mt-0.5 truncate">{r.receiptName}</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5 break-words">{r.receiptName}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>
                       {r.meetingTitle && (
                         <p className="text-xs text-blue-600 mt-0.5">{r.meetingTitle}</p>
                       )}
-                      <div className="flex items-center gap-3 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
                         <span className="text-sm font-bold text-gray-800">{formatCurrency(r.amount)}</span>
                         <span className="text-xs text-gray-400">{formatDate(r.issuedDate)}</span>
                       </div>
@@ -122,7 +122,8 @@ export default async function MyReceiptsPage({
                         href={r.pdfUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-purple-50 rounded-lg text-purple-600 hover:bg-purple-100 transition-colors"
+                        data-tap="button"
+                        className="flex-shrink-0 flex min-h-[3.25rem] min-w-[3.25rem] flex-col items-center justify-center gap-1 p-2 bg-purple-50 rounded-lg text-purple-600 hover:bg-purple-100 transition-colors"
                       >
                         <Download className="h-5 w-5" />
                         <span className="text-xs">PDF</span>
@@ -130,7 +131,8 @@ export default async function MyReceiptsPage({
                     ) : (
                       <Link
                         href={`/club/${slug}/my/receipts/${r.id}/print`}
-                        className="flex-shrink-0 flex flex-col items-center gap-1 p-2 bg-gray-50 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                        data-tap="button"
+                        className="flex-shrink-0 flex min-h-[3.25rem] min-w-[3.25rem] flex-col items-center justify-center gap-1 p-2 bg-gray-50 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
                       >
                         <FileText className="h-5 w-5" />
                         <span className="text-xs">表示</span>

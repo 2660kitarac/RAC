@@ -93,8 +93,8 @@ export default function AttendancesList({ list, page, totalPages, totalCount, pa
     <>
       <div className="bg-white border rounded-xl overflow-hidden">
         {/* デスクトップ */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm">
             <thead className="border-b bg-gray-50">
               <tr>
                 <th className="text-left py-3 px-4 font-medium text-gray-600">氏名</th>
@@ -111,11 +111,11 @@ export default function AttendancesList({ list, page, totalPages, totalCount, pa
             <tbody>
               {rows.map(a => (
                 <tr key={a.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" data-cell="primary">
                     <div className="font-medium">{a.externalName ?? '—'}</div>
                     {a.externalEmail && <div className="text-xs text-gray-400">{a.externalEmail}</div>}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4" data-label="編集">
                     <button
                       onClick={() => openEdit(a)}
                       className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
@@ -124,27 +124,27 @@ export default function AttendancesList({ list, page, totalPages, totalCount, pa
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                   </td>
-                  <td className="py-3 px-4 text-gray-600 text-xs">{a.clubName ?? '—'}</td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3 px-4 text-gray-600 text-xs" data-label="所属クラブ">{a.clubName ?? '—'}</td>
+                  <td className="py-3 px-4 text-center" data-label="種別">
                     <span className="text-xs text-gray-500">
                       {MEMBER_TYPE_LABELS[a.memberType as keyof typeof MEMBER_TYPE_LABELS] ?? a.memberType}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-600 text-xs max-w-[12rem] truncate">
+                  <td className="py-3 px-4 text-gray-600 text-xs max-w-none md:max-w-[12rem] md:truncate" data-label="例会">
                     {a.meeting?.title ?? '—'}
                   </td>
-                  <td className="py-3 px-4 text-gray-500 text-xs">
+                  <td className="py-3 px-4 text-gray-500 text-xs" data-label="開催日">
                     {a.meeting?.date ? formatDate(a.meeting.date) : '—'}
                   </td>
-                  <td className="py-3 px-4 text-right font-mono text-xs">
+                  <td className="py-3 px-4 text-right font-mono text-xs" data-label="参加費">
                     {formatCurrency(a.feeAmount)}
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3 px-4 text-center" data-label="支払">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_COLORS[a.paymentStatus as keyof typeof PAYMENT_STATUS_COLORS] ?? ''}`}>
                       {PAYMENT_STATUS_LABELS[a.paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] ?? a.paymentStatus}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3 px-4 text-center" data-cell="actions">
                     <Link href={`/meetings/${a.meetingId}/attendances`} className="text-xs text-blue-600 hover:underline">
                       出席管理
                     </Link>
@@ -156,7 +156,7 @@ export default function AttendancesList({ list, page, totalPages, totalCount, pa
         </div>
 
         {/* モバイル */}
-        <div className="sm:hidden divide-y">
+        <div className="md:hidden divide-y">
           {rows.map(a => (
             <div key={a.id} className="p-4 space-y-1">
               <div className="flex items-start justify-between gap-2">

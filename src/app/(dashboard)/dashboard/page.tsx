@@ -83,7 +83,8 @@ export default async function DashboardPage() {
       : null;
 
     return (
-      <div className="space-y-4 max-w-2xl mx-auto px-4 pb-10">
+      // スマホは左右の余白を詰める（下端はpb-10でホームバーを十分に避ける）
+      <div className="space-y-4 max-w-2xl mx-auto w-full px-3 sm:px-4 pb-10">
         {/* 年会費未納バナーのみ表示 */}
         <AnnouncementBanner
           userRole={userRole}

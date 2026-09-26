@@ -290,8 +290,8 @@ export default function DonationsList({
           ) : (
             <>
               {/* デスクトップ */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 px-3 font-medium text-gray-600">日付</th>
@@ -305,16 +305,17 @@ export default function DonationsList({
                   <tbody>
                     {filtered.map(d => (
                       <tr key={d.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-3 text-gray-600">{formatDate(d.transaction_date)}</td>
-                        <td className="py-3 px-3 font-medium">{d.donor_name}</td>
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-gray-600" data-cell="primary">{formatDate(d.transaction_date)}</td>
+                        <td className="py-3 px-3 font-medium" data-label="寄付者名">{d.donor_name}</td>
+                        <td className="py-3 px-3 text-center" data-label="種別">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DONATION_TYPE_COLORS[d.donation_type]}`}>
                             {DONATION_TYPE_LABELS[d.donation_type]}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right font-mono font-medium">{formatCurrency(d.amount)}</td>
-                        <td className="py-3 px-3 text-gray-500 text-xs max-w-[14rem] truncate">{d.reason ?? '—'}</td>
-                        <td className="py-3 px-3 text-gray-500 text-xs">{d.meeting?.title ?? '—'}</td>
+                        <td className="py-3 px-3 text-right font-mono font-medium whitespace-nowrap" data-label="金額">{formatCurrency(d.amount)}</td>
+                        {/* スマホ表示では全文を折り返す（max-w はPC以上のみ） */}
+                        <td className="py-3 px-3 text-gray-500 text-xs max-w-none md:max-w-[14rem] md:truncate" data-cell="block" data-label="理由・コメント">{d.reason ?? '—'}</td>
+                        <td className="py-3 px-3 text-gray-500 text-xs" data-label="例会">{d.meeting?.title ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -322,7 +323,7 @@ export default function DonationsList({
               </div>
 
               {/* モバイル */}
-              <div className="sm:hidden space-y-3">
+              <div className="md:hidden space-y-3">
                 {filtered.map(d => (
                   <div key={d.id} className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-start justify-between">
