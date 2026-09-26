@@ -367,6 +367,11 @@ body {
     display: none !important;
   }
 
+  /* 保存完了などの通知が印刷物に写り込まないようにする */
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
   /* h-screen / overflow-hidden / flex を解除して自然な流し込みに */
   [data-app-shell],
   [data-app-body],

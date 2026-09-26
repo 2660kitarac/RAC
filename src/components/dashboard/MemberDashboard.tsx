@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
+import { MeetingParticipantsDialog } from '@/components/dashboard/MeetingParticipantsDialog';
 
 // ─── 型定義 ──────────────────────────────────────────────
 interface MyMeeting {
@@ -433,6 +434,13 @@ function NextMeetingCard({
             onNoteToggle={onNoteToggle}
           />
         </div>
+
+        {/* 参加者一覧（自クラブ＋MU） */}
+        <MeetingParticipantsDialog
+          meetingId={meeting.id}
+          meetingTitle={meeting.title}
+          meetingDate={meeting.date}
+        />
 
         {/* MU URL共有 */}
         <MuShareButton url={meeting.muRegistrationUrl} slug={meeting.muRegistrationSlug} />

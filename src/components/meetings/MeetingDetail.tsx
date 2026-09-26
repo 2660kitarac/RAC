@@ -5,8 +5,7 @@ import { useState } from 'react';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
-  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer
-} from 'lucide-react';
+  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -307,6 +306,13 @@ export default function MeetingDetail({
               status={meeting.status}
               finishedAt={(meeting as any).finished_at ?? null}
             />
+            {/* 例会レジュメ（A4・印刷/PDF） */}
+            <Link href={`/meetings/${meeting.id}/resume`}>
+              <Button variant="outline" size="sm">
+                <ScrollText className="h-4 w-4" />
+                レジュメ
+              </Button>
+            </Link>
             <Link href={`/meetings/${meeting.id}/edit`}>
               <Button variant="outline" size="sm">
                 <Edit className="h-4 w-4" />
