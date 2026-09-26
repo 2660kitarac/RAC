@@ -5,6 +5,7 @@ import { meetings, clubs, attendances, users, transactions, meetingReports } fro
 import { eq, and, isNull } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import MeetingDetail from '@/components/meetings/MeetingDetail';
+import { displayAffiliation } from '@/lib/meetings/own-club';
 
 export default async function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,10 +42,13 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       userName:         users.name,
       userEmail:        users.email,
       userClubId:       users.clubId,
+      userClubName:     clubs.name,
+      userClubShortName: clubs.shortName,
       userNameKana:     users.nameKana,
     })
       .from(attendances)
       .leftJoin(users, eq(attendances.userId, users.id))
+      .leftJoin(clubs, eq(users.clubId, clubs.id))
       .where(and(eq(attendances.meetingId, id), isNull(attendances.deletedAt))),
     db.select().from(transactions).where(and(eq(transactions.meetingId, id), isNull(transactions.deletedAt))),
     db.select().from(meetingReports).where(and(eq(meetingReports.meetingId, id), isNull(meetingReports.deletedAt))).limit(1),
@@ -126,6 +130,12 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
     user_club_id:      a.userClubId,
     // 登録時に選ばれた所属クラブ（自クラブ判定に使う）
     attendance_club_id: a.clubId,
+    // 一覧の「所属」表示用（自クラブ会員は登録経路にかかわらず同じ表記）
+    display_club_name: displayAffiliation(a, {
+      id: meetingRaw.clubId,
+      name: meetingClub?.name ?? null,
+      shortName: meetingClub?.shortName ?? null,
+    }),
     // 氏名の並び替えに使う読みがな（会員のみ）
     user_name_kana:    a.userNameKana,
   }));
