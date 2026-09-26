@@ -247,14 +247,8 @@ export default async function DashboardPage() {
             lte(transactions.transactionDate, lastDayOfMonth),
           )),
 
-    // 領収書未発行数
-    db.select({ value: count() })
-      .from(attendances)
-      .where(and(
-        eq(attendances.receiptRequired, true),
-        eq(attendances.paymentStatus, 'paid'),
-        isNull(attendances.deletedAt),
-      )),
+    // 領収書未発行数：領収書は任意発行のため集計しない（お知らせにも出さない）
+    Promise.resolve([{ value: 0 }]),
 
     // 最近のMU登録
     db.select({

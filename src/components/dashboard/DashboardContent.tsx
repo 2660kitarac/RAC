@@ -58,7 +58,6 @@ export default function DashboardContent({
   upcomingMeetings,
   totalMembers,
   unpaidAnnualFees,
-  unissuedReceipts,
   recentMuRegistrations,
   recentEmails,
   monthlyIncome,
@@ -68,7 +67,8 @@ export default function DashboardContent({
   unpaidAlerts = [],
   capacityAlerts = [],
 }: DashboardContentProps) {
-  const totalAlerts = (unpaidAnnualFees > 0 ? 1 : 0) + (unissuedReceipts > 0 ? 1 : 0)
+  // 領収書は任意発行のため、未発行件数はアラートに数えない
+  const totalAlerts = (unpaidAnnualFees > 0 ? 1 : 0)
     + deadlineAlerts.length + unpaidAlerts.length + capacityAlerts.length;
   return (
     <div className="space-y-6">
@@ -136,14 +136,6 @@ export default function DashboardContent({
                   description={`${unpaidAnnualFees}名の会員の年会費が未納です`}
                   href="/finance/annual-fees"
                   variant="warning"
-                />
-              )}
-              {unissuedReceipts > 0 && (
-                <AlertCard
-                  title="領収書未発行"
-                  description={`${unissuedReceipts}件の領収書が発行待ちです`}
-                  href="/receipts"
-                  variant="info"
                 />
               )}
               {deadlineAlerts.map(m => (
