@@ -72,39 +72,44 @@ export default function MyUpcomingAttendances({ attendances, slug }: Props) {
         const isCanceling = cancelingId === a.id;
 
         return (
-          <div key={a.id} className="p-4 flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-purple-600 font-medium">
-                {a.clubShortName || a.clubName}
-              </p>
-              <p className="text-sm font-medium text-gray-900 truncate">{a.meetingTitle || '—'}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {a.meetingDate ? formatDate(a.meetingDate) : '—'}
-              </p>
+          <div key={a.id} className="p-4">
+            {/* スマホは縦積み、sm以上は横並び */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-purple-600 font-medium break-words">
+                  {a.clubShortName || a.clubName}
+                </p>
+                <p className="text-sm font-medium text-gray-900 break-words">{a.meetingTitle || '—'}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {a.meetingDate ? formatDate(a.meetingDate) : '—'}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:flex-shrink-0 sm:justify-end">
+                <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0.5">
+                  <p className="text-sm font-mono text-gray-800">{formatCurrency(a.feeAmount)}</p>
+                  <span className={`inline-block whitespace-nowrap text-xs px-1.5 py-0.5 rounded-full ${
+                    isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {isPaid ? '支払済' : '未払い'}
+                  </span>
+                </div>
+                {!isPaid && (
+                  <button
+                    data-cancel-btn="true"
+                    disabled={isCanceling}
+                    onClick={() => handleCancel(a.id)}
+                    className={`flex flex-shrink-0 items-center gap-1 text-xs px-3 py-2 rounded-lg border transition-colors ${
+                      isConfirming
+                        ? 'bg-red-500 text-white border-red-500'
+                        : 'text-red-400 border-red-200 hover:bg-red-50'
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {isCanceling ? '…' : isConfirming ? '確認' : 'キャンセル'}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-sm font-mono text-gray-800">{formatCurrency(a.feeAmount)}</p>
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-              }`}>
-                {isPaid ? '支払済' : '未払い'}
-              </span>
-            </div>
-            {!isPaid && (
-              <button
-                data-cancel-btn="true"
-                disabled={isCanceling}
-                onClick={() => handleCancel(a.id)}
-                className={`flex-shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                  isConfirming
-                    ? 'bg-red-500 text-white border-red-500'
-                    : 'text-red-400 border-red-200 hover:bg-red-50'
-                }`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {isCanceling ? '…' : isConfirming ? '確認' : 'キャンセル'}
-              </button>
-            )}
           </div>
         );
       })}

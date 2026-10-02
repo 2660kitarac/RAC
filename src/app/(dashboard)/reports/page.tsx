@@ -58,7 +58,7 @@ export default async function ReportsPage() {
         </div>
       ) : (
         <div className="bg-white border rounded-xl overflow-hidden">
-          <div className="hidden sm:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b bg-gray-50">
                 <tr>
@@ -72,20 +72,20 @@ export default async function ReportsPage() {
               <tbody>
                 {reports.map(r => (
                   <tr key={r.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4" data-cell="primary">
                       <div className="font-medium">{r.meetingTitle ?? '—'}</div>
                       {r.meetingNumber && (
                         <div className="text-xs text-gray-400">第{r.meetingNumber}回</div>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-gray-600">
+                    <td className="py-3 px-4 text-gray-600" data-label="開催日">
                       {r.meetingDate ? formatDate(r.meetingDate) : '—'}
                     </td>
-                    <td className="py-3 px-4 text-center text-gray-700">
+                    <td className="py-3 px-4 text-center text-gray-700" data-label="参加人数">
                       {r.participantsCount ?? 0}名
                     </td>
-                    <td className="py-3 px-4 text-gray-500 text-xs">{formatDate(r.createdAt)}</td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 text-gray-500 text-xs" data-label="作成日">{formatDate(r.createdAt)}</td>
+                    <td className="py-3 px-4 text-center" data-cell="actions">
                       <Link href={`/meetings/${r.meetingId}/report`}
                         className="inline-flex items-center px-3 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
                         編集
@@ -97,7 +97,7 @@ export default async function ReportsPage() {
             </table>
           </div>
 
-          <div className="sm:hidden divide-y">
+          <div className="md:hidden divide-y">
             {reports.map(r => (
               <div key={r.id} className="p-4 space-y-2">
                 <div className="flex items-start justify-between">

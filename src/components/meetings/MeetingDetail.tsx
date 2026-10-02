@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { isOwnClubAttendance } from '@/lib/meetings/own-club';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
-  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer
-} from 'lucide-react';
+  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,54 @@ const PARTICIPATION_TYPE_LABELS: Record<string, string> = {
   waitlist:            'キャンセル待ち',
 };
 
+// ─── 参加者の並び替え ─────────────────────────────
+type SortKey = 'name' | 'club' | 'type' | 'participation' | 'status' | 'payment' | 'fee' | 'registered';
+
+const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: 'name', label: '氏名' },
+  { value: 'club', label: '所属クラブ' },
+  { value: 'type', label: '区分' },
+  { value: 'participation', label: '参加形式' },
+  { value: 'status', label: '出席' },
+  { value: 'payment', label: '支払' },
+  { value: 'fee', label: '登録料' },
+  { value: 'registered', label: '登録日時' },
+];
+
+const PARTICIPATION_ORDER: Record<string, number> = {
+  meeting_and_party: 0, meeting_only: 1, party_only: 2, waitlist: 3, absent: 4,
+};
+const STATUS_ORDER: Record<string, number> = {
+  present: 0, late: 1, early_leave: 2, makeup: 3, undecided: 4, absent: 5,
+};
+const PAYMENT_ORDER: Record<string, number> = { unpaid: 0, paid: 1, exempt: 2 };
+const TYPE_ORDER: Record<string, number> = { RAC: 0, RC: 1, OB_OG: 2, GUEST: 3, OTHER: 4 };
+
+function compareBy(key: SortKey, a: any, b: any): number {
+  const text = (v: unknown) => String(v ?? '');
+  const rank = (m: Record<string, number>, v: unknown) => m[String(v)] ?? 99;
+  switch (key) {
+    case 'name':
+      // 会員は読みがなで五十音順に並べる（ビジターは氏名のまま）
+      return text(a.user_name_kana || a.display_name).localeCompare(text(b.user_name_kana || b.display_name), 'ja');
+    case 'club':
+      return text(a.display_club_name ?? a.club_name).localeCompare(text(b.display_club_name ?? b.club_name), 'ja');
+    case 'type':
+      return rank(TYPE_ORDER, a.member_type) - rank(TYPE_ORDER, b.member_type);
+    case 'participation':
+      return rank(PARTICIPATION_ORDER, a.participation_type ?? 'meeting_only')
+        - rank(PARTICIPATION_ORDER, b.participation_type ?? 'meeting_only');
+    case 'status':
+      return rank(STATUS_ORDER, a.attendance_status) - rank(STATUS_ORDER, b.attendance_status);
+    case 'payment':
+      return rank(PAYMENT_ORDER, a.payment_status) - rank(PAYMENT_ORDER, b.payment_status);
+    case 'fee':
+      return (a.fee_amount ?? 0) - (b.fee_amount ?? 0);
+    case 'registered':
+      return text(a.registered_at).localeCompare(text(b.registered_at));
+  }
+}
+
 export default function MeetingDetail({
   meeting, attendances, stats, report, userRole
 }: MeetingDetailProps) {
@@ -66,7 +114,9 @@ export default function MeetingDetail({
   const [nameSearch, setNameSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [sortKey, setSortKey] = useState<'name' | 'status' | 'payment' | 'fee'>('name');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  // 参加者の表示範囲：すべて（自クラブとMUを分けて表示）／自クラブのみ／MU・ビジターのみ
+  const [groupFilter, setGroupFilter] = useState<'all' | 'own' | 'mu'>('all');
   const [sortAsc, setSortAsc] = useState(true);
 
   // 出席ステータス・支払一括管理
@@ -141,6 +191,8 @@ export default function MeetingDetail({
               externalPhone: editForm.externalPhone,
               club_name: editForm.clubName,
               clubName: editForm.clubName,
+              // 編集後は入力したクラブ名をそのまま表示する（再読み込みで表記がそろう）
+              display_club_name: editForm.clubName || a.display_club_name,
               member_type: editForm.memberType,
               memberType: editForm.memberType,
               note: editForm.note,
@@ -220,7 +272,7 @@ export default function MeetingDetail({
       ['氏名', '所属', '区分', '参加形式', '出席状況', '支払状況', '登録料', '備考'],
       ...attendances.map(a => [
         (a as any).display_name || (a as any).user_name || (a as any).external_name || '',
-        (a as any).club_name || '',
+        (a as any).display_club_name || (a as any).club_name || '',
         MEMBER_TYPE_LABELS[(a as any).member_type] || (a as any).member_type || '',
         PARTICIPATION_TYPE_LABELS[(a as any).participation_type || 'meeting_only'] || '',
         ATTENDANCE_STATUS_LABELS[(a as any).attendance_status] || '',
@@ -237,31 +289,42 @@ export default function MeetingDetail({
     URL.revokeObjectURL(url);
   };
 
+  // 自クラブの会員か（MU登録・他クラブ・ゲストは「MU・ビジター」）
+  // MU登録フォームから登録した自クラブ会員も「自クラブ」に入れる（所属クラブで判定）
+  const ownClubCtx = {
+    id: (meeting as any).club_id,
+    name: (meeting as any).club_name,
+    shortName: (meeting as any).club_short_name,
+  };
+  const isOwnClub = (a: any) =>
+    isOwnClubAttendance(
+      { userId: a.user_id, userClubId: a.user_club_id, clubId: a.attendance_club_id, clubName: a.club_name },
+      ownClubCtx,
+    );
+  const ownCount = localAttendances.filter(isOwnClub).length;
+  const muCount = localAttendances.length - ownCount;
+
   // フィルター & ソート
   const filteredAttendances = localAttendances
     .filter(a => {
       const name = (a as any).display_name || (a as any).user_name || (a as any).external_name || '';
-      const club = (a as any).club_name || '';
+      const club = (a as any).display_club_name || (a as any).club_name || '';
       const matchName = !nameSearch || name.includes(nameSearch) || club.includes(nameSearch);
       const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter;
       const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter;
-      return matchName && matchStatus && matchPayment;
+      const matchGroup = groupFilter === 'all' || (groupFilter === 'own' ? isOwnClub(a) : !isOwnClub(a));
+      return matchName && matchStatus && matchPayment && matchGroup;
     })
     .sort((a, b) => {
-      let va: string | number = '';
-      let vb: string | number = '';
-      if (sortKey === 'name') {
-        va = (a as any).display_name || ''; vb = (b as any).display_name || '';
-      } else if (sortKey === 'status') {
-        va = (a as any).attendance_status || ''; vb = (b as any).attendance_status || '';
-      } else if (sortKey === 'payment') {
-        va = (a as any).payment_status || ''; vb = (b as any).payment_status || '';
-      } else if (sortKey === 'fee') {
-        va = (a as any).fee_amount ?? 0; vb = (b as any).fee_amount ?? 0;
+      // 「すべて」のときは自クラブ → MU・ビジターの順にまとめる
+      if (groupFilter === 'all') {
+        const g = Number(!isOwnClub(a)) - Number(!isOwnClub(b));
+        if (g !== 0) return g;
       }
-      if (va < vb) return sortAsc ? -1 : 1;
-      if (va > vb) return sortAsc ? 1 : -1;
-      return 0;
+      const d = compareBy(sortKey, a, b);
+      if (d !== 0) return sortAsc ? d : -d;
+      // 同じ値のときは氏名順
+      return compareBy('name', a, b);
     });
 
   const toggleSort = (key: typeof sortKey) => {
@@ -269,7 +332,8 @@ export default function MeetingDetail({
     else { setSortKey(key); setSortAsc(true); }
   };
 
-  const SortIcon = ({ k }: { k: typeof sortKey }) =>
+  // 見出しの並び替え矢印（コンポーネントではなく関数にして、描画のたびに作り直さない）
+  const sortIcon = (k: SortKey) =>
     sortKey === k
       ? (sortAsc ? <ChevronUp className="h-3 w-3 inline ml-0.5" /> : <ChevronDown className="h-3 w-3 inline ml-0.5" />)
       : null;
@@ -311,6 +375,13 @@ export default function MeetingDetail({
               <Button variant="outline" size="sm" title="この例会の内容をコピーして新しい例会を作成">
                 <Copy className="h-4 w-4" />
                 コピーして作成
+              </Button>
+            </Link>
+            {/* 例会レジュメ（A4・印刷/PDF） */}
+            <Link href={`/meetings/${meeting.id}/resume`}>
+              <Button variant="outline" size="sm">
+                <ScrollText className="h-4 w-4" />
+                レジュメ
               </Button>
             </Link>
             <Link href={`/meetings/${meeting.id}/edit`}>
@@ -515,7 +586,7 @@ export default function MeetingDetail({
         <TabsContent value="attendances" className="mt-4 space-y-3">
 
           {/* サマリーバー */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-center">
               <p className="text-xs text-blue-600">登録</p>
               <p className="text-lg font-bold text-blue-700">{localAttendances.length}名</p>
@@ -531,6 +602,10 @@ export default function MeetingDetail({
               <p className="text-lg font-bold text-red-700">
                 {localAttendances.filter(a => a.attendance_status === 'absent').length}名
               </p>
+            </div>
+            <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 text-center">
+              <p className="text-xs text-teal-600">自クラブ</p>
+              <p className="text-lg font-bold text-teal-700">{ownCount}名</p>
             </div>
             <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-center">
               <p className="text-xs text-indigo-600">MU登録</p>
@@ -553,6 +628,51 @@ export default function MeetingDetail({
               </p>
             </div>
           )}
+
+          {/* 表示の切り替え（自クラブ／MU）と並び替え */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex w-full rounded-lg bg-gray-100 p-1 sm:w-auto" role="tablist" aria-label="参加者の表示">
+              {([
+                { value: 'all', label: 'すべて', count: localAttendances.length },
+                { value: 'own', label: '自クラブ', count: ownCount },
+                { value: 'mu', label: 'MU・ビジター', count: muCount },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={groupFilter === opt.value}
+                  onClick={() => { setGroupFilter(opt.value); setSelectedIds(new Set()); }}
+                  className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${
+                    groupFilter === opt.value ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {opt.label}
+                  <span className="ml-1 text-xs tabular-nums text-gray-400">{opt.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="attendance-sort" className="whitespace-nowrap text-xs text-gray-500">並び替え</label>
+              <select
+                id="attendance-sort"
+                value={sortKey}
+                onChange={e => { setSortKey(e.target.value as SortKey); setSortAsc(true); }}
+                className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 sm:flex-none"
+              >
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortAsc(v => !v)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                aria-label={sortAsc ? '昇順（押すと降順）' : '降順（押すと昇順）'}
+              >
+                {sortAsc ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {sortAsc ? '昇順' : '降順'}
+              </button>
+            </div>
+          </div>
 
           {/* 操作バー */}
           <div className="flex flex-wrap items-center gap-2">
@@ -658,7 +778,8 @@ export default function MeetingDetail({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  {/* スマホではカード表示に切り替える（.rac-table） */}
+                  <table className="w-full text-sm rac-table">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
                         <th className="px-2 py-2.5 w-8">
@@ -673,20 +794,26 @@ export default function MeetingDetail({
                           />
                         </th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('name')}>
-                          氏名 <SortIcon k="name" />
+                          氏名 {sortIcon('name')}
                         </th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 w-7"></th>
-                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">所属</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">区分</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">参加形式</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('club')}>
+                          所属 {sortIcon('club')}
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('type')}>
+                          区分 {sortIcon('type')}
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('participation')}>
+                          参加形式 {sortIcon('participation')}
+                        </th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('status')}>
-                          出席 <SortIcon k="status" />
+                          出席 {sortIcon('status')}
                         </th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('payment')}>
-                          支払 <SortIcon k="payment" />
+                          支払 {sortIcon('payment')}
                         </th>
                         <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort('fee')}>
-                          登録料 <SortIcon k="fee" />
+                          登録料 {sortIcon('fee')}
                         </th>
                       </tr>
                     </thead>
@@ -703,15 +830,27 @@ export default function MeetingDetail({
                           absent: 'bg-gray-100 text-gray-500',
                           waitlist: 'bg-yellow-100 text-yellow-700',
                         };
+                        // 「すべて」表示では、自クラブとMU・ビジターの境目に見出し行を入れる
+                        const own = isOwnClub(a);
+                        const prev = idx > 0 ? filteredAttendances[idx - 1] : null;
+                        const showSection = groupFilter === 'all' && (idx === 0 || isOwnClub(prev) !== own);
                         return (
-                          <tr key={a.id} className={`transition-colors ${
+                          <Fragment key={a.id}>
+                          {showSection && (
+                            <tr className="rac-section">
+                              <td colSpan={9} className={`px-3 py-2 text-xs font-bold ${own ? 'bg-teal-50 text-teal-800' : 'bg-indigo-50 text-indigo-800'}`}>
+                                {own ? `自クラブ（${ownCount}名）` : `MU・ビジター（${muCount}名）`}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className={`transition-colors ${
                             isUpdating ? 'bg-blue-50' :
                             a.attendance_status === 'absent' ? 'bg-gray-100 text-gray-400' :
                             selectedIds.has(a.id) ? 'bg-blue-50/60' :
                             idx % 2 === 1 ? 'bg-gray-50/40 hover:bg-blue-50/30' :
                             'hover:bg-blue-50/30'
                           }`}>
-                            <td className="px-2 py-2.5">
+                            <td className="px-2 py-2.5" data-label="選択">
                               <input
                                 type="checkbox"
                                 className="rounded border-gray-300 text-blue-600"
@@ -723,7 +862,7 @@ export default function MeetingDetail({
                                 }}
                               />
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5" data-cell="primary">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-medium text-gray-900">{displayName}</span>
                                 {isExternal && (
@@ -749,7 +888,7 @@ export default function MeetingDetail({
                                 <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[160px]" title={a.note}>{a.note}</p>
                               )}
                             </td>
-                            <td className="px-2 py-2.5">
+                            <td className="px-2 py-2.5" data-cell="actions">
                               <button
                                 onClick={() => openEditModal(a)}
                                 title="参加者情報を編集"
@@ -758,19 +897,19 @@ export default function MeetingDetail({
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                             </td>
-                            <td className="px-3 py-2.5 text-gray-600 text-xs">{a.club_name || '-'}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 text-gray-600 text-xs" data-label="所属">{a.display_club_name || a.club_name || '-'}</td>
+                            <td className="px-3 py-2.5" data-label="区分">
                               <Badge variant="secondary" className="text-xs">
                                 {MEMBER_TYPE_LABELS[a.member_type] || a.member_type || '-'}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5" data-label="参加形式">
                               <Badge className={`text-xs ${participationColor[a.participation_type || 'meeting_only'] || 'bg-gray-100 text-gray-500'}`}>
                                 {PARTICIPATION_TYPE_LABELS[a.participation_type || 'meeting_only'] || '-'}
                               </Badge>
                             </td>
                             {/* 出席ステータス インライン変更 */}
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-2" data-label="出席">
                               <select
                                 value={a.attendance_status || 'undecided'}
                                 disabled={isUpdating}
@@ -787,7 +926,7 @@ export default function MeetingDetail({
                               </select>
                             </td>
                             {/* 支払ステータス インライン変更 */}
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-2" data-label="支払">
                               <select
                                 value={a.payment_status || 'unpaid'}
                                 disabled={isUpdating}
@@ -803,10 +942,11 @@ export default function MeetingDetail({
                                 <option value="exempt">免除</option>
                               </select>
                             </td>
-                            <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums">
+                            <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums" data-label="登録料">
                               {formatCurrency(a.fee_amount ?? 0)}
                             </td>
                           </tr>
+                          </Fragment>
                         );
                       })}
                     </tbody>
@@ -817,7 +957,7 @@ export default function MeetingDetail({
                           <td colSpan={8} className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
                             合計 {filteredAttendances.length}名
                           </td>
-                          <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums">
+                          <td className="px-3 py-2 text-right text-xs font-bold text-gray-800 tabular-nums" data-label="合計金額">
                             {formatCurrency(filteredAttendances.reduce((s, a) => s + ((a as any).fee_amount ?? 0), 0))}
                           </td>
                         </tr>

@@ -214,11 +214,11 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
         href={item.href}
         onClick={onClose}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+          'flex items-center gap-2 rounded-md px-3 py-2.5 text-sm transition-colors lg:py-2',
           isActive(item.href)
             ? 'bg-blue-50 text-blue-700 font-medium'
             : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
-          depth > 0 && 'text-xs py-1.5'
+          depth > 0 && 'py-2 text-xs lg:py-1.5'
         )}
       >
         <item.icon className="h-4 w-4 flex-shrink-0" />

@@ -135,26 +135,26 @@ export default function StampSettings({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-4 sm:p-6">
         <CardTitle className="text-base flex items-center gap-2">
           <Stamp className="h-4 w-4 text-red-600" />
           領収書の電子印鑑
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-5 p-4 pt-0 sm:p-6 sm:pt-0">
         <p className="text-xs text-gray-500">
           設定した印影は、領収書の単票印刷・一括印刷・会員マイページの領収書すべてに反映されます。
         </p>
 
         {/* 有効化スイッチ */}
-        <label className="flex items-start gap-3 cursor-pointer border rounded-lg p-4 bg-red-50">
+        <label className="flex items-start gap-3 cursor-pointer border rounded-lg p-3 sm:p-4 bg-red-50">
           <input
             type="checkbox"
             checked={enabled}
             onChange={e => setEnabled(e.target.checked)}
-            className="h-4 w-4 mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500"
+            className="h-5 w-5 mt-0.5 flex-shrink-0 rounded border-gray-300 text-red-600 focus:ring-red-500"
           />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium text-gray-900">電子印鑑を領収書に押印する</p>
             <p className="text-xs text-gray-500">
               OFF の場合は従来どおり空の印枠が印字され、手押しの実印を押せます。
@@ -170,7 +170,7 @@ export default function StampSettings({
               <p className="text-xs text-gray-500">
                 実印をスキャン／撮影した画像をアップロードします。背景が透過した PNG が最もきれいに印字されます。
               </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center">
                 <input
                   ref={fileRef}
                   type="file"
@@ -185,6 +185,7 @@ export default function StampSettings({
                   size="sm"
                   disabled={processing}
                   onClick={() => fileRef.current?.click()}
+                  className="w-full sm:w-auto"
                 >
                   <Upload className="h-4 w-4" />
                   {processing ? '処理中...' : imageUrl ? '画像を変更' : '画像をアップロード'}
@@ -194,7 +195,7 @@ export default function StampSettings({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-red-600 hover:text-red-700"
+                    className="w-full text-red-600 hover:text-red-700 sm:w-auto"
                     onClick={() => setImageUrl(null)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -220,7 +221,8 @@ export default function StampSettings({
           </div>
 
           {/* プレビュー */}
-          <div className="flex flex-col items-center gap-2 rounded-lg border bg-gray-50 p-5 min-w-[140px]">
+          {/* プレビュー枠はスマホでは中央寄せ */}
+          <div className="mx-auto flex w-full max-w-[200px] flex-col items-center gap-2 rounded-lg border bg-gray-50 p-4 sm:p-5 md:mx-0 md:w-auto md:min-w-[140px]">
             <p className="text-xs text-gray-500">プレビュー</p>
             <ReceiptStamp stamp={previewStamp} size="80px" />
             <p className="text-[10px] text-gray-400 text-center leading-tight">
@@ -231,8 +233,9 @@ export default function StampSettings({
           </div>
         </div>
 
-        <div className="flex justify-end pt-1">
-          <Button onClick={handleSave} disabled={saving || processing}>
+        {/* スマホでは全幅ボタン */}
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+          <Button onClick={handleSave} disabled={saving || processing} className="w-full sm:w-auto">
             {saving ? '保存中...' : '印鑑設定を保存'}
           </Button>
         </div>

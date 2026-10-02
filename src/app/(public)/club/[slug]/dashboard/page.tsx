@@ -120,18 +120,18 @@ export default async function MemberDashboardPage({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-blue-600 text-white">
-        <div className="max-w-lg mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-blue-200 text-xs">RAC Cloud</p>
-              <h1 className="text-lg font-bold">{profile.club?.shortName || profile.club?.name}</h1>
+              <h1 className="text-lg font-bold break-words">{profile.club?.shortName || profile.club?.name}</h1>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-sm font-medium">{profile.name}</p>
+            <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+              <div className="min-w-0 text-right">
+                <p className="text-sm font-medium truncate">{profile.name}</p>
                 <p className="text-blue-200 text-xs">メンバー</p>
               </div>
-              <Link href={`/club/${slug}`} className="p-2 rounded-full bg-blue-500 hover:bg-blue-400 transition-colors" title="ログアウト">
+              <Link href={`/club/${slug}`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 hover:bg-blue-400 transition-colors" title="ログアウト">
                 <LogOut className="h-4 w-4" />
               </Link>
             </div>
@@ -139,7 +139,7 @@ export default async function MemberDashboardPage({
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-5 space-y-5 pb-safe">
         <div className="grid grid-cols-2 gap-3">
           {[
             { href: `schedule`, icon: <Calendar className="h-5 w-5 text-blue-600" />, bg: 'bg-blue-100', label: 'スケジュール' },
@@ -147,7 +147,7 @@ export default async function MemberDashboardPage({
             { href: `my/annual-fee`, icon: <CreditCard className="h-5 w-5 text-yellow-600" />, bg: 'bg-yellow-100', label: '年会費' },
             { href: `my/receipts`, icon: <Receipt className="h-5 w-5 text-purple-600" />, bg: 'bg-purple-100', label: '領収書' },
           ].map(item => (
-            <Link key={item.href} href={`/club/${slug}/${item.href}`} className="bg-white rounded-xl border p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow active:scale-95">
+            <Link key={item.href} href={`/club/${slug}/${item.href}`} data-tap="button" className="bg-white rounded-xl border p-4 min-h-[88px] flex flex-col items-center justify-center gap-2 text-center hover:shadow-md transition-shadow active:scale-95">
               <div className={`w-10 h-10 ${item.bg} rounded-full flex items-center justify-center`}>{item.icon}</div>
               <span className="text-xs font-medium text-gray-700">{item.label}</span>
             </Link>
@@ -156,12 +156,12 @@ export default async function MemberDashboardPage({
 
         {currentFee && currentFee.paymentStatus === 'unpaid' && (
           <Link href={`/club/${slug}/my/annual-fee`} className="block bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-yellow-800">{currentYear}年度 年会費が未納です</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-yellow-800 break-words">{currentYear}年度 年会費が未納です</p>
                 <p className="text-xs text-yellow-600 mt-0.5">{formatCurrency(currentFee.amount)}</p>
               </div>
-              <ChevronRight className="h-4 w-4 text-yellow-500" />
+              <ChevronRight className="h-4 w-4 flex-shrink-0 text-yellow-500" />
             </div>
           </Link>
         )}
@@ -179,7 +179,7 @@ export default async function MemberDashboardPage({
                 <div key={m.id} className="bg-white rounded-xl border p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900 truncate">{m.title}</p>
+                      <p className="font-semibold text-sm text-gray-900 break-words">{m.title}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(m.date)}</span>
                         {m.startTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{m.startTime.substring(0, 5)}</span>}
@@ -191,7 +191,7 @@ export default async function MemberDashboardPage({
                     </span>
                   </div>
                   {m.status === 'open' && m.muRegistrationSlug && (
-                    <Link href={`/mu/${m.muRegistrationSlug}`} className="block mt-3 w-full text-center bg-blue-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <Link href={`/mu/${m.muRegistrationSlug}`} data-tap="button" className="block mt-3 w-full text-center bg-blue-600 text-white text-sm font-medium py-3 rounded-lg hover:bg-blue-700 transition-colors">
                       MU登録する
                     </Link>
                   )}
@@ -211,12 +211,12 @@ export default async function MemberDashboardPage({
           ) : (
             <div className="bg-white rounded-xl border divide-y">
               {muHistory.map((a: any) => (
-                <div key={a.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{a.meeting?.title || '—'}</p>
+                <div key={a.id} className="p-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 break-words">{a.meeting?.title || '—'}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{a.meeting?.date ? formatDate(a.meeting.date) : '—'}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex-shrink-0 text-right">
                     <p className="text-sm font-mono">{formatCurrency(a.feeAmount)}</p>
                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${a.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                       {a.paymentStatus === 'paid' ? '支払済' : '未払い'}
@@ -228,17 +228,17 @@ export default async function MemberDashboardPage({
           )}
         </section>
 
-        <Link href={`/club/${slug}/my/profile`} className="flex items-center justify-between bg-white rounded-xl border p-4 hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center">
+        <Link href={`/club/${slug}/my/profile`} data-tap="button" className="flex items-center justify-between gap-3 bg-white rounded-xl border p-4 hover:shadow-md transition-shadow">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="w-9 h-9 flex-shrink-0 bg-gray-100 rounded-full flex items-center justify-center">
               <User className="h-4 w-4 text-gray-500" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">{profile.name}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{profile.name}</p>
               <p className="text-xs text-gray-400">プロフィール編集</p>
             </div>
           </div>
-          <ChevronRight className="h-4 w-4 text-gray-400" />
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400" />
         </Link>
       </div>
     </div>

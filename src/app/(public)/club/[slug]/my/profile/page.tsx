@@ -98,35 +98,35 @@ export default function MyProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href={`/club/${slug}/dashboard`} className="p-1.5 rounded-full hover:bg-gray-100">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href={`/club/${slug}/dashboard`} data-tap="button" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full hover:bg-gray-100" aria-label="戻る">
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </Link>
-            <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-base font-bold text-gray-900 flex items-center gap-2 truncate">
               <User className="h-4 w-4 text-gray-600" /> プロフィール
             </h1>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
+            className="flex flex-shrink-0 items-center gap-1 px-2 text-xs text-gray-500 hover:text-red-500 transition-colors"
           >
             <LogOut className="h-4 w-4" /> ログアウト
           </button>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-5 space-y-5 pb-safe">
 
         {/* 基本情報 */}
-        <section className="bg-white rounded-xl border p-4 space-y-4">
+        <section className="bg-white rounded-xl border p-3 sm:p-4 space-y-4">
           <h2 className="text-sm font-bold text-gray-700 border-b pb-2">基本情報</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="form-group col-span-2 sm:col-span-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="form-group">
               <Label htmlFor="name" required>お名前</Label>
-              <Input id="name" value={form.name} onChange={set('name')} className="mt-1" />
+              <Input id="name" value={form.name} onChange={set('name')} autoComplete="name" className="mt-1" />
             </div>
-            <div className="form-group col-span-2 sm:col-span-1">
+            <div className="form-group">
               <Label htmlFor="name_kana">フリガナ</Label>
               <Input id="name_kana" value={form.name_kana} onChange={set('name_kana')} placeholder="ヤマダ タロウ" className="mt-1" />
             </div>
@@ -137,16 +137,16 @@ export default function MyProfilePage() {
           </div>
           <div className="form-group">
             <Label htmlFor="phone">電話番号</Label>
-            <Input id="phone" type="tel" value={form.phone} onChange={set('phone')} placeholder="090-0000-0000" className="mt-1" />
+            <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} placeholder="090-0000-0000" className="mt-1" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="form-group col-span-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="form-group sm:col-span-1">
               <Label htmlFor="address_zip">郵便番号</Label>
-              <Input id="address_zip" value={form.address_zip} onChange={set('address_zip')} placeholder="530-0001" className="mt-1" />
+              <Input id="address_zip" inputMode="numeric" autoComplete="postal-code" value={form.address_zip} onChange={set('address_zip')} placeholder="530-0001" className="mt-1" />
             </div>
-            <div className="form-group col-span-2">
+            <div className="form-group sm:col-span-2">
               <Label htmlFor="address">住所</Label>
-              <Input id="address" value={form.address} onChange={set('address')} className="mt-1" />
+              <Input id="address" autoComplete="street-address" value={form.address} onChange={set('address')} className="mt-1" />
             </div>
           </div>
           <div className="form-group">
@@ -156,7 +156,7 @@ export default function MyProfilePage() {
         </section>
 
         {/* 食事・健康情報 */}
-        <section className="bg-white rounded-xl border p-4 space-y-4">
+        <section className="bg-white rounded-xl border p-3 sm:p-4 space-y-4">
           <h2 className="text-sm font-bold text-gray-700 border-b pb-2">食事・健康情報</h2>
           <div className="form-group">
             <Label htmlFor="allergy">食物アレルギー</Label>
@@ -169,7 +169,7 @@ export default function MyProfilePage() {
         </section>
 
         {/* 緊急連絡先 */}
-        <section className="bg-white rounded-xl border p-4 space-y-4">
+        <section className="bg-white rounded-xl border p-3 sm:p-4 space-y-4">
           <h2 className="text-sm font-bold text-gray-700 border-b pb-2">緊急連絡先（任意）</h2>
           <div className="form-group">
             <Label htmlFor="emergency_contact_name">氏名</Label>
@@ -177,7 +177,7 @@ export default function MyProfilePage() {
           </div>
           <div className="form-group">
             <Label htmlFor="emergency_contact_phone">電話番号</Label>
-            <Input id="emergency_contact_phone" type="tel" value={form.emergency_contact_phone} onChange={set('emergency_contact_phone')} placeholder="090-0000-0000" className="mt-1" />
+            <Input id="emergency_contact_phone" type="tel" inputMode="tel" value={form.emergency_contact_phone} onChange={set('emergency_contact_phone')} placeholder="090-0000-0000" className="mt-1" />
           </div>
         </section>
 

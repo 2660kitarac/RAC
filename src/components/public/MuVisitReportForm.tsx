@@ -74,22 +74,22 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-blue-700">
-          <PlusCircle className="h-4 w-4" />
+        <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700">
+          <PlusCircle className="h-4 w-4 flex-shrink-0" />
           他クラブMU訪問を報告する
         </span>
         {open ? (
-          <ChevronUp className="h-4 w-4 text-gray-400" />
+          <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
         )}
       </button>
 
       {/* フォーム本体 */}
       {open && (
-        <div className="border-t px-4 py-4">
+        <div className="border-t px-3 sm:px-4 py-4">
           {isPersonalBurden ? (
             <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-3">
               ℹ️ あなたのクラブはMU費個人負担設定のため、会計への自動計上は行われません。訪問回数の管理のみ行います。
@@ -114,7 +114,7 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
           <form onSubmit={handleSubmit} className="space-y-3">
             {/* 訪問先クラブ名 */}
             <div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-600 mb-1">
                 <MapPin className="h-3.5 w-3.5" />
                 訪問先クラブ名 <span className="text-red-500">*</span>
               </label>
@@ -125,13 +125,14 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
                 onChange={handleChange}
                 placeholder="例: ○○RAC"
                 required
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                autoComplete="off"
+                className="w-full h-11 md:h-10 border rounded-lg px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
 
             {/* 訪問日 */}
             <div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-600 mb-1">
                 <Calendar className="h-3.5 w-3.5" />
                 訪問日 <span className="text-red-500">*</span>
               </label>
@@ -141,13 +142,13 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
                 value={form.visitDate}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full h-11 md:h-10 border rounded-lg px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
 
             {/* MU費 */}
             <div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-600 mb-1">
                 <Coins className="h-3.5 w-3.5" />
                 MU費（支払金額）
               </label>
@@ -161,14 +162,15 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
                   placeholder="0"
                   min={0}
                   step={100}
-                  className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  inputMode="numeric"
+                  className="w-full h-11 md:h-10 border rounded-lg pl-7 pr-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
             </div>
 
             {/* メモ */}
             <div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-600 mb-1">
                 <StickyNote className="h-3.5 w-3.5" />
                 メモ（任意）
               </label>
@@ -177,15 +179,15 @@ export default function MuVisitReportForm({ isPersonalBurden }: Props) {
                 value={form.note}
                 onChange={handleChange}
                 placeholder="気づきや感想など"
-                rows={2}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                rows={3}
+                className="w-full border rounded-lg px-3 py-2 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
               />
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full flex min-h-[3rem] items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 text-base font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

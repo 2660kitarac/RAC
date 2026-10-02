@@ -277,7 +277,7 @@ export default function MeetingForm({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
         <Link href="/meetings">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4" />
@@ -457,12 +457,12 @@ export default function MeetingForm({
       <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
         {/* 基本情報 */}
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base">基本情報</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="form-group md:col-span-2">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="form-group sm:col-span-2">
                 <Label required>例会名</Label>
                 <Input
                   {...register('title')}
@@ -477,6 +477,7 @@ export default function MeetingForm({
                 <Input
                   {...register('meeting_number')}
                   type="number"
+                  inputMode="numeric"
                   placeholder="例: 12"
                   className="mt-1"
                 />
@@ -492,7 +493,7 @@ export default function MeetingForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="form-group">
                 <Label required>開催日</Label>
                 <Input
@@ -522,7 +523,7 @@ export default function MeetingForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="form-group">
                 <Label>会場名</Label>
                 <Input
@@ -542,7 +543,7 @@ export default function MeetingForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="form-group">
                 <Label>担当委員会</Label>
                 <Input
@@ -601,7 +602,7 @@ export default function MeetingForm({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="form-group">
                 <Label>ステータス</Label>
                 <Select onValueChange={v => setValue('status', v as MeetingFormData['status'])} defaultValue={watch('status')}>
@@ -627,9 +628,10 @@ export default function MeetingForm({
                   <Input
                     {...register('capacity')}
                     type="number"
+                    inputMode="numeric"
                     min="1"
                     placeholder="例: 30"
-                    className="pr-6"
+                    className="pr-8"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">名</span>
                 </div>
@@ -640,11 +642,11 @@ export default function MeetingForm({
 
         {/* 登録料設定 */}
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base">登録料設定</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               {[
                 { key: 'fee_rac', label: 'RAC登録料' },
                 { key: 'fee_rc', label: 'RC登録料' },
@@ -657,9 +659,10 @@ export default function MeetingForm({
                     <Input
                       {...register(key as keyof MeetingFormData)}
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       step="100"
-                      className="pr-6"
+                      className="pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
                   </div>
@@ -671,13 +674,13 @@ export default function MeetingForm({
 
         {/* 自クラブ会員の登録料設定 */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="h-4 w-4 text-indigo-500" />
               自クラブ会員の登録料
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
             <p className="text-xs text-gray-500">
               自クラブ会員の登録料は通常0円です。この例会で異なる金額を設定する場合のみ有効にしてください。
             </p>
@@ -688,7 +691,7 @@ export default function MeetingForm({
                 role="switch"
                 aria-checked={ownClubFeeEnabled}
                 onClick={() => setValue('own_club_fee_enabled', !ownClubFeeEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                className={`tap-auto relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
                   ownClubFeeEnabled ? 'bg-indigo-600' : 'bg-gray-200'
                 }`}
               >
@@ -709,9 +712,10 @@ export default function MeetingForm({
                   <Input
                     {...register('own_club_fee')}
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     step="100"
-                    className="pr-6"
+                    className="pr-8"
                     placeholder="例: 1000"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
@@ -726,13 +730,13 @@ export default function MeetingForm({
 
         {/* 懇親会設定 */}
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base flex items-center gap-2">
               <PartyPopper className="h-4 w-4 text-purple-500" />
               懇親会設定
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
             {/* 懇親会あり/なしトグル */}
             <div className="flex items-center gap-3">
               <button
@@ -740,7 +744,7 @@ export default function MeetingForm({
                 role="switch"
                 aria-checked={hasAfterParty}
                 onClick={() => setValue('has_after_party', !hasAfterParty)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                className={`tap-auto relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                   hasAfterParty ? 'bg-purple-600' : 'bg-gray-200'
                 }`}
               >
@@ -757,8 +761,8 @@ export default function MeetingForm({
 
             {/* 懇親会詳細（懇親会ありの場合のみ表示） */}
             {hasAfterParty && (
-              <div className="space-y-4 pl-4 border-l-2 border-purple-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4 pl-3 border-l-2 border-purple-200 sm:pl-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="form-group">
                     <Label>懇親会場所</Label>
                     <Input
@@ -784,7 +788,7 @@ export default function MeetingForm({
                     role="switch"
                     aria-checked={afterPartyAllowPartyOnly}
                     onClick={() => setValue('after_party_allow_party_only', !afterPartyAllowPartyOnly)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                    className={`tap-auto relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                       afterPartyAllowPartyOnly ? 'bg-purple-600' : 'bg-gray-200'
                     }`}
                   >
@@ -801,23 +805,23 @@ export default function MeetingForm({
                 {/* 参加費タイプ */}
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">懇親会参加費の設定方法</p>
-                  <div className="flex gap-3 mb-3">
-                    <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-colors ${afterPartyFeeType === 'fixed' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                  <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:gap-3">
+                    <label className={`flex w-full items-center gap-2 px-3 py-3 rounded-lg border-2 cursor-pointer transition-colors sm:flex-1 sm:px-4 ${afterPartyFeeType === 'fixed' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                       <input type="radio" className="hidden" checked={afterPartyFeeType === 'fixed'} onChange={() => setValue('after_party_fee_type', 'fixed')} />
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${afterPartyFeeType === 'fixed' ? 'border-purple-500' : 'border-gray-400'}`}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 items-center justify-center ${afterPartyFeeType === 'fixed' ? 'border-purple-500' : 'border-gray-400'}`}>
                         {afterPartyFeeType === 'fixed' && <div className="w-2 h-2 rounded-full bg-purple-500" />}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className={`text-sm font-medium ${afterPartyFeeType === 'fixed' ? 'text-purple-800' : 'text-gray-700'}`}>固定金額</p>
                         <p className="text-xs text-gray-500">区分ごとに金額を設定</p>
                       </div>
                     </label>
-                    <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-colors ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                    <label className={`flex w-full items-center gap-2 px-3 py-3 rounded-lg border-2 cursor-pointer transition-colors sm:flex-1 sm:px-4 ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                       <input type="radio" className="hidden" checked={afterPartyFeeType === 'actual_cost'} onChange={() => setValue('after_party_fee_type', 'actual_cost')} />
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500' : 'border-gray-400'}`}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 items-center justify-center ${afterPartyFeeType === 'actual_cost' ? 'border-purple-500' : 'border-gray-400'}`}>
                         {afterPartyFeeType === 'actual_cost' && <div className="w-2 h-2 rounded-full bg-purple-500" />}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className={`text-sm font-medium ${afterPartyFeeType === 'actual_cost' ? 'text-purple-800' : 'text-gray-700'}`}>実費精算</p>
                         <p className="text-xs text-gray-500">当日・後日に実費で精算</p>
                       </div>
@@ -825,7 +829,7 @@ export default function MeetingForm({
                   </div>
 
                   {afterPartyFeeType === 'fixed' && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                       {[
                         { key: 'after_party_fee_rac', label: 'RAC' },
                         { key: 'after_party_fee_rc', label: 'RC' },
@@ -838,9 +842,10 @@ export default function MeetingForm({
                             <Input
                               {...register(key as keyof MeetingFormData)}
                               type="number"
+                              inputMode="numeric"
                               min="0"
                               step="100"
-                              className="pr-6"
+                              className="pr-8"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">円</span>
                           </div>
@@ -849,7 +854,7 @@ export default function MeetingForm({
                     </div>
                   )}
                   {afterPartyFeeType === 'actual_cost' && (
-                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 sm:px-4">
                       <span className="text-amber-600 text-sm">💡</span>
                       <p className="text-sm text-amber-800">参加者の登録フォームに「実費精算」と表示されます。金額は登録時には確定しません。</p>
                     </div>
@@ -865,9 +870,10 @@ export default function MeetingForm({
                     <Input
                       {...register('after_party_capacity')}
                       type="number"
+                      inputMode="numeric"
                       min="1"
                       placeholder="例: 20"
-                      className="pr-6"
+                      className="pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">名</span>
                   </div>
@@ -879,10 +885,10 @@ export default function MeetingForm({
 
         {/* 例会内容 */}
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base">例会内容</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
             <div className="form-group">
               <Label>例会内容</Label>
               <Textarea
@@ -918,15 +924,15 @@ export default function MeetingForm({
         {/* MU登録URL（編集モードのみ・slug生成済みの場合） */}
         {mode === 'edit' && (meeting as any)?.mu_registration_slug && (
           <Card className="border-blue-200 bg-blue-50">
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
               <CardTitle className="text-base flex items-center gap-2 text-blue-700">
                 <Link2 className="h-4 w-4" />
                 MU登録URL（外部参加者向け登録リンク）
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <code className="flex-1 text-sm bg-white px-3 py-2 rounded border border-blue-200 text-blue-800 break-all">
+            <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <code className="w-full text-xs sm:text-sm sm:flex-1 bg-white px-3 py-2 rounded border border-blue-200 text-blue-800 break-all">
                   {existingMuUrl || (meeting as any)?.mu_registration_url}
                 </code>
                 <Button
@@ -934,7 +940,7 @@ export default function MeetingForm({
                   size="sm"
                   variant="outline"
                   onClick={() => copyMuUrl(existingMuUrl || (meeting as any)?.mu_registration_url || '')}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+                  className="w-full border-blue-300 text-blue-700 hover:bg-blue-100 sm:w-auto sm:flex-shrink-0"
                 >
                   <Copy className="h-4 w-4" />
                   コピー
@@ -943,12 +949,13 @@ export default function MeetingForm({
                   href={existingMuUrl || (meeting as any)?.mu_registration_url || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="block w-full sm:w-auto"
                 >
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+                    className="w-full border-blue-300 text-blue-700 hover:bg-blue-100 sm:w-auto sm:flex-shrink-0"
                   >
                     <ExternalLink className="h-4 w-4" />
                     開く
@@ -962,14 +969,14 @@ export default function MeetingForm({
           </Card>
         )}
 
-        {/* 送信ボタン */}
-        <div className="flex justify-end gap-3">
-          <Link href="/meetings">
-            <Button type="button" variant="outline">
+        {/* 送信ボタン：長いフォームなのでスマホでは画面下部に固定して常に押せるようにする */}
+        <div className="sticky bottom-0 z-20 -mx-3 flex flex-col-reverse gap-2 border-t bg-white/95 px-3 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+          <Link href="/meetings" className="block w-full sm:w-auto">
+            <Button type="button" variant="outline" className="w-full sm:w-auto">
               キャンセル
             </Button>
           </Link>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} className="w-full sm:w-auto">
             <Save className="h-4 w-4" />
             {mode === 'create' ? '例会を作成' : '変更を保存'}
           </Button>

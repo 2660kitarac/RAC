@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, real, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
 // ============================================================
@@ -228,6 +228,8 @@ export const receipts = pgTable('receipts', {
   transactionId: text('transaction_id'),
   receiptNumber: text('receipt_number').notNull(),
   receiptName: text('receipt_name').notNull(),
+  // 宛名のクラブ名（外部参加者の訪問クラブ名。印刷時に氏名の上に表示）
+  receiptClubName: text('receipt_club_name'),
   amount: integer('amount').notNull().default(0),
   description: text('description').notNull().default(''),
   issuedDate: text('issued_date').notNull(),
@@ -517,6 +519,47 @@ export const muVisits = pgTable('mu_visits', {
   createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
   deletedAt: text('deleted_at'),
+});
+
+// ============================================================
+// 例会レジュメ（migrations/0011_meeting_resume.sql）
+// 既存テーブルには列を足さず、別テーブルに持つ
+// ============================================================
+
+/** クラブ共通のレジュメ設定 */
+export const clubResumeSettings = pgTable('club_resume_settings', {
+  clubId: text('club_id').primaryKey().references(() => clubs.id),
+  headerLabel: text('header_label'),
+  sponsorName: text('sponsor_name'),
+  logoUrl: text('logo_url'),
+  anthemTitle: text('anthem_title'),
+  anthemText: text('anthem_text'),
+  songTitle: text('song_title'),
+  songText: text('song_text'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+});
+
+/** 会員名簿用プロフィール（写真・ローマ字・委員会・勤務先） */
+export const memberResumeProfiles = pgTable('member_resume_profiles', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  clubId: text('club_id').notNull().references(() => clubs.id),
+  nameEn: text('name_en'),
+  committee: text('committee'),
+  company: text('company'),
+  photoUrl: text('photo_url'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+});
+
+/** 例会ごとのレジュメ内容（中身は JSON: src/lib/resume/types.ts の ResumeData） */
+export const meetingResumes = pgTable('meeting_resumes', {
+  meetingId: text('meeting_id').primaryKey().references(() => meetings.id),
+  clubId: text('club_id').notNull().references(() => clubs.id),
+  data: jsonb('data').notNull().default({}),
+  updatedBy: text('updated_by'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
 });
 
 // ============================================================

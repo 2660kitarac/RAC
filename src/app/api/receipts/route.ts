@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         transactionId: receipts.transactionId,
         receiptNumber: receipts.receiptNumber,
         receiptName: receipts.receiptName,
+        receiptClubName: receipts.receiptClubName,
         amount: receipts.amount,
         description: receipts.description,
         issuedDate: receipts.issuedDate,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       clubId, meetingId, attendanceId, transactionId, receiptNumber,
-      receiptName, amount, description, issuedDate, pdfUrl,
+      receiptName, receiptClubName, amount, description, issuedDate, pdfUrl,
     } = body;
 
     if (!canManageFinance(session.user.role)) {
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
       transactionId: transactionId || null,
       receiptNumber: autoReceiptNumber,
       receiptName,
+      receiptClubName: receiptClubName || null,
       amount,
       description: description || '例会参加費',
       issuedDate,

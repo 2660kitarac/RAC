@@ -188,7 +188,8 @@ export default function AwardsSettings({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* スマホ（768px未満）では .rac-table により1行=1カード表示になる */}
+              <table className="w-full text-sm rac-table">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-2 px-3 font-medium text-gray-600">コード</th>
@@ -202,17 +203,17 @@ export default function AwardsSettings({
                 <tbody>
                   {items.map(item => (
                     <tr key={item.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-3 font-mono text-xs">{item.code}</td>
-                      <td className="py-2 px-3 font-medium">{item.name}</td>
-                      <td className="py-2 px-3 text-center">{item.max_score ?? '—'}</td>
-                      <td className="py-2 px-3 text-gray-600 text-xs">
+                      <td className="py-2 px-3 font-mono text-xs" data-label="コード">{item.code}</td>
+                      <td className="py-2 px-3 font-medium" data-cell="primary">{item.name}</td>
+                      <td className="py-2 px-3 text-center" data-label="上限点">{item.max_score ?? '—'}</td>
+                      <td className="py-2 px-3 text-gray-600 text-xs" data-label="計算方法">
                         {CALC_TYPES.find(t => t.value === item.calculation_type)?.label ?? item.calculation_type}
                       </td>
-                      <td className="py-2 px-3 text-gray-400 text-xs max-w-[12rem] truncate">
+                      <td className="py-2 px-3 text-gray-400 text-xs md:max-w-[12rem] md:truncate" data-cell="block" data-label="説明">
                         {item.description ?? ''}
                       </td>
                       {canManage && (
-                        <td className="py-2 px-3 text-center">
+                        <td className="py-2 px-3 text-center" data-cell="actions">
                           <div className="flex items-center justify-center gap-1">
                             <Button size="sm" variant="ghost" onClick={() => openEdit(item)}>
                               <Pencil className="h-3.5 w-3.5" />

@@ -429,6 +429,7 @@ export interface Receipt {
   transaction_id: string | null;
   receipt_number: string;
   receipt_name: string;
+  receipt_club_name: string | null;
   amount: number;
   description: string;
   issued_date: string;

@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
+import { MeetingParticipantsDialog } from '@/components/dashboard/MeetingParticipantsDialog';
 
 // ─── 型定義 ──────────────────────────────────────────────
 interface MyMeeting {
@@ -141,14 +142,15 @@ function MuShareButton({ url, slug }: { url: string | null; slug: string | null 
         <p className="text-sm font-medium text-blue-800">友達・家族を誘う</p>
       </div>
       <p className="text-xs text-blue-600 mb-2">このURLを送ると、MUから直接申込できます</p>
-      <div className="flex gap-2">
+      {/* スマホではURL欄とコピーボタンを縦に積む */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 min-w-0 bg-white rounded-lg px-3 py-2 border border-blue-200">
           <p className="text-xs text-gray-600 truncate font-mono">{shareUrl}</p>
         </div>
         <Button
           size="sm"
           variant={copied ? 'default' : 'outline'}
-          className={`shrink-0 gap-1.5 text-xs transition-all ${copied ? 'bg-green-500 hover:bg-green-600 border-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
+          className={`w-full sm:w-auto shrink-0 justify-center gap-1.5 text-xs transition-all ${copied ? 'bg-green-500 hover:bg-green-600 border-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
           onClick={handleCopy}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -354,13 +356,14 @@ function NextMeetingCard({
   return (
     <Card className="overflow-hidden border-0 shadow-md">
       {/* ヘッダー帯 */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 text-white">
-        <div className="flex items-center justify-between gap-2">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 sm:px-5 py-4 text-white">
+        {/* バッジが増えても横にはみ出さないよう折り返す */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 opacity-90" />
             <span className="font-semibold text-base">次の例会</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {myType && (
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${PARTICIPATION_COLORS[myType]} bg-white/90`}>
                 {myType === 'meeting_only' && <CheckCircle className="h-3 w-3 inline mr-1" />}
@@ -377,7 +380,7 @@ function NextMeetingCard({
             )}
           </div>
         </div>
-        <p className="mt-2 text-xl font-bold leading-tight">{meeting.title}</p>
+        <p className="mt-2 text-lg sm:text-xl font-bold leading-tight break-words">{meeting.title}</p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-blue-100">
           <span className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />
@@ -397,18 +400,19 @@ function NextMeetingCard({
       <CardContent className="p-4 space-y-4">
         {/* 場所・地図 */}
         {(meeting.venueName || meeting.venueAddress) && (
-          <div className="flex items-start justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-gray-800">{meeting.venueName}</p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800 break-words">{meeting.venueName}</p>
               {meeting.venueAddress && (
-                <p className="text-xs text-gray-500 mt-0.5">{meeting.venueAddress}</p>
+                <p className="text-xs text-gray-500 mt-0.5 break-words">{meeting.venueAddress}</p>
               )}
             </div>
             <a
               href={`https://maps.google.com/maps?q=${mapQuery}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-white border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+              data-tap="button"
+              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-white border border-blue-200 rounded-lg px-3 py-2 sm:py-1.5 hover:bg-blue-50 transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               地図
@@ -430,6 +434,13 @@ function NextMeetingCard({
             onNoteToggle={onNoteToggle}
           />
         </div>
+
+        {/* 参加者一覧（自クラブ＋MU） */}
+        <MeetingParticipantsDialog
+          meetingId={meeting.id}
+          meetingTitle={meeting.title}
+          meetingDate={meeting.date}
+        />
 
         {/* MU URL共有 */}
         <MuShareButton url={meeting.muRegistrationUrl} slug={meeting.muRegistrationSlug} />
@@ -457,14 +468,14 @@ function AttendanceStatsCard({ stats }: { stats: Stats }) {
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs text-gray-500">参加率</p>
-            <p className={`text-3xl font-bold ${color}`}>
+            <p className={`text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
               {stats.attendanceRate !== null ? `${stats.attendanceRate}%` : '—'}
               <span className="text-lg ml-1">{stats.attendanceRate !== null ? emoji : ''}</span>
             </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-500">参加回数</p>
-            <p className="text-xl font-bold text-gray-800">
+            <p className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums">
               {stats.attendedCount}
               <span className="text-sm font-normal text-gray-500"> / {stats.pastMeetings}回</span>
             </p>
@@ -490,15 +501,189 @@ function AttendanceStatsCard({ stats }: { stats: Stats }) {
         <div className="grid grid-cols-2 gap-2 pt-1">
           <div className="bg-blue-50 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-blue-600">年度例会数</p>
-            <p className="font-bold text-blue-800">{stats.totalMeetings}回</p>
+            <p className="font-bold text-blue-800 tabular-nums">{stats.totalMeetings}回</p>
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-gray-500">残り例会数</p>
-            <p className="font-bold text-gray-700">{stats.totalMeetings - stats.pastMeetings}回</p>
+            <p className="font-bold text-gray-700 tabular-nums">{stats.totalMeetings - stats.pastMeetings}回</p>
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── 年間スケジュール：1件分の行 ───────────────────────────
+// futureItems/pastItems の .map() から呼ばれる独立コンポーネント。
+// フック（useState）を持つため、通常関数として.map()内で呼び出してはならない
+// （呼び出すとレンダーごとにフック呼び出し回数が変わりReactエラーになる）。
+function ScheduleItemRow({
+  item,
+  today,
+  memberType,
+  submitting,
+  noteInputs,
+  noteOpen,
+  onRegister,
+  onNoteChange,
+  onNoteToggle,
+}: {
+  item: ScheduleItem;
+  today: string;
+  memberType: string;
+  submitting: string | null;
+  noteInputs: Record<string, string>;
+  noteOpen: Record<string, boolean>;
+  onRegister: (meetingId: string, type: string) => void;
+  onNoteChange: (meetingId: string, val: string) => void;
+  onNoteToggle: (meetingId: string) => void;
+}) {
+  // 早期returnより前で無条件に呼ぶ（Rules of Hooks: フックを分岐の中に置かない）
+  const [expanded, setExpanded] = useState(false);
+
+  const isPast = item.date < today;
+  const dateObj = new Date(item.date + 'T00:00:00');
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+  const dayOfWeek = DAYS_JA[dateObj.getDay()];
+  const isSun = dateObj.getDay() === 0;
+  const isSat = dateObj.getDay() === 6;
+
+  if (item.kind === 'district_event') {
+    return (
+      <div
+        className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
+          isPast ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-amber-50 border-amber-200'
+        }`}
+      >
+        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${isPast ? 'bg-gray-100' : 'bg-amber-100'}`}>
+          <p className="text-xs text-gray-500">{month}月</p>
+          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
+            {day}
+          </p>
+          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
+        </div>
+        <div className="flex-1 min-w-0 py-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-medium">
+              地区行事
+            </span>
+            {item.isAwardTarget && (
+              <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Star className="h-2.5 w-2.5" />表彰
+              </span>
+            )}
+            <span className="text-xs text-gray-500">{item.eventType}</span>
+          </div>
+          <p className="font-semibold text-gray-900 text-sm mt-0.5 break-words">{item.title}</p>
+          {item.venueName && (
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+              <MapPin className="h-3 w-3" />{item.venueName}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // meeting
+  const myType = item.myAttendance?.participationType ?? null;
+  const isOpen = item.status === 'open';
+  const deadlineInfo = checkDeadline(item);
+
+  return (
+    <div
+      className={`rounded-xl border transition-all ${
+        isPast
+          ? 'bg-gray-50 border-gray-100'
+          : isOpen
+          ? 'bg-white border-blue-200 shadow-sm'
+          : 'bg-white border-gray-200'
+      }`}
+    >
+      <div
+        className="flex items-start gap-3 px-4 py-3 cursor-pointer"
+        onClick={() => !isPast && setExpanded(e => !e)}
+      >
+        {/* 日付バッジ */}
+        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${
+          isPast ? 'bg-gray-100' : isOpen ? 'bg-blue-100' : 'bg-gray-100'
+        }`}>
+          <p className="text-xs text-gray-500">{month}月</p>
+          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
+            {day}
+          </p>
+          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
+        </div>
+
+        <div className="flex-1 min-w-0 py-0.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className={`font-semibold text-sm truncate ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
+              {item.title}
+            </p>
+            {/* 出欠バッジ */}
+            {myType && (
+              <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${PARTICIPATION_COLORS[myType]}`}>
+                {myType === 'meeting_only' && '✓ 参加'}
+                {myType === 'meeting_and_party' && '✓ ＋懇'}
+                {myType === 'absent' && '✗ 欠席'}
+                {myType === 'waitlist' && '⌛ 待機'}
+              </span>
+            )}
+            {!myType && isOpen && !isPast && deadlineInfo.allowed && (
+              <span
+                className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
+                  deadlineInfo.deadlinePassed
+                    ? 'border-red-200 bg-red-50 text-red-600'
+                    : 'border-orange-200 bg-orange-50 text-orange-600'
+                }`}
+              >
+                {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+            {item.startTime && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Clock className="h-3 w-3" />{item.startTime.substring(0, 5)}
+              </span>
+            )}
+            {item.venueName && (
+              <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[60%] sm:max-w-[180px]">
+                <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {!isPast && isOpen && (
+          <div className="shrink-0 text-gray-300">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        )}
+      </div>
+
+      {/* 展開：出欠登録 + MU URL */}
+      {!isPast && expanded && (
+        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-gray-100">
+          {isOpen && (
+            <div className="pt-3">
+              <AttendanceButtons
+                meeting={item}
+                memberType={memberType}
+                submitting={submitting}
+                noteInputs={noteInputs}
+                noteOpen={noteOpen}
+                onRegister={onRegister}
+                onNoteChange={onNoteChange}
+                onNoteToggle={onNoteToggle}
+              />
+            </div>
+          )}
+          <MuShareButton url={item.muRegistrationUrl} slug={item.muRegistrationSlug} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -536,155 +721,7 @@ function YearlyScheduleCard({
   const futureItems = allItems.filter(item => item.date >= today);
   const pastItems = allItems.filter(item => item.date < today).reverse(); // 新しい順
 
-  const renderItem = (item: ScheduleItem) => {
-    const isPast = item.date < today;
-    const dateObj = new Date(item.date + 'T00:00:00');
-    const month = dateObj.getMonth() + 1;
-    const day = dateObj.getDate();
-    const dayOfWeek = DAYS_JA[dateObj.getDay()];
-    const isSun = dateObj.getDay() === 0;
-    const isSat = dateObj.getDay() === 6;
-
-    if (item.kind === 'district_event') {
-      return (
-        <div
-          key={`de-${item.id}`}
-          className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
-            isPast ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-amber-50 border-amber-200'
-          }`}
-        >
-          <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${isPast ? 'bg-gray-100' : 'bg-amber-100'}`}>
-            <p className="text-xs text-gray-500">{month}月</p>
-            <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-              {day}
-            </p>
-            <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-          </div>
-          <div className="flex-1 min-w-0 py-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                地区行事
-              </span>
-              {item.isAwardTarget && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Star className="h-2.5 w-2.5" />表彰
-                </span>
-              )}
-              <span className="text-xs text-gray-500">{item.eventType}</span>
-            </div>
-            <p className="font-semibold text-gray-900 text-sm mt-0.5 truncate">{item.title}</p>
-            {item.venueName && (
-              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                <MapPin className="h-3 w-3" />{item.venueName}
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // meeting
-    const myType = item.myAttendance?.participationType ?? null;
-    const isOpen = item.status === 'open';
-    const deadlineInfo = checkDeadline(item);
-    const [expanded, setExpanded] = useState(false);
-
-    return (
-      <div
-        key={`m-${item.id}`}
-        className={`rounded-xl border transition-all ${
-          isPast
-            ? 'bg-gray-50 border-gray-100'
-            : isOpen
-            ? 'bg-white border-blue-200 shadow-sm'
-            : 'bg-white border-gray-200'
-        }`}
-      >
-        <div
-          className="flex items-start gap-3 px-4 py-3 cursor-pointer"
-          onClick={() => !isPast && setExpanded(e => !e)}
-        >
-          {/* 日付バッジ */}
-          <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${
-            isPast ? 'bg-gray-100' : isOpen ? 'bg-blue-100' : 'bg-gray-100'
-          }`}>
-            <p className="text-xs text-gray-500">{month}月</p>
-            <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-              {day}
-            </p>
-            <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-          </div>
-
-          <div className="flex-1 min-w-0 py-0.5">
-            <div className="flex items-start justify-between gap-2">
-              <p className={`font-semibold text-sm truncate ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-                {item.title}
-              </p>
-              {/* 出欠バッジ */}
-              {myType && (
-                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${PARTICIPATION_COLORS[myType]}`}>
-                  {myType === 'meeting_only' && '✓ 参加'}
-                  {myType === 'meeting_and_party' && '✓ ＋懇'}
-                  {myType === 'absent' && '✗ 欠席'}
-                  {myType === 'waitlist' && '⌛ 待機'}
-                </span>
-              )}
-              {!myType && isOpen && !isPast && deadlineInfo.allowed && (
-                <span
-                  className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
-                    deadlineInfo.deadlinePassed
-                      ? 'border-red-200 bg-red-50 text-red-600'
-                      : 'border-orange-200 bg-orange-50 text-orange-600'
-                  }`}
-                >
-                  {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-              {item.startTime && (
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />{item.startTime.substring(0, 5)}
-                </span>
-              )}
-              {item.venueName && (
-                <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[180px]">
-                  <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {!isPast && isOpen && (
-            <div className="shrink-0 text-gray-300">
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </div>
-          )}
-        </div>
-
-        {/* 展開：出欠登録 + MU URL */}
-        {!isPast && expanded && (
-          <div className="px-4 pb-4 pt-0 space-y-3 border-t border-gray-100">
-            {isOpen && (
-              <div className="pt-3">
-                <AttendanceButtons
-                  meeting={item}
-                  memberType={memberType}
-                  submitting={submitting}
-                  noteInputs={noteInputs}
-                  noteOpen={noteOpen}
-                  onRegister={onRegister}
-                  onNoteChange={onNoteChange}
-                  onNoteToggle={onNoteToggle}
-                />
-              </div>
-            )}
-            <MuShareButton url={item.muRegistrationUrl} slug={item.muRegistrationSlug} />
-          </div>
-        )}
-      </div>
-    );
-  };
+  const rowProps = { today, memberType, submitting, noteInputs, noteOpen, onRegister, onNoteChange, onNoteToggle };
 
   return (
     <Card className="border-0 shadow-md">
@@ -700,7 +737,9 @@ function YearlyScheduleCard({
           <p className="text-sm text-gray-400 py-8 text-center">予定が登録されていません</p>
         )}
 
-        {futureItems.map(renderItem)}
+        {futureItems.map(item => (
+          <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
+        ))}
 
         {/* 過去の例会（折りたたみ） */}
         {pastItems.length > 0 && (
@@ -714,7 +753,9 @@ function YearlyScheduleCard({
             </button>
             {showPast && (
               <div className="space-y-2 mt-2">
-                {pastItems.map(renderItem)}
+                {pastItems.map(item => (
+                  <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
+                ))}
               </div>
             )}
           </div>
@@ -849,12 +890,12 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
   return (
     <div className="space-y-5">
       {/* グリーティング */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words">
             こんにちは、{userName.split(' ')[0]}さん 👋
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <p className="text-sm text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <Building2 className="h-3.5 w-3.5" />
             {meta?.clubName || clubName}
             {memberType && (
@@ -888,7 +929,7 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
       )}
 
       {/* 参加率 + 年間スケジュール（2カラム on md+） */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
         {/* 参加率（左 1/3） */}
         {stats && (
           <div className="md:col-span-1">

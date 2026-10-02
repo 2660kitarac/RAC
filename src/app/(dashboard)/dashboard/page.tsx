@@ -83,7 +83,8 @@ export default async function DashboardPage() {
       : null;
 
     return (
-      <div className="space-y-4 max-w-2xl mx-auto px-4 pb-10">
+      // スマホは左右の余白を詰める（下端はpb-10でホームバーを十分に避ける）
+      <div className="space-y-4 max-w-2xl mx-auto w-full px-3 sm:px-4 pb-10">
         {/* 年会費未納バナーのみ表示 */}
         <AnnouncementBanner
           userRole={userRole}
@@ -246,14 +247,8 @@ export default async function DashboardPage() {
             lte(transactions.transactionDate, lastDayOfMonth),
           )),
 
-    // 領収書未発行数
-    db.select({ value: count() })
-      .from(attendances)
-      .where(and(
-        eq(attendances.receiptRequired, true),
-        eq(attendances.paymentStatus, 'paid'),
-        isNull(attendances.deletedAt),
-      )),
+    // 領収書未発行数：領収書は任意発行のため集計しない（お知らせにも出さない）
+    Promise.resolve([{ value: 0 }]),
 
     // 最近のMU登録
     db.select({

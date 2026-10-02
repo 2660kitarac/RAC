@@ -66,14 +66,15 @@ export default async function EmailHistoryPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* スマホでは見出しと件数を縦に並べる */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="page-title">メール送信履歴</h1>
         <p className="text-sm text-gray-500">{emailsCount}件</p>
       </div>
 
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm rac-table">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">件名</th>
@@ -86,12 +87,12 @@ export default async function EmailHistoryPage({
             <tbody className="divide-y divide-gray-100">
               {emailsResult.map(email => (
                 <tr key={email.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{email.subject}</td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">
+                  <td className="px-4 py-3 font-medium" data-cell="primary">{email.subject}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs" data-label="例会">
                     {email.meetingId ? meetingMap[email.meetingId] || '-' : '-'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{email.targetType || '-'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-600 text-xs" data-label="送信先">{email.targetType || '-'}</td>
+                  <td className="px-4 py-3" data-label="状態">
                     <Badge className={
                       email.status === 'sent' ? 'bg-green-100 text-green-700' :
                       email.status === 'failed' ? 'bg-red-100 text-red-700' :
@@ -100,7 +101,7 @@ export default async function EmailHistoryPage({
                       {email.status === 'sent' ? '送信済' : email.status === 'failed' ? '失敗' : '下書き'}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">
+                  <td className="px-4 py-3 text-gray-600 text-xs" data-label="送信日時">
                     {email.sentAt ? formatDateTime(email.sentAt) : '-'}
                   </td>
                 </tr>

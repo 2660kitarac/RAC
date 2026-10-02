@@ -142,21 +142,22 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
       {/* プロフィールタブ */}
       <TabsContent value="profile">
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base">プロフィール情報</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
             {/* 変更不可情報 */}
             <div className="rounded-lg bg-gray-50 p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
+              {/* スマホでは項目名と値を縦積みにして折り返す */}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">メールアドレス</span>
-                <span className="font-medium">{profile.email}</span>
+                <span className="font-medium break-all">{profile.email}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">所属クラブ</span>
-                <span className="font-medium">{club?.name ?? '未設定'}</span>
+                <span className="font-medium break-words">{club?.name ?? '未設定'}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:gap-3">
                 <span className="text-gray-500">役割</span>
                 <span className="font-medium">{USER_ROLE_LABELS[profile.role]}</span>
               </div>
@@ -176,7 +177,7 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
               </div>
               <div className="space-y-1.5">
                 <Label>電話番号</Label>
-                <Input type="tel" placeholder="090-0000-0000"
+                <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="090-0000-0000"
                   value={profileForm.phone}
                   onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
@@ -195,8 +196,9 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleProfileSave} disabled={profileLoading}>
+            {/* スマホでは全幅ボタン */}
+            <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+              <Button onClick={handleProfileSave} disabled={profileLoading} className="w-full sm:w-auto">
                 {profileLoading ? '保存中...' : '変更を保存'}
               </Button>
             </div>
@@ -208,10 +210,10 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
       {canManageClub && (
         <TabsContent value="club">
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-base">クラブ基本設定</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label required>クラブ名</Label>
@@ -232,13 +234,14 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label>メールアドレス</Label>
-                  <Input type="email"
+                  <Input type="email" inputMode="email" autoCapitalize="none" spellCheck={false}
                     value={clubForm.email}
                     onChange={e => setClubForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>電話番号</Label>
-                  <Input value={clubForm.phone}
+                  <Input type="tel" inputMode="tel" placeholder="06-0000-0000"
+                    value={clubForm.phone}
                     onChange={e => setClubForm(f => ({ ...f, phone: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
@@ -256,19 +259,19 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
               </div>
 
               {/* MU費負担方式 */}
-              <div className="border rounded-lg p-4 bg-orange-50">
+              <div className="border rounded-lg p-3 sm:p-4 bg-orange-50">
                 <h3 className="text-sm font-semibold text-gray-800 mb-1">MU費負担方式</h3>
                 <p className="text-xs text-gray-500 mb-3">
                   会員が他クラブにMU訪問した際のMU費の負担方式を設定します。
                 </p>
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={clubForm.muFeePersonalBurden}
                     onChange={e => setClubForm(f => ({ ...f, muFeePersonalBurden: e.target.checked }))}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900">MU費を個人負担にする</p>
                     <p className="text-xs text-gray-500">
                       OFFの場合: クラブ負担（会計に自動計上・後日精算）<br />
@@ -278,8 +281,9 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
                 </label>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button onClick={handleClubSave} disabled={clubLoading}>
+              {/* スマホでは全幅ボタン */}
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button onClick={handleClubSave} disabled={clubLoading} className="w-full sm:w-auto">
                   {clubLoading ? '保存中...' : 'クラブ設定を保存'}
                 </Button>
               </div>
@@ -304,10 +308,10 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
       {/* セキュリティタブ */}
       <TabsContent value="security">
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-base">パスワード変更</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 max-w-sm">
+          <CardContent className="space-y-4 p-4 pt-0 sm:max-w-sm sm:p-6 sm:pt-0">
             <div className="space-y-1.5">
               <Label required>現在のパスワード</Label>
               <Input type="password" placeholder="現在のパスワードを入力"
@@ -325,11 +329,13 @@ export default function SettingsPage({ profile, club }: SettingsPageProps) {
             <div className="space-y-1.5">
               <Label required>新しいパスワード（確認）</Label>
               <Input type="password" placeholder="同じパスワードを入力"
+                autoComplete="new-password"
                 value={pwForm.confirm}
                 onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
             </div>
-            <div className="flex justify-end pt-2">
-              <Button onClick={handlePasswordChange} disabled={pwLoading}>
+            {/* スマホでは全幅ボタン */}
+            <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+              <Button onClick={handlePasswordChange} disabled={pwLoading} className="w-full sm:w-auto">
                 {pwLoading ? '変更中...' : 'パスワードを変更'}
               </Button>
             </div>

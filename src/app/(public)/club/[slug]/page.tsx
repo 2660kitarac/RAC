@@ -79,21 +79,21 @@ export default async function ClubTopPage({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-blue-600 text-white">
-        <div className="max-w-lg mx-auto px-4 py-5">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-blue-200 text-xs font-medium uppercase tracking-wide">RAC Cloud</p>
-              <h1 className="text-xl font-bold mt-0.5">{club.shortName || club.name}</h1>
-              <p className="text-blue-200 text-sm mt-0.5">{club.name}</p>
+              <h1 className="text-xl font-bold mt-0.5 break-words">{club.shortName || club.name}</h1>
+              <p className="text-blue-200 text-sm mt-0.5 break-words">{club.name}</p>
             </div>
-            <Link href={`/club/${slug}/login`} className="flex items-center gap-1.5 bg-white text-blue-600 px-4 py-2 rounded-full text-sm font-semibold shadow hover:bg-blue-50 transition-colors">
+            <Link href={`/club/${slug}/login`} data-tap="button" className="flex flex-shrink-0 items-center gap-1.5 bg-white text-blue-600 px-4 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-blue-50 transition-colors">
               <LogIn className="h-4 w-4" />ログイン
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-6 space-y-6 pb-safe">
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
@@ -112,8 +112,8 @@ export default async function ClubTopPage({
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-sm truncate">{m.title}</p>
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                        <p className="font-semibold text-gray-900 text-sm break-words">{m.title}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(m.date)}</span>
                           {m.startTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{m.startTime.substring(0, 5)}</span>}
                         </div>
@@ -125,7 +125,7 @@ export default async function ClubTopPage({
                     </div>
                     {m.status === 'open' && m.muRegistrationSlug && (
                       <div className="mt-3">
-                        <Link href={`/mu/${m.muRegistrationSlug}`} className="block w-full text-center bg-blue-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <Link href={`/mu/${m.muRegistrationSlug}`} data-tap="button" className="block w-full text-center bg-blue-600 text-white text-sm font-medium py-3 rounded-lg hover:bg-blue-700 transition-colors">
                           MU登録する
                         </Link>
                       </div>
@@ -154,8 +154,8 @@ export default async function ClubTopPage({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-purple-600 mb-0.5">{m.club?.shortName || m.club?.name}</p>
-                        <p className="font-semibold text-gray-900 text-sm truncate">{m.title}</p>
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                        <p className="font-semibold text-gray-900 text-sm break-words">{m.title}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(m.date)}</span>
                           {m.startTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{m.startTime.substring(0, 5)}</span>}
                         </div>
@@ -167,7 +167,7 @@ export default async function ClubTopPage({
                     </div>
                     {m.status === 'open' && m.muRegistrationSlug && (
                       <div className="mt-3">
-                        <Link href={`/mu/${m.muRegistrationSlug}`} className="block w-full text-center bg-purple-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                        <Link href={`/mu/${m.muRegistrationSlug}`} data-tap="button" className="block w-full text-center bg-purple-600 text-white text-sm font-medium py-3 rounded-lg hover:bg-purple-700 transition-colors">
                           MU登録する
                         </Link>
                       </div>
@@ -182,7 +182,7 @@ export default async function ClubTopPage({
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 text-center">
           <p className="text-sm font-medium text-blue-800 mb-1">メンバーの方へ</p>
           <p className="text-xs text-blue-600 mb-4">ログインすると出席履歴・年会費・領収書を確認できます</p>
-          <Link href={`/club/${slug}/login`} className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-blue-700 transition-colors">
+          <Link href={`/club/${slug}/login`} data-tap="button" className="inline-flex w-full items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-semibold shadow hover:bg-blue-700 transition-colors sm:w-auto">
             <LogIn className="h-4 w-4" />メンバーログイン
           </Link>
         </div>

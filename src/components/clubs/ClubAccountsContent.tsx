@@ -425,7 +425,8 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* スマホではカード表示（.rac-table） */}
+              <table className="w-full text-sm rac-table">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">クラブ名</th>
@@ -441,11 +442,11 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
                     return (
                       <tr key={account.id} className="hover:bg-gray-50 transition-colors">
                         {/* クラブ名 */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" data-cell="primary">
                           <span className="font-medium text-gray-900">{getClubName(account.clubId)}</span>
                         </td>
                         {/* メールアドレス */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" data-label="メールアドレス">
                           <div className="flex items-center gap-1.5">
                             <code className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
                               {account.email}
@@ -460,10 +461,10 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
                           </div>
                         </td>
                         {/* ログインURL */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" data-cell="block" data-label="ログインURL">
                           {loginUrl ? (
                             <div className="flex items-center gap-1.5">
-                              <code className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded max-w-[200px] truncate block">
+                              <code className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded max-w-none md:max-w-[200px] md:truncate block">
                                 {loginUrl}
                               </code>
                               <button
@@ -488,7 +489,7 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
                           )}
                         </td>
                         {/* 状態 */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3" data-label="状態">
                           <Badge className={account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>
                             {account.isActive ? '有効' : '無効'}
                           </Badge>
