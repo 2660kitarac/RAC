@@ -14,9 +14,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save, PartyPopper, Users, Link2, Copy, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Save, PartyPopper, Users, Link2, Copy, ExternalLink, History, X, AlertTriangle, Search } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import Link from 'next/link';
 import type { Meeting } from '@/types';
+import { MEETING_STATUS_LABELS, type MeetingStatus } from '@/types';
+import { formatDate } from '@/lib/utils';
 
 const meetingSchema = z.object({
   title: z.string().min(1, '例会名は必須です'),
@@ -60,16 +65,43 @@ const meetingSchema = z.object({
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
 
+/** 例会作成時のコピー元候補 */
+export interface CopyCandidate {
+  id: string;
+  title: string;
+  date: string;
+  meetingNumber: number | null;
+  status: string;
+}
+
 interface MeetingFormProps {
   mode: 'create' | 'edit';
   clubId: string;
   meeting?: Meeting;
   members: { id: string; name: string }[];
+  /** 作成モード: コピー元として選べる過去例会 */
+  copyCandidates?: CopyCandidate[];
+  /** 作成モード: 現在取り込んでいるコピー元 */
+  copySource?: { id: string; title: string; date: string } | null;
+  /** 作成モード: ?from= で指定された例会が見つからない／権限なし */
+  copyNotFound?: boolean;
 }
 
-export default function MeetingForm({ mode, clubId, meeting, members }: MeetingFormProps) {
+function candidateLabel(c: CopyCandidate) {
+  const date = c.date ? formatDate(c.date, 'yyyy/M/d') : '日付未定';
+  const status = MEETING_STATUS_LABELS[c.status as MeetingStatus] ?? c.status;
+  return `${date}　${c.title}（${status}）`;
+}
+
+export default function MeetingForm({
+  mode, clubId, meeting, members,
+  copyCandidates = [], copySource = null, copyNotFound = false,
+}: MeetingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const isCopy = mode === 'create' && !!copySource;
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copySearch, setCopySearch] = useState('');
 
   // 編集モード時のMU登録URL（作成済みのslugから生成）
   const existingMuUrl = mode === 'edit' && (meeting as any)?.mu_registration_slug
@@ -89,7 +121,7 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<MeetingFormData>({
     resolver: zodResolver(meetingSchema) as any,
     defaultValues: {
@@ -132,6 +164,30 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
       own_club_fee: (meeting as any)?.own_club_fee?.toString() || '0',
     },
   });
+
+  // コピー元の切り替え（入力中の内容は破棄されるため確認する）
+  const applyCopySource = (id: string | null) => {
+    if (id === (copySource?.id ?? null)) return;
+    if (isDirty && !window.confirm('入力中の内容は破棄されます。よろしいですか？')) return;
+    router.replace(id ? `/meetings/new?from=${encodeURIComponent(id)}` : '/meetings/new');
+  };
+
+  const latestMeeting = copyCandidates[0];
+
+  const filteredCandidates = copySearch.trim()
+    ? copyCandidates.filter(c => {
+        const q = copySearch.trim().toLowerCase();
+        return c.title.toLowerCase().includes(q)
+          || (c.date ?? '').includes(q)
+          || (c.meetingNumber != null && String(c.meetingNumber).includes(q));
+      })
+    : copyCandidates;
+
+  const selectFromDialog = (id: string) => {
+    setCopyDialogOpen(false);
+    setCopySearch('');
+    applyCopySource(id);
+  };
 
   const hasAfterParty = watch('has_after_party');
   const afterPartyFeeType = watch('after_party_fee_type');
@@ -221,7 +277,7 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-2 sm:gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
         <Link href="/meetings">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4" />
@@ -231,7 +287,172 @@ export default function MeetingForm({ mode, clubId, meeting, members }: MeetingF
         <h1 className="page-title">
           {mode === 'create' ? '例会を作成' : '例会を編集'}
         </h1>
+        {mode === 'create' && (
+          <Button
+            id="open-copy-dialog-button"
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCopyDialogOpen(true)}
+            className="ml-auto border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <History className="h-4 w-4" />
+            過去例会をコピー
+          </Button>
+        )}
       </div>
+
+      {/* 過去例会選択ダイアログ */}
+      {mode === 'create' && (
+        <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="h-4 w-4 text-blue-600" />
+                過去の例会をコピー
+              </DialogTitle>
+              <DialogDescription>
+                選んだ例会の内容をフォームに取り込みます（開催日・登録締切日は引き継ぎません）。
+              </DialogDescription>
+            </DialogHeader>
+
+            {copyCandidates.length === 0 ? (
+              <p className="text-sm text-gray-500 py-6 text-center">コピーできる過去の例会はまだありません。</p>
+            ) : (
+              <div className="space-y-3">
+                {latestMeeting && (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => selectFromDialog(latestMeeting.id)}
+                  >
+                    <Copy className="h-4 w-4" />
+                    前回例会をコピー（{latestMeeting.title}）
+                  </Button>
+                )}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={copySearch}
+                    onChange={e => setCopySearch(e.target.value)}
+                    placeholder="例会名・日付・例会番号で検索"
+                    className="pl-9"
+                  />
+                </div>
+                <ul className="max-h-80 overflow-y-auto divide-y border rounded-md">
+                  {filteredCandidates.length === 0 && (
+                    <li className="px-3 py-4 text-sm text-gray-500 text-center">該当する例会がありません</li>
+                  )}
+                  {filteredCandidates.map(c => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectFromDialog(c.id)}
+                        className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors ${
+                          copySource?.id === c.id ? 'bg-blue-50' : ''
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-gray-800 truncate">{c.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {c.date ? formatDate(c.date, 'yyyy/M/d') : '日付未定'}
+                          {c.meetingNumber != null && `　第${c.meetingNumber}例会`}
+                          {`　${MEETING_STATUS_LABELS[c.status as MeetingStatus] ?? c.status}`}
+                          {copySource?.id === c.id && '　（選択中）'}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* 過去の例会からコピー（作成モードのみ） */}
+      {mode === 'create' && (
+        <Card id="copy-from-past-meeting" className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-blue-800">
+              <History className="h-4 w-4" />
+              過去の例会からコピーして作成
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {copyNotFound && (
+              <div className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                指定された例会が見つからないか、コピーする権限がありません。
+              </div>
+            )}
+
+            {copyCandidates.length === 0 ? (
+              <p className="text-sm text-gray-500">コピーできる過去の例会はまだありません。</p>
+            ) : (
+              <div className="flex flex-col md:flex-row gap-2 md:items-center">
+                {latestMeeting && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyCopySource(latestMeeting.id)}
+                    disabled={copySource?.id === latestMeeting.id}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+                    title={candidateLabel(latestMeeting)}
+                  >
+                    <Copy className="h-4 w-4" />
+                    前回例会をコピー
+                  </Button>
+                )}
+                <div className="flex-1 min-w-0">
+                  <Select
+                    value={copySource?.id ?? ''}
+                    onValueChange={v => applyCopySource(v || null)}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="コピーする例会を選択…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {copyCandidates.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{candidateLabel(c)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {isCopy && copySource && (
+              <div className="flex items-start justify-between gap-2 bg-white border border-blue-200 rounded-md px-3 py-2">
+                <div className="text-sm">
+                  <p className="text-blue-800 font-medium">
+                    「{copySource.title}」{copySource.date ? `（${formatDate(copySource.date, 'yyyy/M/d')}）` : ''}の内容を取り込みました
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    開催日・登録締切日は空欄になっています。ステータスは「下書き」、MU登録URLは新しく発行されます。
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyCopySource(null)}
+                  className="text-gray-500 flex-shrink-0"
+                  title="コピーを解除して空のフォームに戻す"
+                >
+                  <X className="h-4 w-4" />
+                  解除
+                </Button>
+              </div>
+            )}
+            {!isCopy && copyCandidates.length > 0 && (
+              <p className="text-xs text-gray-500">
+                会場・時間・登録料・懇親会設定・例会内容などを引き継ぎます（開催日と登録締切日は引き継ぎません）。
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
         {/* 基本情報 */}

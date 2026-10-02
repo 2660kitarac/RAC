@@ -2,13 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import {
   Search, ArrowLeft, Download, Users, DollarSign,
   CheckCircle, XCircle, Clock, Smartphone, PartyPopper, Hourglass,
   Pencil, X, Trash2, ArrowUpDown, ArrowUp, ArrowDown, UserPlus,
+  FileSpreadsheet,
 } from 'lucide-react';
+import SpreadsheetImportModal from './SpreadsheetImportModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +52,9 @@ interface AttendanceManagementProps {
 export default function AttendanceManagement({
   meeting, initialAttendances, userRole
 }: AttendanceManagementProps) {
+  const router = useRouter();
   const [attendances, setAttendances] = useState(initialAttendances);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
@@ -561,6 +566,15 @@ export default function AttendanceManagement({
             CSV
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportModal(true)}
+            className="gap-1.5 border-green-300 text-green-700 hover:bg-green-50"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            スプシ取り込み
+          </Button>
+          <Button
             size="sm"
             onClick={openAddModal}
             className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
@@ -893,6 +907,16 @@ export default function AttendanceManagement({
             </Card>
           )}
         </>
+      )}
+
+      {/* ===== スプレッドシート取り込みモーダル ===== */}
+      {showImportModal && (
+        <SpreadsheetImportModal
+          meetingId={(meeting as any).id}
+          meetingTitle={(meeting as any).title || '例会'}
+          onClose={() => setShowImportModal(false)}
+          onImported={() => router.refresh()}
+        />
       )}
 
       {/* ===== 手動追加モーダル ===== */}
