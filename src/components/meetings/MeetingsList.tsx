@@ -59,20 +59,10 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
     });
   };
 
-  // 例会コピー
-  const handleCopy = async (id: string, title: string) => {
+  // 例会コピー: 作成画面にコピー元を渡して開く（保存するまでDBには作成しない）
+  const handleCopy = (id: string) => {
     setCopyingId(id);
-    try {
-      const res = await fetch(`/api/meetings/${id}/copy`, { method: 'POST' });
-      if (!res.ok) throw new Error('コピーに失敗しました');
-      const data = await res.json();
-      toast.success(`「${title}」をコピーしました。内容を編集してください。`);
-      router.push(`/meetings/${data.id}/edit`);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setCopyingId(null);
-    }
+    router.push(`/meetings/new?from=${encodeURIComponent(id)}`);
   };
 
   // 例会削除
@@ -289,7 +279,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                                   size="icon-sm"
                                   title="コピーして作成"
                                   disabled={copyingId === meeting.id}
-                                  onClick={() => handleCopy(meeting.id, meeting.title)}
+                                  onClick={() => handleCopy(meeting.id)}
                                   className="text-blue-400 hover:text-blue-600 hover:bg-blue-50"
                                 >
                                   <Copy className="h-4 w-4" />
@@ -409,7 +399,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                           variant="outline"
                           size="sm"
                           disabled={copyingId === meeting.id}
-                          onClick={() => handleCopy(meeting.id, meeting.title)}
+                          onClick={() => handleCopy(meeting.id)}
                           className="text-blue-600 border-blue-200 hover:bg-blue-50"
                           title="コピーして作成"
                         >

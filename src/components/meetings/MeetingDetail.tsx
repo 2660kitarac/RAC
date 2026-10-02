@@ -307,6 +307,12 @@ export default function MeetingDetail({
               status={meeting.status}
               finishedAt={(meeting as any).finished_at ?? null}
             />
+            <Link href={`/meetings/new?from=${meeting.id}`}>
+              <Button variant="outline" size="sm" title="この例会の内容をコピーして新しい例会を作成">
+                <Copy className="h-4 w-4" />
+                コピーして作成
+              </Button>
+            </Link>
             <Link href={`/meetings/${meeting.id}/edit`}>
               <Button variant="outline" size="sm">
                 <Edit className="h-4 w-4" />
