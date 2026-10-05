@@ -6,6 +6,11 @@ import { eq, and, isNull, gte, lte, isNotNull, inArray, count, desc, asc, gt, sq
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import AnnouncementBanner from '@/components/dashboard/AnnouncementBanner';
 import MemberDashboard from '@/components/dashboard/MemberDashboard';
+import { isDistrictOfficer } from '@/lib/auth/tenant';
+import DistrictAnnouncements from '@/components/dashboard/DistrictAnnouncements';
+import { districtAnnouncements as districtAnnouncementsTable } from '@/lib/db/schema';
+import { resolveDistrict, todayJst } from '@/lib/district/context';
+import { sortAnnouncements, toAnnouncementView, type AnnouncementView } from '@/lib/district/announcements';
 
 export const metadata = { title: 'ダッシュボード' };
 
@@ -38,6 +43,8 @@ export default async function DashboardPage() {
     .limit(1);
 
   const profile = profileResult[0] ?? null;
+  // 地区役員は地区ダッシュボードへ（クラブ用の画面は使わない）
+  if (isDistrictOfficer(profile?.role)) redirect('/district/dashboard');
   const userRole = (session.user as any).role || '';
   const userStatus = (session.user as any).status || 'active';
   const isAdminRole = ['system_owner', 'district_admin'].includes(userRole);
@@ -56,6 +63,12 @@ export default async function DashboardPage() {
       </div>
     );
   }
+
+  // 地区からのお知らせ（取得に失敗してもダッシュボードは表示する）
+  const districtAnnouncements = await loadDashboardAnnouncements(db, {
+    clubId: profile?.clubId ?? null,
+    role: userRole,
+  });
 
   // ── 個人会員（member）は専用ダッシュボードを表示 ──────────
   if (isMember) {
@@ -94,6 +107,7 @@ export default async function DashboardPage() {
           nextMeeting={null}
           memberAnnualFeeStatus={memberAnnualFeeStatus}
         />
+        <DistrictAnnouncements announcements={districtAnnouncements} />
         <MemberDashboard
           userName={profile?.name || 'メンバー'}
           clubName={profile?.club?.name || ''}
@@ -423,6 +437,8 @@ export default async function DashboardPage() {
         pendingMuVisits={pendingMuVisitsCount}
       />
 
+      <DistrictAnnouncements announcements={districtAnnouncements} />
+
       <DashboardContent
         user={profile as any}
         nextMeeting={nextMeeting as any}
@@ -441,4 +457,40 @@ export default async function DashboardPage() {
       />
     </div>
   );
+}
+
+/**
+ * ダッシュボードに出す「地区からのお知らせ」（掲載中のもの）を取得する。
+ * テーブルが無い等で失敗しても空配列を返し、ダッシュボードは止めない。
+ */
+const OFFICER_AUDIENCE_ROLES = [
+  'system_owner', 'club_account', 'club_admin', 'president', 'secretary', 'treasurer', 'committee_chair',
+];
+
+async function loadDashboardAnnouncements(
+  db: Awaited<ReturnType<typeof getDbFromContext>>,
+  me: { clubId: string | null; role: string },
+): Promise<AnnouncementView[]> {
+  try {
+    const district = await resolveDistrict(db, { districtId: null, clubId: me.clubId });
+    if (!district) return [];
+    const today = todayJst();
+    const t = districtAnnouncementsTable;
+    const rows = await db
+      .select()
+      .from(t)
+      .where(and(
+        eq(t.districtId, district.id),
+        isNull(t.deletedAt),
+        sql`(${t.publishFrom} IS NULL OR ${t.publishFrom} <= ${today})`,
+        sql`(${t.publishUntil} IS NULL OR ${t.publishUntil} >= ${today})`,
+        // 「クラブ役員のみ」はクラブの管理役（クラブアカウント・会長・幹事・会計など）だけに出す
+        OFFICER_AUDIENCE_ROLES.includes(me.role) ? undefined : eq(t.audience, 'all'),
+      ))
+      .limit(50);
+    return sortAnnouncements(rows.map(toAnnouncementView));
+  } catch (e) {
+    console.error('loadDashboardAnnouncements error:', e);
+    return [];
+  }
 }

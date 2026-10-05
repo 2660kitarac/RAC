@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 import { formatDate, formatTime } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,8 +13,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import type { UserRole } from '@/types';
-import { canManageAwards } from '@/lib/hooks/useAuth';
-import { Calendar, Plus, Pencil } from 'lucide-react';
+import { isDistrictStaff } from '@/lib/auth/tenant';
+import { Calendar, ClipboardList, FilePlus2, MapPin, Plus, Pencil } from 'lucide-react';
+
+/** 行事に紐づく申込フォーム */
+export interface LinkedForm {
+  id: string;
+  title: string;
+  status: 'draft' | 'open' | 'closed';
+  deadline: string | null;
+  /** 申込件数（取消を除く） */
+  registrations: number;
+}
+
+const FORM_STATUS: Record<LinkedForm['status'], { label: string; className: string }> = {
+  open: { label: '受付中', className: 'bg-green-100 text-green-700' },
+  draft: { label: '下書き', className: 'bg-gray-100 text-gray-600' },
+  closed: { label: '受付終了', className: 'bg-amber-100 text-amber-800' },
+};
+
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+/** 'YYYY-MM-DD' を時差の影響なく分解する */
+function ymd(date: string): { m: number; d: number; w: string } {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  const w = WEEKDAYS[new Date(Date.UTC(y, (m || 1) - 1, d || 1)).getUTCDay()];
+  return { m, d, w };
+}
 
 interface DistrictEvent {
   id: string;
@@ -39,15 +65,21 @@ interface DistrictEventsListProps {
   clubs: { id: string; name: string }[];
   districtId: string;
   userRole: UserRole;
+  /** 行事ID → 紐づく申込フォーム */
+  linkedForms?: Record<string, LinkedForm[]>;
 }
+
+/** 主催クラブ「なし（地区主催）」を表す値（Select は空文字を値にできないため） */
+const NO_HOST = '__district__';
 
 const EVENT_TYPES = [
   '地区大会', '地区協議会', 'ゾーン会議', '合同例会', 'サービスプロジェクト',
   '研修会', '表彰式', '交流会', 'その他'
 ];
 
-export default function DistrictEventsList({ events: initialEvents, clubs, districtId, userRole }: DistrictEventsListProps) {
-  const canManage = canManageAwards(userRole);
+export default function DistrictEventsList({ events: initialEvents, clubs, districtId, userRole, linkedForms = {} }: DistrictEventsListProps) {
+  // 行事の登録・編集は地区役員なら誰でもできる（API 側も地区スタッフを許可）
+  const canManage = isDistrictStaff(userRole);
 
   const [events, setEvents] = useState<DistrictEvent[]>(initialEvents);
   const [showDialog, setShowDialog] = useState(false);
@@ -107,7 +139,7 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
         registrationFee: Number(form.registration_fee) || 0,
         registrationDeadline: form.registration_deadline || null,
         description: form.description || null,
-        hostClubId: form.host_club_id || null,
+        hostClubId: form.host_club_id && form.host_club_id !== NO_HOST ? form.host_club_id : null,
         isAwardTarget: form.is_award_target,
         isJointMeeting: form.is_joint_meeting,
       };
@@ -163,7 +195,7 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
             description: payload.description,
             is_award_target: payload.isAwardTarget,
             is_joint_meeting: payload.isJointMeeting,
-            created_at: new Date().toISOString(),
+            created_at: '',
           }, ...prev]);
         }
         toast.success('行事を登録しました');
@@ -197,7 +229,7 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
                 </SelectContent>
               </Select>
               {canManage && (
-                <Button size="sm" onClick={openCreate}>
+                <Button size="sm" onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700">
                   <Plus className="h-4 w-4 mr-1" />行事登録
                 </Button>
               )}
@@ -208,49 +240,92 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
           {filtered.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-200" />
-              <p>行事がありません</p>
+              <p className="font-medium text-gray-600">行事がありません</p>
+              {canManage && <p className="mt-1 text-sm">「行事登録」から地区大会・研修会などを登録できます。</p>}
             </div>
           ) : (
-            <div className="space-y-3">
-              {filtered.map(event => (
-                <div key={event.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {/* 日付バッジ */}
-                      <div className="flex-shrink-0 text-center bg-blue-50 rounded-lg px-3 py-2 hidden sm:block">
-                        <p className="text-xs text-blue-600">{new Date(event.date).getMonth() + 1}月</p>
-                        <p className="text-xl font-bold text-blue-700">{new Date(event.date).getDate()}</p>
+            <ul className="space-y-3">
+              {filtered.map(event => {
+                const { m, d, w } = ymd(event.date);
+                const forms = linkedForms[event.id] ?? [];
+                return (
+                  <li key={event.id} className="rounded-lg border p-3 sm:p-4">
+                    <div className="flex items-start gap-3">
+                      {/* 日付 */}
+                      <div className="w-12 shrink-0 rounded-lg bg-indigo-50 py-1.5 text-center">
+                        <p className="text-[11px] text-indigo-600">{m}月</p>
+                        <p className="text-lg font-bold leading-tight text-indigo-700">{d}</p>
+                        <p className="text-[11px] text-indigo-600">（{w}）</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-gray-900">{event.title}</p>
-                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                            {event.event_type}
-                          </span>
-                          {event.is_award_target && (
-                            <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">表彰対象</span>
-                          )}
-                          {event.is_joint_meeting && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">合同例会</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="min-w-0 break-words font-medium text-gray-900">{event.title}</p>
+                          {canManage && (
+                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(event)} aria-label="行事を編集" className="shrink-0">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500 mt-0.5">
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{event.event_type}</span>
+                          {event.is_award_target && (
+                            <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">表彰対象</span>
+                          )}
+                          {event.is_joint_meeting && (
+                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">合同例会</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-500">
                           {formatDate(event.date)}
                           {event.start_time && ` ${formatTime(event.start_time)}`}
                           {event.end_time && `〜${formatTime(event.end_time)}`}
                         </p>
-                        {event.venue_name && <p className="text-xs text-gray-400">{event.venue_name}</p>}
+                        {event.venue_name && (
+                          <p className="mt-0.5 flex items-start gap-1 break-words text-xs text-gray-500">
+                            <MapPin className="mt-0.5 h-3 w-3 shrink-0" />{event.venue_name}
+                          </p>
+                        )}
+
+                        {/* 申込フォームとの連携 */}
+                        <div className="mt-3 border-t pt-3">
+                          {forms.length > 0 ? (
+                            <ul className="space-y-2">
+                              {forms.map(f => (
+                                <li key={f.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
+                                    <ClipboardList className="h-4 w-4 shrink-0 text-indigo-600" />
+                                    <span className="text-gray-700">申込フォーム</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${FORM_STATUS[f.status].className}`}>
+                                      {FORM_STATUS[f.status].label}
+                                    </span>
+                                    <span className="text-gray-600">申込 {f.registrations}件</span>
+                                    {f.deadline && <span className="text-xs text-gray-500">締切 {formatDate(f.deadline)}</span>}
+                                  </div>
+                                  <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
+                                    <Link href={`/district/registrations/${f.id}`}>申込状況を見る</Link>
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : canManage ? (
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="text-xs text-gray-500">この行事の申込フォームはまだありません</p>
+                              <Button asChild size="sm" variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 sm:w-auto">
+                                <Link href={`/district/registrations/new?eventId=${encodeURIComponent(event.id)}`}>
+                                  <FilePlus2 className="h-3.5 w-3.5" />申込フォームを作る
+                                </Link>
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500">申込フォームはありません</p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {canManage && (
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(event)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>
@@ -267,7 +342,7 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
               <Input placeholder="第○回地区大会" value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label required>行事種別</Label>
                 <Select value={form.event_type} onValueChange={v => setForm(f => ({ ...f, event_type: v }))}>
@@ -298,7 +373,12 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
               <Input placeholder="○○ホール" value={form.venue_name}
                 onChange={e => setForm(f => ({ ...f, venue_name: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>会場住所</Label>
+              <Input placeholder="○○市○○町1-2-3" value={form.venue_address}
+                onChange={e => setForm(f => ({ ...f, venue_address: e.target.value }))} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>参加費（円）</Label>
                 <Input type="number" min={0} value={form.registration_fee}
@@ -313,16 +393,16 @@ export default function DistrictEventsList({ events: initialEvents, clubs, distr
             {clubs.length > 0 && (
               <div className="space-y-1.5">
                 <Label>主催クラブ</Label>
-                <Select value={form.host_club_id} onValueChange={v => setForm(f => ({ ...f, host_club_id: v }))}>
+                <Select value={form.host_club_id || NO_HOST} onValueChange={v => setForm(f => ({ ...f, host_club_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="選択..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— 地区主催 —</SelectItem>
+                    <SelectItem value={NO_HOST}>— 地区主催 —</SelectItem>
                     {clubs.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             )}
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.is_award_target}
                   onChange={e => setForm(f => ({ ...f, is_award_target: e.target.checked }))}

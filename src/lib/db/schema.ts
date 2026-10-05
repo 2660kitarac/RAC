@@ -432,6 +432,28 @@ export const instagramPosts = pgTable('instagram_posts', {
 });
 
 // ============================================================
+// district_announcements テーブル（地区からのお知らせ）
+// ============================================================
+export const districtAnnouncements = pgTable('district_announcements', {
+  id: text('id').primaryKey(),
+  districtId: text('district_id').notNull().references(() => districts.id),
+  title: text('title').notNull(),
+  body: text('body').notNull().default(''),
+  level: text('level').notNull().default('info'), // info / important / urgent
+  audience: text('audience').notNull().default('all'), // all / officers
+  linkUrl: text('link_url'),
+  linkLabel: text('link_label'),
+  publishFrom: text('publish_from'),
+  publishUntil: text('publish_until'),
+  pinned: boolean('pinned').notNull().default(false),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+// ============================================================
 // Relations
 // ============================================================
 export const clubsRelations = relations(clubs, ({ many }) => ({

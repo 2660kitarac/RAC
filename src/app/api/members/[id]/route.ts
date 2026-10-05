@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+import { canAssignRole, canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
 
 /** 会員情報を編集できるロール */
 const MEMBER_MANAGER_ROLES = [
@@ -81,6 +81,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (key in body) updateData[key] = body[key];
       }
 
+      // 上位ロール・地区ロールの付与は権限のある人だけ
+      if ('role' in updateData && !canAssignRole(sessionUser.role, updateData.role as string, target.role)) {
+        return NextResponse.json({ error: 'このロールは設定できません' }, { status: 403 });
+      }
       // 上位ロールへの昇格はクラブ側からは不可（権限昇格の防止）
       if ('role' in updateData && !isDistrictScope(sessionUser.role)) {
         if (isDistrictScope(updateData.role)) {

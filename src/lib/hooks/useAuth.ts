@@ -128,5 +128,16 @@ export function canApproveMembers(role: UserRole | undefined): boolean {
  * @alias isDistrictAdmin - isDistrictAdminと同義。後方互換のためのエイリアス
  */
 export function isDistrictStaff(role: UserRole | undefined): boolean {
-  return hasRole(role, ['system_owner', 'district_admin']);
+  return hasRole(role, [
+    'system_owner', 'district_admin', 'district_representative',
+    'district_secretary', 'district_treasurer', 'district_pr_chair',
+  ]);
+}
+
+/** 地区役員（地区専用モードで表示する人）。system_owner は含めない */
+export function isDistrictOfficer(role: UserRole | undefined): boolean {
+  return hasRole(role, [
+    'district_admin', 'district_representative', 'district_secretary',
+    'district_treasurer', 'district_pr_chair',
+  ]);
 }

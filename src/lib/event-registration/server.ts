@@ -9,7 +9,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { clubs, districts, eventRegistrationLogs, registrationForms, users } from '@/lib/db/schema';
-import { isDistrictScope } from '@/lib/auth/tenant';
+import { isDistrictStaff } from '@/lib/auth/tenant';
 import { attendeeName, calcFees } from './calc';
 import {
   DEFAULT_ATTENDEE_FIELDS,
@@ -234,7 +234,7 @@ export async function requireDistrictStaff(): Promise<
     .from(users)
     .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)))
     .limit(1);
-  if (!me || !isDistrictScope(me.role)) return { ok: false, status: 403, error: '地区役員のみ利用できます' };
+  if (!me || !isDistrictStaff(me.role)) return { ok: false, status: 403, error: '地区役員のみ利用できます' };
 
   let districtId: string | null = me.districtId ?? null;
   if (!districtId && me.clubId) {

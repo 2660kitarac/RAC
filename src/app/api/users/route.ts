@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canAssignRole } from '@/lib/auth/tenant';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 
@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
     const targetClubId = writeScope.clubId;
     if (!isTopAdmin && targetClubId !== session.user.clubId) {
       return NextResponse.json({ error: '他クラブへの登録は権限がありません' }, { status: 403 });
+    }
+
+    // 上位ロール・地区ロールは権限のある人だけが付与できる
+    if (role && !canAssignRole(session.user.role, role, null)) {
+      return NextResponse.json({ error: 'このロールは設定できません' }, { status: 403 });
     }
 
     // メール重複チェック
