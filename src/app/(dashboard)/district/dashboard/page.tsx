@@ -3,7 +3,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs, districts, districtEvents, clubReports } from '@/lib/db/schema';
 import { eq, and, isNull, gte, asc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { isDistrictStaff } from '@/lib/hooks/useAuth';
+import { isDistrictStaff } from '@/lib/auth/tenant';
 import DistrictDashboardContent from '@/components/district/DistrictDashboardContent';
 
 export const metadata = { title: '地区ダッシュボード' };

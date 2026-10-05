@@ -125,3 +125,8 @@ export function canManageClub(role: string | null | undefined): boolean {
   if (!role) return false;
   return (CLUB_MANAGER_ROLES as readonly string[]).includes(role);
 }
+
+/** 地区管理画面を使えるロール（system_owner / district_admin）。useAuth の isDistrictStaff のサーバー版 */
+export function isDistrictStaff(role: string | null | undefined): boolean {
+  return role === 'system_owner' || role === 'district_admin';
+}
