@@ -7,11 +7,13 @@ import {
   LayoutDashboard, Calendar, Users, Building2, Receipt,
   Mail, FileText, BarChart3, Settings, ChevronDown,
   ChevronRight, LogOut, Award, Globe, CreditCard, UserCheck,
-  Heart, TrendingUp, Bell, Key, ShieldCheck, MapPin, ClipboardList
+  Heart, TrendingUp, Key, ShieldCheck, MapPin, ClipboardList,
+  Megaphone, Camera, UserCog, CalendarDays, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
-import { isDistrictStaff, isClubAdmin, canManageFinance, canManageReceipts, canSendEmails, canManageAwards } from '@/lib/hooks/useAuth';
+import { USER_ROLE_LABELS } from '@/types';
+import { isDistrictStaff, isDistrictOfficer } from '@/lib/hooks/useAuth';
 import { signOut } from '@/app/actions/auth';
 
 interface NavItem {
@@ -23,16 +25,34 @@ interface NavItem {
   badge?: number;
 }
 
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+/** 地区役員向けの件数バッジ */
+export interface DistrictBadges {
+  reports?: number;
+  instagram?: number;
+}
+
 interface SidebarProps {
   user: User | null;
   onClose?: () => void;
   pendingMembersCount?: number;  // 承認待ち会員数（バッジ表示用）
+  districtLabel?: string | null; // 地区役員のとき「第2660地区」
+  districtBadges?: DistrictBadges;
 }
 
-export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: SidebarProps) {
+/** クラブで地区へ報告書・Instagramを提出できるロール */
+const CLUB_SUBMITTER_ROLES = ['club_account', 'club_admin', 'president', 'secretary'];
+
+export default function Sidebar({ user, onClose, pendingMembersCount = 0, districtLabel, districtBadges }: SidebarProps) {
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['meetings']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['meetings', '地区管理']);
   const role = user?.role;
+  // 地区役員（地区管理者・地区代表・地区幹事・地区会計・地区広報委員長）は地区専用のメニューにする
+  const districtMode = isDistrictOfficer(role);
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev =>
@@ -116,17 +136,25 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
   ];
 
   // 地区役員向けメニュー
+  // クラブ → 地区への提出（報告書・Instagram）
+  if (role && CLUB_SUBMITTER_ROLES.includes(role) && (user?.club_id || (user as { clubId?: string | null } | null)?.clubId)) {
+    navItems.push({ label: '地区への提出', href: '/district-submissions', icon: Send });
+  }
+
   if (isDistrictStaff(role)) {
     navItems.push({
       label: '地区管理',
       icon: Globe,
       children: [
         { label: '地区ダッシュボード', href: '/district/dashboard', icon: LayoutDashboard },
+        { label: 'クラブ', href: '/district/clubs', icon: Building2 },
         { label: '地区行事', href: '/district/events', icon: Calendar },
+        { label: '行事カレンダー', href: '/district/calendar', icon: CalendarDays },
         { label: '行事の申込管理', href: '/district/registrations', icon: ClipboardList },
-        { label: '報告書管理', href: '/district/reports', icon: FileText },
-        { label: 'Instagram管理', href: '/district/instagram', icon: Globe },
-        { label: 'カレンダー管理', href: '/district/calendar', icon: Calendar },
+        { label: 'お知らせ配信', href: '/district/announcements', icon: Megaphone },
+        { label: '報告書の審査', href: '/district/reports', icon: FileText, badge: districtBadges?.reports },
+        { label: 'Instagram審査', href: '/district/instagram', icon: Camera, badge: districtBadges?.instagram },
+        { label: '地区役員', href: '/district/officers', icon: UserCog },
       ],
     });
 
@@ -167,6 +195,40 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
       { label: 'ユーザー権限', href: '/users', icon: Users },
     ],
   });
+
+  // 地区役員の専用メニュー
+  const districtSections: NavSection[] = [
+    {
+      items: [
+        { label: '地区ダッシュボード', href: '/district/dashboard', icon: LayoutDashboard },
+        { label: 'クラブ', href: '/district/clubs', icon: Building2 },
+      ],
+    },
+    {
+      title: '行事',
+      items: [
+        { label: '地区行事', href: '/district/events', icon: Calendar },
+        { label: '行事カレンダー', href: '/district/calendar', icon: CalendarDays },
+        { label: '行事の申込管理', href: '/district/registrations', icon: ClipboardList },
+      ],
+    },
+    {
+      title: 'クラブとのやりとり',
+      items: [
+        { label: 'お知らせ配信', href: '/district/announcements', icon: Megaphone },
+        { label: '報告書の審査', href: '/district/reports', icon: FileText, badge: districtBadges?.reports },
+        { label: 'Instagram審査', href: '/district/instagram', icon: Camera, badge: districtBadges?.instagram },
+      ],
+    },
+    {
+      title: '管理',
+      items: [
+        { label: '地区役員', href: '/district/officers', icon: UserCog },
+        ...(role === 'district_admin' ? [{ label: 'クラブアカウント', href: '/clubs/accounts', icon: Key }] : []),
+        { label: '設定', href: '/settings', icon: Settings },
+      ],
+    },
+  ];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -217,7 +279,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
         className={cn(
           'flex items-center gap-2 rounded-md px-3 py-2.5 text-sm transition-colors lg:py-2',
           isActive(item.href)
-            ? 'bg-blue-50 text-blue-700 font-medium'
+            ? districtMode ? 'bg-indigo-50 text-indigo-700 font-medium' : 'bg-blue-50 text-blue-700 font-medium'
             : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
           depth > 0 && 'py-2 text-xs lg:py-1.5'
         )}
@@ -238,22 +300,37 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
       {/* ロゴ */}
       <div className="flex items-center h-16 px-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">R</span>
+          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', districtMode ? 'bg-indigo-600' : 'bg-blue-600')}>
+            <span className="text-white font-bold text-sm">{districtMode ? '地' : 'R'}</span>
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900">RAC Cloud</p>
-            <p className="text-xs text-gray-500 truncate max-w-[140px]">
-              {user?.club?.name || 'クラブ管理システム'}
+            <p className="text-xs text-gray-500 truncate max-w-[160px]">
+              {districtMode
+                ? `${districtLabel || '地区'}・地区役員`
+                : user?.club?.name || 'クラブ管理システム'}
             </p>
           </div>
         </div>
       </div>
 
       {/* ナビゲーション */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {navItems.map(item => renderNavItem(item))}
-      </nav>
+      {districtMode ? (
+        <nav className="flex-1 overflow-y-auto py-4 px-3" aria-label="地区メニュー">
+          {districtSections.map((section, i) => (
+            <div key={section.title ?? i} className={cn(i > 0 && 'mt-5')}>
+              {section.title && (
+                <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{section.title}</p>
+              )}
+              <div className="space-y-1">{section.items.map(item => renderNavItem(item))}</div>
+            </div>
+          ))}
+        </nav>
+      ) : (
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          {navItems.map(item => renderNavItem(item))}
+        </nav>
+      )}
 
       {/* ユーザー情報 */}
       <div className="flex-shrink-0 border-t border-gray-200 p-4">
@@ -265,7 +342,9 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            <p className="text-xs text-gray-500 truncate">
+              {districtMode && role ? `${USER_ROLE_LABELS[role] ?? ''}・` : ''}{user?.email}
+            </p>
           </div>
           <button
             type="button"

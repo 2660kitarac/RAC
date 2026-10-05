@@ -33,8 +33,11 @@ import {
 } from '@/lib/event-registration/types';
 import { newKey, yen } from './shared';
 
+/** 地区行事から作るときの初期値（任意） */
+export type FormEditorInitialValues = Partial<Pick<RegistrationFormConfig, 'title' | 'eventDate' | 'venue' | 'deadline' | 'description'>>;
+
 type Props =
-  | { mode: 'new' }
+  | { mode: 'new'; initialValues?: FormEditorInitialValues; districtEventId?: string; eventTitle?: string }
   | { mode: 'settings'; formId: string; initialConfig: RegistrationFormConfig; registrationCount: number };
 
 /** 何も入っていないフォーム設定 */
@@ -177,13 +180,23 @@ export default function FormEditor(props: Props) {
   if (!config) {
     return (
       <div className="space-y-4">
+        {props.mode === 'new' && props.eventTitle && (
+          <p className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+            地区行事『{props.eventTitle}』の申込フォームとして作成します
+          </p>
+        )}
         <p className="text-sm text-gray-600">まず、行事の形に近いひな形を選んでください。あとから自由に変更できます。</p>
         <div className="grid gap-3 md:grid-cols-3">
           {TEMPLATES.map(t => (
             <button
               key={t.id}
               type="button"
-              onClick={() => setConfig(t.build())}
+              onClick={() => {
+                const built = t.build();
+                // 地区行事から作るときは、行事の情報を最初から入れておく
+                const iv = props.mode === 'new' ? props.initialValues : undefined;
+                setConfig(iv ? { ...built, ...Object.fromEntries(Object.entries(iv).filter(([, v]) => v !== undefined)) } : built);
+              }}
               className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <span className="flex items-center gap-2 font-semibold text-gray-900">
@@ -218,7 +231,7 @@ export default function FormEditor(props: Props) {
         const res = await fetch('/api/district/registration-forms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config }),
+          body: JSON.stringify(props.districtEventId ? { config, districtEventId: props.districtEventId } : { config }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'フォームの作成に失敗しました');
@@ -262,6 +275,11 @@ export default function FormEditor(props: Props) {
 
   return (
     <div className="space-y-4 pb-24">
+      {props.mode === 'new' && props.eventTitle && (
+        <p className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+          地区行事『{props.eventTitle}』の申込フォームとして作成します
+        </p>
+      )}
       {/* 基本情報 */}
       <Section title="基本情報" description="申込ページの上部に表示されます。">
         <div>

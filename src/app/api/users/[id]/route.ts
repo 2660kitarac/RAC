@@ -4,7 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+import { canAssignRole, canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
 import { canResetPasswordFor, validatePassword } from '@/lib/auth/password';
 
 type SessionUser = { id?: string | null; role?: string | null; clubId?: string | null };
@@ -76,6 +76,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // ---- 権限昇格の防止 ----
+    if ('role' in updateData && !canAssignRole(sessionUser.role, updateData.role as string, target.role)) {
+      return NextResponse.json({ error: 'このロールは設定できません' }, { status: 403 });
+    }
     if ('role' in updateData && !isAdmin) {
       if (isDistrictScope(updateData.role as string)) {
         return NextResponse.json({ error: 'このロールは設定できません' }, { status: 403 });

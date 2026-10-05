@@ -1,76 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { districtEvents, users } from '@/lib/db/schema';
+import { districtEvents } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { isDistrictScope } from '@/lib/auth/tenant';
+import { nowJst, requireDistrictContext } from '@/lib/district/context';
+import { parseEventInput } from '@/lib/district/event-input';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/** 担当地区の行事か確認して返す */
+async function loadEvent(ctx: Extract<Awaited<ReturnType<typeof requireDistrictContext>>, { ok: true }>, id: string) {
+  if (!ctx.district) return null;
+  const [ev] = await ctx.db
+    .select({ id: districtEvents.id })
+    .from(districtEvents)
+    .where(and(eq(districtEvents.id, id.slice(0, 64)), eq(districtEvents.districtId, ctx.district.id), isNull(districtEvents.deletedAt)))
+    .limit(1);
+  return ev ?? null;
+}
+
 // PATCH /api/district/[id] - 地区行事更新
-export async function PATCH(
-  request: NextRequest,
-  { params }: RouteContext
-) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-
-    const db = await getDbFromContext();
-
-    // 権限チェック
-    const profile = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(and(eq(users.id, session.user.id!), isNull(users.deletedAt)))
-      .then((r: any[]) => r[0]);
-
-    if (!isDistrictScope(profile?.role || 'member')) {
-      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
-    }
-
+    const ctx = await requireDistrictContext();
+    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     const { id } = await params;
-    const body = await request.json();
-    const {
-      title, eventType, date, startTime, endTime,
-      venueName, venueAddress, registrationFee, registrationDeadline,
-      description, hostClubId, isAwardTarget, isJointMeeting,
-    } = body;
+    const existing = await loadEvent(ctx, id);
+    if (!existing || !ctx.district) return NextResponse.json({ error: '行事が見つかりません' }, { status: 404 });
 
-    if (!title || !date) {
-      return NextResponse.json({ error: '行事名・開催日は必須です' }, { status: 400 });
-    }
+    const body = await request.json().catch(() => null);
+    const parsed = await parseEventInput(ctx.db, ctx.district.id, body);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-    // 対象行事の存在確認
-    const existing = await db
-      .select({ id: districtEvents.id })
-      .from(districtEvents)
-      .where(and(eq(districtEvents.id, id), isNull(districtEvents.deletedAt)))
-      .then((r: any[]) => r[0]);
-
-    if (!existing) {
-      return NextResponse.json({ error: '行事が見つかりません' }, { status: 404 });
-    }
-
-    await db.update(districtEvents)
-      .set({
-        title,
-        eventType: eventType || 'その他',
-        date,
-        startTime: startTime || null,
-        endTime: endTime || null,
-        venueName: venueName || null,
-        venueAddress: venueAddress || null,
-        registrationFee: registrationFee || 0,
-        registrationDeadline: registrationDeadline || null,
-        description: description || null,
-        hostClubId: hostClubId || null,
-        isAwardTarget: isAwardTarget ?? false,
-        isJointMeeting: isJointMeeting ?? false,
-        updatedAt: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-      })
-      .where(eq(districtEvents.id, id));
-
+    await ctx.db
+      .update(districtEvents)
+      .set({ ...parsed.values, updatedAt: nowJst() })
+      .where(eq(districtEvents.id, existing.id));
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('PATCH /api/district/[id] error:', error);
@@ -79,33 +42,16 @@ export async function PATCH(
 }
 
 // DELETE /api/district/[id] - 地区行事削除（論理削除）
-export async function DELETE(
-  request: NextRequest,
-  { params }: RouteContext
-) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-
-    const db = await getDbFromContext();
-
-    // 権限チェック
-    const profile = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(and(eq(users.id, session.user.id!), isNull(users.deletedAt)))
-      .then((r: any[]) => r[0]);
-
-    if (!isDistrictScope(profile?.role || 'member')) {
-      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
-    }
-
+    const ctx = await requireDistrictContext();
+    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
     const { id } = await params;
-    const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-    await db.update(districtEvents)
-      .set({ deletedAt: now, updatedAt: now })
-      .where(and(eq(districtEvents.id, id), isNull(districtEvents.deletedAt)));
+    const existing = await loadEvent(ctx, id);
+    if (!existing) return NextResponse.json({ error: '行事が見つかりません' }, { status: 404 });
 
+    const now = nowJst();
+    await ctx.db.update(districtEvents).set({ deletedAt: now, updatedAt: now }).where(eq(districtEvents.id, existing.id));
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/district/[id] error:', error);

@@ -1,9 +1,12 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { users, clubs } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { users, clubs, clubReports, instagramPosts } from '@/lib/db/schema';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { isDistrictStaff } from '@/lib/auth/tenant';
+import { resolveDistrict } from '@/lib/district/context';
+import type { DistrictBadges } from '@/components/layout/Sidebar';
 
 export default async function DashboardRootLayout({
   children,
@@ -17,6 +20,8 @@ export default async function DashboardRootLayout({
   }
 
   let profile = null;
+  let districtLabel: string | null = null;
+  let districtBadges: DistrictBadges | undefined;
 
   try {
     const db = await getDbFromContext();
@@ -50,6 +55,32 @@ export default async function DashboardRootLayout({
       .limit(1);
 
     profile = result[0] ?? null;
+
+    // 地区役員：地区名と審査待ちの件数（サイドバーのバッジ）
+    if (profile && isDistrictStaff(profile.role)) {
+      try {
+        const [me] = await db
+          .select({ districtId: users.districtId, clubId: users.clubId })
+          .from(users)
+          .where(eq(users.id, profile.id))
+          .limit(1);
+        const district = await resolveDistrict(db, { districtId: me?.districtId ?? null, clubId: me?.clubId ?? null, role: profile.role });
+        districtLabel = district?.label ?? null;
+        if (district) {
+          const [r] = await db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(clubReports)
+            .where(and(eq(clubReports.districtId, district.id), eq(clubReports.status, 'submitted'), isNull(clubReports.deletedAt)));
+          const [ig] = await db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(instagramPosts)
+            .where(and(eq(instagramPosts.districtId, district.id), eq(instagramPosts.status, 'pending'), isNull(instagramPosts.deletedAt)));
+          districtBadges = { reports: r?.n ?? 0, instagram: ig?.n ?? 0 };
+        }
+      } catch (e) {
+        console.error('[DashboardLayout] district info error:', e);
+      }
+    }
   } catch (error) {
     console.error('[DashboardLayout] DB error:', error);
     // DBエラーでもレイアウトは表示する（セッション情報のみ使用）
@@ -67,7 +98,7 @@ export default async function DashboardRootLayout({
   }
 
   return (
-    <DashboardLayout user={profile as any}>
+    <DashboardLayout user={profile as any} districtLabel={districtLabel} districtBadges={districtBadges}>
       {children}
     </DashboardLayout>
   );

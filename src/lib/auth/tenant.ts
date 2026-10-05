@@ -126,7 +126,49 @@ export function canManageClub(role: string | null | undefined): boolean {
   return (CLUB_MANAGER_ROLES as readonly string[]).includes(role);
 }
 
-/** 地区管理画面を使えるロール（system_owner / district_admin）。useAuth の isDistrictStaff のサーバー版 */
+/** 地区役員の役職（地区専用モードで使う） */
+export const DISTRICT_OFFICER_ROLES = [
+  'district_admin',
+  'district_representative',
+  'district_secretary',
+  'district_treasurer',
+  'district_pr_chair',
+] as const;
+export type DistrictOfficerRole = (typeof DISTRICT_OFFICER_ROLES)[number];
+
+/** 地区役員（地区専用モードで表示する人）。system_owner は含めない */
+export function isDistrictOfficer(role: string | null | undefined): boolean {
+  return !!role && (DISTRICT_OFFICER_ROLES as readonly string[]).includes(role);
+}
+
+/** 地区管理画面を使えるロール（system_owner と地区役員）。useAuth の isDistrictStaff のサーバー版 */
 export function isDistrictStaff(role: string | null | undefined): boolean {
-  return role === 'system_owner' || role === 'district_admin';
+  return role === 'system_owner' || isDistrictOfficer(role);
+}
+
+/** 地区役員アカウントの追加・役職変更ができるロール */
+export function canManageDistrictOfficers(role: string | null | undefined): boolean {
+  return role === 'system_owner' || role === 'district_admin' || role === 'district_representative';
+}
+
+/**
+ * ロールを変更してよいか（権限昇格の防止）
+ *  - system_owner はすべて可
+ *  - district_admin は system_owner の付与・変更以外は可
+ *  - 地区役員の付与・変更は canManageDistrictOfficers のロールのみ（地区管理者の付与は上の2つのみ）
+ *  - それ以外は、地区系・上位ロールの付与も、上位ロールの人の変更もできない
+ */
+export function canAssignRole(
+  actorRole: string | null | undefined,
+  newRole: string | null | undefined,
+  targetCurrentRole: string | null | undefined,
+): boolean {
+  if (actorRole === 'system_owner') return true;
+  const high = (r: string | null | undefined) => r === 'system_owner' || r === 'district_admin';
+  if (newRole === 'system_owner' || targetCurrentRole === 'system_owner') return false;
+  if (actorRole === 'district_admin') return true;
+  if (high(newRole) || high(targetCurrentRole)) return false;
+  const districtish = (r: string | null | undefined) => isDistrictScope(r) || isDistrictOfficer(r);
+  if (districtish(newRole) || districtish(targetCurrentRole)) return canManageDistrictOfficers(actorRole);
+  return true;
 }
