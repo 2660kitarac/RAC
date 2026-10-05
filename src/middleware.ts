@@ -27,6 +27,8 @@ const PUBLIC_PATHS = [
   '/pending',
   '/reset-password',
   '/mu/',
+  // 地区行事の申込フォーム（ログイン不要・修正用リンクも含む）
+  '/entry/',
   '/api/clubs/public',
   '/api/',
   '/club/',

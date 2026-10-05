@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users, Building2, Receipt,
   Mail, FileText, BarChart3, Settings, ChevronDown,
   ChevronRight, LogOut, Award, Globe, CreditCard, UserCheck,
-  Heart, TrendingUp, Bell, Key, ShieldCheck, MapPin
+  Heart, TrendingUp, Bell, Key, ShieldCheck, MapPin, ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
@@ -123,6 +123,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0 }: Side
       children: [
         { label: '地区ダッシュボード', href: '/district/dashboard', icon: LayoutDashboard },
         { label: '地区行事', href: '/district/events', icon: Calendar },
+        { label: '行事の申込管理', href: '/district/registrations', icon: ClipboardList },
         { label: '報告書管理', href: '/district/reports', icon: FileText },
         { label: 'Instagram管理', href: '/district/instagram', icon: Globe },
         { label: 'カレンダー管理', href: '/district/calendar', icon: Calendar },
