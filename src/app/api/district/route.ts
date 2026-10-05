@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { districtEvents, users } from '@/lib/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
-import { isDistrictStaff } from '@/lib/hooks/useAuth';
+import { isDistrictStaff } from '@/lib/auth/tenant';
 import { nanoid } from 'nanoid';
 
 // GET /api/district - 地区行事一覧

@@ -3,7 +3,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs, districts, districtEvents } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { isDistrictStaff } from '@/lib/hooks/useAuth';
+import { isDistrictStaff } from '@/lib/auth/tenant';
 import { formatTime } from '@/lib/utils';
 
 export const metadata = { title: 'カレンダー管理' };
