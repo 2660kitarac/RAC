@@ -563,6 +563,62 @@ export const meetingResumes = pgTable('meeting_resumes', {
 });
 
 // ============================================================
+// 地区行事の申込フォーム（migrations/0012_event_registrations.sql）
+// ============================================================
+
+/** 申込フォーム（設定の中身は src/lib/event-registration/types.ts の RegistrationFormConfig） */
+export const registrationForms = pgTable('registration_forms', {
+  id: text('id').primaryKey(),
+  districtId: text('district_id').notNull().references(() => districts.id),
+  districtEventId: text('district_event_id').references(() => districtEvents.id),
+  slug: text('slug').notNull().unique(),
+  config: jsonb('config').notNull().default({}),
+  createdBy: text('created_by'),
+  updatedBy: text('updated_by'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+/** クラブごとの申込 */
+export const eventRegistrations = pgTable('event_registrations', {
+  id: text('id').primaryKey(),
+  formId: text('form_id').notNull().references(() => registrationForms.id),
+  editToken: text('edit_token').notNull().unique(),
+  districtName: text('district_name'),
+  clubId: text('club_id').references(() => clubs.id),
+  clubName: text('club_name').notNull(),
+  registrantName: text('registrant_name').notNull(),
+  registrantEmail: text('registrant_email').notNull(),
+  registrantPhone: text('registrant_phone'),
+  data: jsonb('data').notNull().default({}),
+  attendeeCount: integer('attendee_count').notNull().default(0),
+  registrationFee: integer('registration_fee').notNull().default(0),
+  itemsFee: integer('items_fee').notNull().default(0),
+  totalAmount: integer('total_amount').notNull().default(0),
+  paymentStatus: text('payment_status').notNull().default('unpaid'),
+  paidAmount: integer('paid_amount').notNull().default(0),
+  paidAt: text('paid_at'),
+  paymentNote: text('payment_note'),
+  adminNote: text('admin_note'),
+  status: text('status').notNull().default('submitted'),
+  submittedAt: text('submitted_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  updatedAt: text('updated_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+  deletedAt: text('deleted_at'),
+});
+
+/** 申込の操作履歴 */
+export const eventRegistrationLogs = pgTable('event_registration_logs', {
+  id: text('id').primaryKey(),
+  formId: text('form_id').notNull().references(() => registrationForms.id),
+  registrationId: text('registration_id').references(() => eventRegistrations.id),
+  action: text('action').notNull(),
+  actor: text('actor'),
+  detail: text('detail'),
+  createdAt: text('created_at').notNull().default(sql`(now() AT TIME ZONE 'Asia/Tokyo')::text`),
+});
+
+// ============================================================
 // 型エクスポート
 // ============================================================
 export type Club = typeof clubs.$inferSelect;
