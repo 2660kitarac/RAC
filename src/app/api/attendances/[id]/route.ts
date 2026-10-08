@@ -14,11 +14,17 @@ async function loadAndAuthorize(
   db: any,
   sessionUser: any,
   id: string,
-): Promise<{ ok: true; isOwner: boolean } | { ok: false; res: NextResponse }> {
+): Promise<
+  | { ok: true; isOwner: boolean; locked: boolean }
+  | { ok: false; res: NextResponse }
+> {
   const [record] = await db
     .select({
       id: attendances.id,
       userId: attendances.userId,
+      paymentStatus: attendances.paymentStatus,
+      attendanceStatus: attendances.attendanceStatus,
+      meetingFinishedAt: meetings.finishedAt,
       attendanceClubId: attendances.clubId,
       meetingClubId: meetings.clubId,
     })
@@ -40,7 +46,11 @@ async function loadAndAuthorize(
   // 本人の登録は、他クラブの例会でも本人が取り消し・一部修正できる
   const isOwner = !!record.userId && record.userId === sessionUser?.id;
   if (isOwner && !(canManageClub(sessionUser?.role) && canMutateClubRecord(sessionUser, ownerClubId))) {
-    return { ok: true, isOwner: true };
+    // 支払済み・出席確定・例会終了後の登録は、本人では取り消し・変更できない（記録を残すため）
+    const locked = record.paymentStatus === 'paid'
+      || record.attendanceStatus === 'present'
+      || !!record.meetingFinishedAt;
+    return { ok: true, isOwner: true, locked };
   }
 
   // それ以外は、例会を主催するクラブの運営ロールのみ（一般会員が他人の支払状況等を変えられないように）
@@ -54,7 +64,7 @@ async function loadAndAuthorize(
     };
   }
 
-  return { ok: true, isOwner: false };
+  return { ok: true, isOwner: false, locked: false };
 }
 
 // PATCH /api/attendances/[id] - 出席情報更新
@@ -73,6 +83,12 @@ export async function PATCH(
     // ---- 所有クラブ検証（他クラブのレコードは操作不可） ----
     const authz = await loadAndAuthorize(db, sessionUser, id);
     if (!authz.ok) return authz.res;
+    if (authz.isOwner && authz.locked) {
+      return NextResponse.json(
+        { error: '支払済み・出席確定済み、または終了した例会の登録は変更できません。主催クラブにお問い合わせください' },
+        { status: 400 },
+      );
+    }
 
     const body = await request.json();
 
@@ -122,6 +138,12 @@ export async function DELETE(
     // ---- 所有クラブ検証（他クラブのレコードは削除不可） ----
     const authz = await loadAndAuthorize(db, sessionUser, id);
     if (!authz.ok) return authz.res;
+    if (authz.isOwner && authz.locked) {
+      return NextResponse.json(
+        { error: '支払済み・出席確定済み、または終了した例会の登録は変更できません。主催クラブにお問い合わせください' },
+        { status: 400 },
+      );
+    }
 
     await db
       .update(attendances)

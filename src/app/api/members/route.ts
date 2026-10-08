@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull, like, or } from 'drizzle-orm';
-import { resolveClubScope, canManageClub, canAssignRole } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageClub, canAssignRole, isDistrictScope } from '@/lib/auth/tenant';
 import { validatePassword } from '@/lib/auth/password';
 import { randomUUID, randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -77,6 +77,11 @@ export async function POST(request: NextRequest) {
     }
     // 自分より上位のロールや地区ロールは付与させない（権限昇格の防止）
     if (typeof role !== 'string' || !canAssignRole(session.user.role, role, null)) {
+      return NextResponse.json({ error: 'このロールは付与できません' }, { status: 403 });
+    }
+    // 一般会員以外（クラブアカウント・会長など）の作成はクラブアカウント以上に限る
+    const actorRole = session.user.role;
+    if (role !== 'member' && !isDistrictScope(actorRole) && actorRole !== 'club_account' && actorRole !== 'club_admin') {
       return NextResponse.json({ error: 'このロールは付与できません' }, { status: 403 });
     }
 

@@ -89,12 +89,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 認証済み + /login or /register → /dashboard へリダイレクト
-  if (hasSession && (pathname === '/login' || pathname === '/register')) {
-    const url = req.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
-  }
+  // ※ 以前は「cookie があれば /login → /dashboard」へ転送していたが、
+  //   cookie が残っていてもセッションが無効（期限切れ・アカウント無効化など）の場合、
+  //   画面側の /login 転送と往復して無限リダイレクトになるため行わない。
+  //   ログイン済みの人が /login を開いた場合はログイン画面が表示される。
 
   // 認証済み + /pending → そのまま通す（pending画面はサーバー側でstatusを確認）
 

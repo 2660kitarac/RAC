@@ -8,7 +8,7 @@ import { resolveClubScope, canManageClub, canMutateClubRecord } from '@/lib/auth
 /** 1回の送信で扱う宛先数の上限（誤操作・悪用時の被害を抑える） */
 const MAX_RECIPIENTS = 500;
 /** メールアドレスの簡易検証（区切り文字や空白を含む値を弾く） */
-const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
+const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+$/;
 const isEmail = (v: unknown): v is string => typeof v === 'string' && EMAIL_RE.test(v.trim());
 import { randomUUID } from 'crypto';
 
@@ -35,8 +35,11 @@ export async function POST(request: NextRequest) {
       targetType, recipients, replyTo, emailId: existingEmailId,
     } = reqBody;
     // 送信画面は cc / bcc というキーで送ってくるため、両方の名前を受け付ける
-    const ccEmails: string[] | undefined = reqBody.ccEmails ?? reqBody.cc;
-    const bccEmails: string[] | undefined = reqBody.bccEmails ?? reqBody.bcc;
+    // 形式の正しくないアドレスは除外する（区切り文字の混入によるヘッダー改ざんを防ぐ）
+    const cleanList = (v: unknown): string[] | undefined =>
+      Array.isArray(v) ? v.filter(isEmail).map(e => e.trim()).slice(0, 50) : undefined;
+    const ccEmails = cleanList(reqBody.ccEmails ?? reqBody.cc);
+    const bccEmails = cleanList(reqBody.bccEmails ?? reqBody.bcc);
 
     if (!subject || !bodyContent) {
       return NextResponse.json({ error: 'subject と body は必須です' }, { status: 400 });
@@ -46,11 +49,6 @@ export async function POST(request: NextRequest) {
     }
     if (recipients.length > MAX_RECIPIENTS) {
       return NextResponse.json({ error: `一度に送信できるのは${MAX_RECIPIENTS}件までです` }, { status: 400 });
-    }
-    for (const list of [ccEmails, bccEmails]) {
-      if (list !== undefined && list !== null && (!Array.isArray(list) || list.length > 50 || !list.every(isEmail))) {
-        return NextResponse.json({ error: 'CC / BCC のメールアドレスが正しくありません' }, { status: 400 });
-      }
     }
     if (replyTo && !isEmail(replyTo)) {
       return NextResponse.json({ error: '返信先のメールアドレスが正しくありません' }, { status: 400 });

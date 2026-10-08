@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
 //  - それ以外（未ログインの外部参加者・一般会員・他クラブ）… MU登録のみ可。
 //    本人以外の userId・支払状況・出席確定・金額はクライアントの値を信用せず、
 //    参加費はサーバー側で例会の設定から計算する
-const MEMBER_TYPES = ['RAC', 'RC', 'OB_OG', 'GUEST'];
+const MEMBER_TYPES = ['RAC', 'RC', 'OB_OG', 'GUEST', 'OTHER'];
 const PARTICIPATION_TYPES = ['meeting_only', 'meeting_and_party', 'party_only', 'absent'];
 
 export async function POST(request: NextRequest) {
