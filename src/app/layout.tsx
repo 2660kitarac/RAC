@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   },
   description: 'ローターアクトクラブの例会管理、出席管理、会計管理を一元化するSaaSシステム',
   keywords: ['ローターアクト', 'RAC', 'クラブ管理', '例会管理'],
-  // iPhone で「ホーム画面に追加」したときの名前・表示（アイコンは app/apple-icon.png）
+  // iPhone で「ホーム画面に追加」したときの名前・表示
   applicationName: 'RAC Cloud',
   appleWebApp: {
     capable: true,
@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    // iPhone のホーム画面アイコン（iOS は /apple-touch-icon.png も自動で探す）
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
 };
 
