@@ -25,7 +25,7 @@ type Tab = {
 };
 
 /** 例会運営をするクラブ側のロール */
-const CLUB_STAFF_ROLES = ['system_owner', 'district_admin', 'club_account', 'club_admin', 'president', 'secretary', 'treasurer'];
+const CLUB_STAFF_ROLES = ['system_owner', 'club_account', 'club_admin', 'president', 'secretary', 'treasurer'];
 
 /**
  * 下部タブを出さない画面（編集画面には独自の「保存」バーが画面下にあり、重なってしまうため）

@@ -24,8 +24,9 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
   const bottomTabs = shouldShowBottomNav(pathname) ? bottomTabsFor(user?.role, districtMode, districtBadges) : [];
   const hasBottomNav = bottomTabs.length > 0;
 
+  // 横向きの iPhone で、左右の切り欠き部分に表示が隠れないよう左右に safe-area の余白を取る
   return (
-    <div className="flex h-[100dvh] bg-gray-50" data-app-shell>
+    <div className="flex h-[100dvh] bg-gray-50 pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]" data-app-shell>
       {/* デスクトップサイドバー */}
       <div className="hidden lg:flex lg:flex-shrink-0 print:hidden" data-app-chrome>
         <div className="w-64">
