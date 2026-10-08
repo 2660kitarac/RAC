@@ -4,8 +4,8 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull, like, or } from 'drizzle-orm';
 import { resolveClubScope, canManageClub, canAssignRole, isDistrictScope } from '@/lib/auth/tenant';
-import { validatePassword } from '@/lib/auth/password';
-import { randomUUID, randomBytes } from 'crypto';
+import { validatePassword, generateTemporaryPassword } from '@/lib/auth/password';
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 
 // GET /api/members - 会員一覧
@@ -91,10 +91,10 @@ export async function POST(request: NextRequest) {
       if (pwError) return NextResponse.json({ error: pwError }, { status: 400 });
     }
 
-    // パスワード未指定時は推測できないランダム値にする（固定の初期パスワードは使わない）。
-    // ログインさせる場合は、会員一覧の「パスワードリセット」で仮パスワードを発行する。
-    const initialPassword = password || randomBytes(24).toString('base64url');
-    const passwordHash = await bcrypt.hash(initialPassword, 10);
+    // パスワード未指定時は、会員ごとに別々の仮パスワードを発行して画面に表示する
+    // （以前は全員共通の固定パスワードだったため、メールアドレスを知っていれば誰でもログインできた）
+    const temporaryPassword = password ? null : generateTemporaryPassword(10);
+    const passwordHash = await bcrypt.hash(password || temporaryPassword!, 10);
     const id = randomUUID();
     // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
     const writeScope = resolveClubScope(session.user, body.clubId);
@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
       memo, passwordHash, isActive: true,
     });
 
-    return NextResponse.json({ member: { id, name, email, role, memberType } });
+    // 仮パスワードはこの応答でだけ返す（保存はハッシュのみ）。管理者が本人に伝える
+    return NextResponse.json({ member: { id, name, email, role, memberType }, temporaryPassword });
   } catch (e: any) {
     // Postgres の一意制約違反は code 23505（旧 SQLite の文言も念のため残す）
     if (e?.code === '23505' || e?.cause?.code === '23505' || e.message?.includes('UNIQUE constraint')) {

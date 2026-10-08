@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { generateTemporaryPassword } from '@/lib/auth/password';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -106,7 +107,8 @@ export async function POST(request: NextRequest) {
     }
 
     // パスワードハッシュ（未指定なら仮パスワード）
-    const rawPassword = password || Math.random().toString(36).slice(-10);
+    // 仮パスワードは暗号論的乱数で作る（Math.random は予測できるため使わない）
+    const rawPassword = password || generateTemporaryPassword(10);
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
     const id = randomUUID();

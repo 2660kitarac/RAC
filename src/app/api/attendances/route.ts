@@ -6,6 +6,7 @@ import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { resolveClubScope, canManageClub, canMutateClubRecord } from '@/lib/auth/tenant';
 import { calculateFee } from '@/lib/utils';
+import { postAttendanceIncome } from '@/lib/finance/attendance-income';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
@@ -288,6 +289,12 @@ export async function POST(request: NextRequest) {
 
     const id = randomUUID();
     await db.insert(attendances).values({ id, ...values } as any);
+
+    // 受付での手動追加など、支払済みで登録したときは会計にも計上する
+    if (values.paymentStatus === 'paid') {
+      await postAttendanceIncome(db, id, sessionUser?.id ?? null)
+        .catch(e => console.error('attendance income post error:', e));
+    }
 
     return NextResponse.json({
       id,

@@ -17,6 +17,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { LEGACY_INITIAL_PASSWORD } from '@/lib/auth/password';
 
 /** ログイン中のアカウント状態（ロール・有効/無効）をDBと照合する間隔 */
 const SESSION_RECHECK_MS = 5 * 60 * 1000;
@@ -28,13 +29,30 @@ const SESSION_RECHECK_MS = 5 * 60 * 1000;
  */
 type AccountState = {
   role: string; clubId: string | null; status: string; isActive: boolean; name: string; email: string;
+  passwordHash: string;
 } | null;
 const ACCOUNT_CACHE_MS = 60 * 1000;
 const accountCache = new Map<string, { at: number; state: AccountState }>();
 
-async function loadAccountState(userId: string): Promise<AccountState> {
+/** パスワード変更・アカウント変更の直後に、キャッシュを捨てて最新の状態を読ませる */
+export function invalidateAccountCache(userId: string) {
+  accountCache.delete(userId);
+}
+
+/** ハッシュが旧初期パスワードのものか（同じハッシュの照合結果は覚えておく） */
+const legacyHashCache = new Map<string, boolean>();
+async function isLegacyInitialHash(hash: string): Promise<boolean> {
+  const hit = legacyHashCache.get(hash);
+  if (hit !== undefined) return hit;
+  const result = await bcrypt.compare(LEGACY_INITIAL_PASSWORD, hash || '');
+  if (legacyHashCache.size > 5000) legacyHashCache.clear();
+  legacyHashCache.set(hash, result);
+  return result;
+}
+
+async function loadAccountState(userId: string, fresh = false): Promise<AccountState> {
   const now = Date.now();
-  const hit = accountCache.get(userId);
+  const hit = fresh ? undefined : accountCache.get(userId);
   if (hit && now - hit.at < ACCOUNT_CACHE_MS) return hit.state;
   const [current] = await db
     .select({
@@ -44,6 +62,7 @@ async function loadAccountState(userId: string): Promise<AccountState> {
       isActive: users.isActive,
       name: users.name,
       email: users.email,
+      passwordHash: users.passwordHash,
     })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
@@ -73,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.status = (user as any).status;
         token.name = user.name;
         token.email = user.email;
+        token.mustChangePassword = !!(user as any).mustChangePassword;
         token.checkedAt = Date.now();
         return token;
       }
@@ -80,9 +100,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // ログイン中のアカウント状態を定期的にDBと照合する。
       // JWT は30日有効なため、照合しないと無効化・削除・ロール変更が次回ログインまで反映されない。
       const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0;
-      if (token.id && Date.now() - checkedAt > SESSION_RECHECK_MS) {
+      // 初期パスワードの変更待ちの人は、変更が反映されるよう毎回照合する（対象者のみ・結果はキャッシュ）
+      if (token.id && (token.mustChangePassword || Date.now() - checkedAt > SESSION_RECHECK_MS)) {
         try {
-          const current = await loadAccountState(token.id as string);
+          // 変更待ちの人はキャッシュを使わない（別のサーバーで変更しても即反映させる）
+          const current = await loadAccountState(token.id as string, !!token.mustChangePassword);
 
           // 削除・無効化・却下されたアカウントはセッションを破棄する
           if (!current || !current.isActive || current.status === 'rejected') return null;
@@ -92,6 +114,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.status = current.status;
           token.name = current.name;
           token.email = current.email;
+          if (token.mustChangePassword) {
+            token.mustChangePassword = await isLegacyInitialHash(current.passwordHash);
+          }
           token.checkedAt = Date.now();
         } catch (e) {
           // DB 障害時はログアウトさせず、次回に再照合する
@@ -107,6 +132,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).role = token.role;
         (session.user as any).clubId = token.clubId;
         (session.user as any).status = token.status;
+        (session.user as any).mustChangePassword = !!token.mustChangePassword;
       }
       return session;
     },
@@ -171,6 +197,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: user.role,
             clubId: user.clubId,
             status: user.status,
+            // 旧初期パスワードのままなら、ログイン直後にパスワード設定を必須にする
+            mustChangePassword: credentials.password === LEGACY_INITIAL_PASSWORD,
           };
         } catch (e: any) {
           if (e?.message === 'PENDING_APPROVAL' || e?.message === 'ACCOUNT_REJECTED') {
@@ -195,6 +223,7 @@ declare module 'next-auth' {
       role: string;
       clubId: string | null;
       status: string;
+      mustChangePassword?: boolean;
     };
   }
 }

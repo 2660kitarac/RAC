@@ -10,6 +10,12 @@ import { isDistrictOfficer } from './tenant';
 /** パスワードの最低文字数 */
 export const PASSWORD_MIN_LENGTH = 8;
 
+/**
+ * 以前、画面から追加した会員に一律で設定されていた初期パスワード。
+ * このパスワードのままの会員は、ログイン直後に新しいパスワードの設定を必須にする。
+ */
+export const LEGACY_INITIAL_PASSWORD = 'changeme123';
+
 /** クラブ内の会員パスワードをリセットできるロール（自クラブ限定） */
 const CLUB_PASSWORD_MANAGER_ROLES = [
   'club_account',

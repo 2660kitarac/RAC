@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
+import { postAttendanceIncome, cancelAttendanceIncome } from '@/lib/finance/attendance-income';
 
 /**
  * 対象の出席レコードを取得し、操作権限を検証する。
@@ -15,7 +16,7 @@ async function loadAndAuthorize(
   sessionUser: any,
   id: string,
 ): Promise<
-  | { ok: true; isOwner: boolean; locked: boolean }
+  | { ok: true; isOwner: boolean; locked: boolean; paymentStatus: string | null; feeAmount: number | null }
   | { ok: false; res: NextResponse }
 > {
   const [record] = await db
@@ -23,6 +24,7 @@ async function loadAndAuthorize(
       id: attendances.id,
       userId: attendances.userId,
       paymentStatus: attendances.paymentStatus,
+      feeAmount: attendances.feeAmount,
       attendanceStatus: attendances.attendanceStatus,
       meetingFinishedAt: meetings.finishedAt,
       attendanceClubId: attendances.clubId,
@@ -50,7 +52,7 @@ async function loadAndAuthorize(
     const locked = record.paymentStatus === 'paid'
       || record.attendanceStatus === 'present'
       || !!record.meetingFinishedAt;
-    return { ok: true, isOwner: true, locked };
+    return { ok: true, isOwner: true, locked, paymentStatus: record.paymentStatus, feeAmount: record.feeAmount };
   }
 
   // それ以外は、例会を主催するクラブの運営ロールのみ（一般会員が他人の支払状況等を変えられないように）
@@ -64,7 +66,7 @@ async function loadAndAuthorize(
     };
   }
 
-  return { ok: true, isOwner: false, locked: false };
+  return { ok: true, isOwner: false, locked: false, paymentStatus: record.paymentStatus, feeAmount: record.feeAmount };
 }
 
 // PATCH /api/attendances/[id] - 出席情報更新
@@ -115,6 +117,27 @@ export async function PATCH(
       .set(updateData as any)
       .where(and(eq(attendances.id, id), isNull(attendances.deletedAt)));
 
+    // ---- 会計への自動計上（どの画面から支払済みにしても同じ結果にする） ----
+    const newStatus = (updateData.paymentStatus as string | undefined) ?? authz.paymentStatus;
+    const statusChanged = 'paymentStatus' in updateData && updateData.paymentStatus !== authz.paymentStatus;
+    const feeChanged = 'feeAmount' in updateData && Number(updateData.feeAmount) !== Number(authz.feeAmount);
+    if (statusChanged || feeChanged) {
+      try {
+        let cancelled = 0;
+        if (authz.paymentStatus === 'paid' && (newStatus !== 'paid' || feeChanged)) {
+          cancelled = await cancelAttendanceIncome(db, id);
+        }
+        // 新たに支払済みになったとき、または自動計上済みの金額を直したときに計上する
+        // （この機能より前に手入力で記帳した支払いは、金額を直しても二重計上しない）
+        if (newStatus === 'paid' && (statusChanged || cancelled > 0)) {
+          await postAttendanceIncome(db, id, sessionUser.id ?? null);
+        }
+      } catch (e) {
+        // 計上に失敗しても出席情報の更新は成功扱い（会計画面で手入力できる）
+        console.error('attendance income sync error:', e);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('PATCH /api/attendances/[id] error:', error);
@@ -149,6 +172,11 @@ export async function DELETE(
       .update(attendances)
       .set({ deletedAt: new Date().toISOString() } as any)
       .where(and(eq(attendances.id, id), isNull(attendances.deletedAt)));
+
+    // 自動計上した参加費も取り消す
+    if (authz.paymentStatus === 'paid') {
+      await cancelAttendanceIncome(db, id).catch(e => console.error('attendance income cancel error:', e));
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
