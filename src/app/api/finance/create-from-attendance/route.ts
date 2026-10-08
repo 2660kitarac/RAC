@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { canManageClub, canMutateClubRecord } from '@/lib/auth/tenant';
-import { postAttendanceIncome } from '@/lib/finance/attendance-income';
+import { syncAttendanceIncome } from '@/lib/finance/attendance-income';
 
 /**
  * POST /api/finance/create-from-attendance
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '他クラブの例会は操作できません' }, { status: 403 });
     }
 
-    const transactionId = await postAttendanceIncome(db, attendanceId, session.user.id);
-    if (!transactionId) return NextResponse.json({ success: false, message: '計上済み、または対象外です' });
-    return NextResponse.json({ success: true, transactionId });
+    const result = await syncAttendanceIncome(db, attendanceId, session.user.id, { allowNewPost: true });
+    if (result === 'unchanged') return NextResponse.json({ success: false, message: '計上済み、または対象外です' });
+    return NextResponse.json({ success: true, result });
   } catch (e) {
     console.error('POST /api/finance/create-from-attendance error:', e);
     return NextResponse.json({ error: '会計への計上に失敗しました' }, { status: 500 });

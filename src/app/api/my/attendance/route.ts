@@ -226,6 +226,13 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (existing[0]) {
+      // 支払済みの登録は本人では変更できない（会計の記録とずれないように）
+      if (existing[0].paymentStatus === 'paid') {
+        return NextResponse.json(
+          { error: '支払済みのため変更できません。変更が必要な場合は主催クラブにお問い合わせください' },
+          { status: 400 },
+        );
+      }
       // 更新
       await db.update(attendances).set({
         participationType: participationType as any,

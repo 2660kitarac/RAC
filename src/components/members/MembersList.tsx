@@ -60,6 +60,11 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
   const [copiedKey, setCopiedKey] = useState<'password' | 'message' | null>(null);
 
   const copyText = (text: string, key: 'password' | 'message') => {
+    // HTTPS 以外や古いブラウザでは clipboard が使えない（その場合は長押しでコピーしてもらう）
+    if (!navigator.clipboard?.writeText) {
+      toast.error('この端末では自動コピーできません。長押しでコピーしてください');
+      return;
+    }
     navigator.clipboard.writeText(text)
       .then(() => {
         setCopiedKey(key);

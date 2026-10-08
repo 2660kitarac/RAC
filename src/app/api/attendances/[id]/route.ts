@@ -4,7 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
-import { postAttendanceIncome, cancelAttendanceIncome } from '@/lib/finance/attendance-income';
+import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 
 /**
  * 対象の出席レコードを取得し、操作権限を検証する。
@@ -118,24 +118,9 @@ export async function PATCH(
       .where(and(eq(attendances.id, id), isNull(attendances.deletedAt)));
 
     // ---- 会計への自動計上（どの画面から支払済みにしても同じ結果にする） ----
-    const newStatus = (updateData.paymentStatus as string | undefined) ?? authz.paymentStatus;
-    const statusChanged = 'paymentStatus' in updateData && updateData.paymentStatus !== authz.paymentStatus;
-    const feeChanged = 'feeAmount' in updateData && Number(updateData.feeAmount) !== Number(authz.feeAmount);
-    if (statusChanged || feeChanged) {
-      try {
-        let cancelled = 0;
-        if (authz.paymentStatus === 'paid' && (newStatus !== 'paid' || feeChanged)) {
-          cancelled = await cancelAttendanceIncome(db, id);
-        }
-        // 新たに支払済みになったとき、または自動計上済みの金額を直したときに計上する
-        // （この機能より前に手入力で記帳した支払いは、金額を直しても二重計上しない）
-        if (newStatus === 'paid' && (statusChanged || cancelled > 0)) {
-          await postAttendanceIncome(db, id, sessionUser.id ?? null);
-        }
-      } catch (e) {
-        // 計上に失敗しても出席情報の更新は成功扱い（会計画面で手入力できる）
-        console.error('attendance income sync error:', e);
-      }
+    if ('paymentStatus' in updateData || 'feeAmount' in updateData) {
+      const becamePaid = updateData.paymentStatus === 'paid' && authz.paymentStatus !== 'paid';
+      await syncAttendanceIncomeSafely(db, id, sessionUser.id ?? null, { allowNewPost: becamePaid });
     }
 
     return NextResponse.json({ success: true });
@@ -175,7 +160,7 @@ export async function DELETE(
 
     // 自動計上した参加費も取り消す
     if (authz.paymentStatus === 'paid') {
-      await cancelAttendanceIncome(db, id).catch(e => console.error('attendance income cancel error:', e));
+      await syncAttendanceIncomeSafely(db, id, sessionUser.id ?? null, { allowNewPost: false });
     }
 
     return NextResponse.json({ success: true });

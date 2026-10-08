@@ -29,6 +29,9 @@ export default function ChangePasswordForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'パスワードの設定に失敗しました');
+      // ログイン情報（cookie）を最新の状態に書き換える。
+      // 画面の描画中は cookie を更新できないため、ここで更新しないと照合が毎回走り続ける
+      await fetch('/api/auth/session', { cache: 'no-store' }).catch(() => {});
       router.replace('/dashboard');
       router.refresh();
     } catch (err) {
