@@ -248,7 +248,7 @@ export default function ClubDetailView({ detail, yearLabel }: { detail: ClubDeta
                   return (
                     <tr key={r.id} className={cancelled ? 'text-gray-400' : ''}>
                       <td data-cell="primary" className="px-3 py-2">
-                        <Link href={`/district/registrations/${r.formId}`} className={`font-medium hover:underline ${cancelled ? 'line-through' : 'text-indigo-700'}`}>
+                        <Link href={`/district/registrations/${r.formId}`} className={`rac-row-link font-medium hover:underline ${cancelled ? 'line-through' : 'text-indigo-700'}`}>
                           {r.formTitle}
                         </Link>
                         {r.eventDate && <div className="text-xs font-normal text-gray-500">{formatYmd(r.eventDate)}</div>}

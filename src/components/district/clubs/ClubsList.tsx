@@ -117,7 +117,7 @@ export default function ClubsList({ clubs }: { clubs: ClubWithStats[] }) {
             {rows.map(c => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <td data-cell="primary" className="px-3 py-2">
-                  <Link href={`/district/clubs/${c.id}`} className="font-medium text-indigo-700 hover:underline">
+                  <Link href={`/district/clubs/${c.id}`} className="rac-row-link font-medium text-indigo-700 hover:underline">
                     {c.name}
                   </Link>
                   {!c.isActive && <span className="ml-2 text-xs text-gray-400">（休止中）</span>}

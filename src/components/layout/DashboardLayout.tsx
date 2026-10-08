@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Menu, X, Bell } from 'lucide-react';
 import Sidebar, { type DistrictBadges } from './Sidebar';
+import BottomNav, { bottomTabsFor, shouldShowBottomNav } from './BottomNav';
+import { usePathname } from 'next/navigation';
 import { isDistrictOfficer } from '@/lib/hooks/useAuth';
 import type { User } from '@/types';
 import { cn } from '@/lib/utils';
@@ -18,9 +20,13 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children, user, pendingMembersCount = 0, districtLabel, districtBadges }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const districtMode = isDistrictOfficer(user?.role);
+  const pathname = usePathname();
+  const bottomTabs = shouldShowBottomNav(pathname) ? bottomTabsFor(user?.role, districtMode, districtBadges) : [];
+  const hasBottomNav = bottomTabs.length > 0;
 
+  // 横向きの iPhone で、左右の切り欠き部分に表示が隠れないよう左右に safe-area の余白を取る
   return (
-    <div className="flex h-[100dvh] bg-gray-50" data-app-shell>
+    <div className="flex h-[100dvh] bg-gray-50 pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]" data-app-shell>
       {/* デスクトップサイドバー */}
       <div className="hidden lg:flex lg:flex-shrink-0 print:hidden" data-app-chrome>
         <div className="w-64">
@@ -93,13 +99,22 @@ export default function DashboardLayout({ children, user, pendingMembersCount = 
         {/* ページコンテンツ */}
         <main className="flex-1 overflow-y-auto" data-app-main>
           <div
-            className="mx-auto max-w-7xl px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:p-4 md:p-6"
+            className={cn(
+              'mx-auto max-w-7xl px-3 py-4 sm:p-4 md:p-6',
+              // 下部タブの分だけ下に余白を空ける（最後の行がタブに隠れないように）
+              hasBottomNav
+                ? 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-6'
+                : 'pb-[calc(1rem+env(safe-area-inset-bottom,0px))]',
+            )}
             data-app-content
           >
             {children}
           </div>
         </main>
       </div>
+
+      {/* スマホ：下部タブ */}
+      <BottomNav tabs={bottomTabs} onOpenMenu={() => setSidebarOpen(true)} />
     </div>
   );
 }

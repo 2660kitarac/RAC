@@ -195,7 +195,7 @@ export default function DistrictDashboard({ data }: { data: DashboardData }) {
                 {topClubs.map(c => (
                   <tr key={c.id}>
                     <td data-cell="primary" className="px-3 py-2">
-                      <Link href={`/district/clubs/${c.id}`} className="font-medium text-indigo-700 hover:underline">
+                      <Link href={`/district/clubs/${c.id}`} className="rac-row-link font-medium text-indigo-700 hover:underline">
                         {c.name}
                       </Link>
                     </td>
