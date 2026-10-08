@@ -4,7 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { muVisits, users, transactions, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { resolveClubScope, isDistrictScope } from '@/lib/auth/tenant';
+import { resolveClubScope, isDistrictScope, canManageClub } from '@/lib/auth/tenant';
 
 // GET /api/mu-visits?clubId=xxx&userId=xxx
 // クラブアカウント → 自クラブの全会員の訪問一覧（clubIdクエリは無視され自クラブに強制）
@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
 
     // ---- テナント検証: クエリの clubId は信頼せず、自クラブへ強制する ----
     const requestedClubId = url.searchParams.get('clubId');
-    const scope = resolveClubScope(sessionUser, requestedClubId);
+    const isClubless = !sessionUser.clubId && !isDistrictScope(sessionUser.role);
+    // クラブ未所属の個人会員は自分の履歴だけを見られる（下で userId を自分に固定する）
+    const scope = isClubless
+      ? { clubId: null, crossClub: false, forbidden: false }
+      : resolveClubScope(sessionUser, requestedClubId);
 
     if (scope.forbidden) {
       return NextResponse.json(
@@ -61,7 +65,11 @@ export async function GET(request: NextRequest) {
 
     // クラブに属さないアカウント（未所属の個人会員など）は
     // クラブ横断参照を許さず、自分自身の履歴のみに限定する
-    if (!scope.clubId && !scope.crossClub && !userId) {
+    // 一般会員（運営ロールでない人）も自分の履歴のみ
+    if (
+      (!scope.clubId && !scope.crossClub) ||
+      (!canManageClub(sessionUser.role) && !isDistrictScope(sessionUser.role))
+    ) {
       userId = sessionUser.id ?? null;
       if (!userId) {
         return NextResponse.json({ error: '参照権限がありません' }, { status: 403 });

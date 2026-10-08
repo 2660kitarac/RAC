@@ -33,7 +33,8 @@ export async function getSubmitter(): Promise<
   const [me] = await db
     .select({ id: users.id, name: users.name, role: users.role, clubId: users.clubId, districtId: users.districtId })
     .from(users)
-    .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)))
+    // 無効化・却下されたアカウントは古いセッションでも提出させない
+    .where(and(eq(users.id, session.user.id), isNull(users.deletedAt), eq(users.isActive, true), eq(users.status, 'active')))
     .limit(1);
   if (!me || !canSubmitToDistrict(me.role, me.clubId) || !me.clubId) {
     return { ok: false, status: 403, error: 'この画面はクラブの役員アカウントのみ利用できます' };

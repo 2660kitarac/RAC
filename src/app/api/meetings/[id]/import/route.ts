@@ -15,6 +15,7 @@ import {
   type ImportMemberType,
 } from '@/lib/meetings/import-parse';
 import { loadExistingAttendances } from '@/lib/meetings/import-server';
+import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 
 export const runtime = 'nodejs';
 
@@ -244,6 +245,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             } as any)
             .where(eq(attendances.id, targetId))
             .returning();
+
+          // 支払済みの登録の金額が変わったときは、自動計上分の金額もそろえる
+          if (res?.paymentStatus === 'paid') {
+            await syncAttendanceIncomeSafely(db, targetId, session.user.id ?? null, { allowNewPost: false });
+          }
 
           processedKeys.add(key);
           updated.push(res);

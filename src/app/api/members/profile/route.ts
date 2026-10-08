@@ -25,15 +25,17 @@ export async function PATCH(request: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
   const db = await getDbFromContext();
   const body = await request.json();
-  await db.update(users).set({
-    name: body.name, nameKana: body.nameKana ?? null,
-    birthDate: body.birthDate ?? null, phone: body.phone ?? null,
-    addressZip: body.addressZip ?? null, address: body.address ?? null,
-    occupation: body.occupation ?? null, allergy: body.allergy ?? null,
-    dietaryNote: body.dietaryNote ?? null,
-    emergencyContactName: body.emergencyContactName ?? null,
-    emergencyContactPhone: body.emergencyContactPhone ?? null,
-    updatedAt: new Date().toISOString(),
-  }).where(eq(users.id, session.user.id));
+  // 送られてきた項目だけを更新する（送られなかった項目を空にしない）
+  const fields = [
+    'nameKana', 'birthDate', 'phone', 'addressZip', 'address', 'occupation',
+    'allergy', 'dietaryNote', 'emergencyContactName', 'emergencyContactPhone',
+  ];
+  const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  if (typeof body.name === 'string' && body.name.trim()) updateData.name = body.name;
+  for (const f of fields) {
+    if (f in body) updateData[f] = body[f] ?? null;
+  }
+  await db.update(users).set(updateData as any)
+    .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)));
   return NextResponse.json({ success: true });
 }

@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
-    const now = new Date();
+    // 日本時間で年度・今日を判定する（サーバーは UTC で動くため +9時間した日時を UTC として読む）
+    const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
     // 7月始まりの年度対応: 7月以降なら currentYear、以前なら currentYear-1
-    const fiscalYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const fiscalYear = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
     const yearParam = url.searchParams.get('year');
     const targetYear = yearParam ? parseInt(yearParam) : fiscalYear;
 

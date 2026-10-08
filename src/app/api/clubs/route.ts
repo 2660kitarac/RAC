@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { isDistrictScope } from '@/lib/auth/tenant';
 
 // GET /api/clubs?type=RAC&isActive=true
 export async function GET(request: NextRequest) {
@@ -47,7 +48,14 @@ export async function GET(request: NextRequest) {
       updatedAt: clubs.updatedAt,
     }).from(clubs).where(conditions).orderBy(clubs.name);
 
-    return NextResponse.json(results);
+    // 連絡先・内部メモは地区スタッフと自クラブにのみ返す（/api/clubs/[id] と同じ方針）
+    const user = session.user as { role?: string | null; clubId?: string | null };
+    if (isDistrictScope(user.role)) return NextResponse.json(results);
+    return NextResponse.json(results.map(c =>
+      c.id === user.clubId
+        ? c
+        : { ...c, email: null, phone: null, address: null, contactName: null, memo: null },
+    ));
   } catch (error) {
     console.error('GET /api/clubs error:', error);
     return NextResponse.json({ error: 'クラブ一覧の取得に失敗しました' }, { status: 500 });

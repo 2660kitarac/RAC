@@ -153,7 +153,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
   });
 
   const memberType = watch('member_type');
-  const mealRequired = watch('meal_required');
+  // お弁当の締切後は選べない（サーバー側も締切後はお弁当なしで登録する）
+  const mealRequired = watch('meal_required') && deadlineInfo.mealAllowed;
   const receiptRequired = watch('receipt_required');
   const receiptNameType = watch('receipt_name_type');
   const participationType = watch('participation_type');
@@ -212,7 +213,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           memberType: isOwnClubMember && !isAdminRole(loggedInUser?.role ?? '') ? 'RAC' : data.member_type,
           attendanceStatus: 'undecided',
           registrationType: 'mu',
-          mealRequired: data.meal_required,
+          mealRequired: data.meal_required && deadlineInfo.mealAllowed,
           feeAmount: meetingFee,
           paymentStatus: 'unpaid',
           // 参加形態
@@ -963,7 +964,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
               <CardTitle className="text-base">オプション</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
-              {meeting.meal_fee > 0 && participationType !== 'party_only' && (
+              {meeting.meal_fee > 0 && participationType !== 'party_only' && deadlineInfo.mealAllowed && (
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <input
                     type="checkbox"

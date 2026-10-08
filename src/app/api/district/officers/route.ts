@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
       if (existing.role === 'system_owner') {
         return NextResponse.json({ error: 'このアカウントは変更できません' }, { status: 403 });
       }
+      // 無効・承認待ち・却下のアカウントは地区役員にしない
+      if (!existing.isActive || existing.status !== 'active') {
+        return NextResponse.json({ error: 'このアカウントは有効になっていないため、地区役員にできません' }, { status: 400 });
+      }
       if (existing.role === 'club_account') {
         return NextResponse.json({ error: 'クラブアカウントは地区役員にできません。個人のアカウントを指定してください' }, { status: 400 });
       }
@@ -77,7 +81,8 @@ export async function POST(request: NextRequest) {
       }
       // 同じ地区の会員に限る（他地区の会員は対象外）
       const clubIds = await districtClubIds(db, district.id);
-      const sameDistrict = existing.districtId === district.id || (!!existing.clubId && clubIds.includes(existing.clubId));
+      const sameDistrict = existing.districtId === district.id
+        || (!existing.districtId && !!existing.clubId && clubIds.includes(existing.clubId));
       if (!sameDistrict) {
         return NextResponse.json({ error: 'この地区のクラブに所属する会員ではありません' }, { status: 400 });
       }

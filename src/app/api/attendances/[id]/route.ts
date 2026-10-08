@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { canMutateClubRecord } from '@/lib/auth/tenant';
+import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
+import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 
 /**
  * 対象の出席レコードを取得し、操作権限を検証する。
@@ -14,10 +15,18 @@ async function loadAndAuthorize(
   db: any,
   sessionUser: any,
   id: string,
-): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
+): Promise<
+  | { ok: true; isOwner: boolean; locked: boolean; paymentStatus: string | null; feeAmount: number | null }
+  | { ok: false; res: NextResponse }
+> {
   const [record] = await db
     .select({
       id: attendances.id,
+      userId: attendances.userId,
+      paymentStatus: attendances.paymentStatus,
+      feeAmount: attendances.feeAmount,
+      attendanceStatus: attendances.attendanceStatus,
+      meetingFinishedAt: meetings.finishedAt,
       attendanceClubId: attendances.clubId,
       meetingClubId: meetings.clubId,
     })
@@ -36,7 +45,18 @@ async function loadAndAuthorize(
   // 例会の所有クラブを優先して判定（MU登録では attendances.clubId は訪問元クラブが入る）
   const ownerClubId = record.meetingClubId ?? record.attendanceClubId;
 
-  if (!canMutateClubRecord(sessionUser, ownerClubId)) {
+  // 本人の登録は、他クラブの例会でも本人が取り消し・一部修正できる
+  const isOwner = !!record.userId && record.userId === sessionUser?.id;
+  if (isOwner && !(canManageClub(sessionUser?.role) && canMutateClubRecord(sessionUser, ownerClubId))) {
+    // 支払済み・出席確定・例会終了後の登録は、本人では取り消し・変更できない（記録を残すため）
+    const locked = record.paymentStatus === 'paid'
+      || record.attendanceStatus === 'present'
+      || !!record.meetingFinishedAt;
+    return { ok: true, isOwner: true, locked, paymentStatus: record.paymentStatus, feeAmount: record.feeAmount };
+  }
+
+  // それ以外は、例会を主催するクラブの運営ロールのみ（一般会員が他人の支払状況等を変えられないように）
+  if (!canManageClub(sessionUser?.role) || !canMutateClubRecord(sessionUser, ownerClubId)) {
     return {
       ok: false,
       res: NextResponse.json(
@@ -46,7 +66,7 @@ async function loadAndAuthorize(
     };
   }
 
-  return { ok: true };
+  return { ok: true, isOwner: false, locked: false, paymentStatus: record.paymentStatus, feeAmount: record.feeAmount };
 }
 
 // PATCH /api/attendances/[id] - 出席情報更新
@@ -65,6 +85,12 @@ export async function PATCH(
     // ---- 所有クラブ検証（他クラブのレコードは操作不可） ----
     const authz = await loadAndAuthorize(db, sessionUser, id);
     if (!authz.ok) return authz.res;
+    if (authz.isOwner && authz.locked) {
+      return NextResponse.json(
+        { error: '支払済み・出席確定済み、または終了した例会の登録は変更できません。主催クラブにお問い合わせください' },
+        { status: 400 },
+      );
+    }
 
     const body = await request.json();
 
@@ -79,7 +105,10 @@ export async function PATCH(
       // 参加者基本情報（管理者による修正用 Issue #2）
       'externalName', 'externalEmail', 'externalPhone', 'clubName',
     ];
-    for (const field of allowedFields) {
+    // 本人による修正は、金額・支払・出欠確定に関わらない項目に限る
+    const ownerFields = ['receiptRequired', 'receiptNameType', 'receiptName', 'note', 'externalPhone'];
+    const fields = authz.isOwner ? ownerFields : allowedFields;
+    for (const field of fields) {
       if (field in body) updateData[field] = body[field];
     }
 
@@ -87,6 +116,12 @@ export async function PATCH(
       .update(attendances)
       .set(updateData as any)
       .where(and(eq(attendances.id, id), isNull(attendances.deletedAt)));
+
+    // ---- 会計への自動計上（どの画面から支払済みにしても同じ結果にする） ----
+    if ('paymentStatus' in updateData || 'feeAmount' in updateData) {
+      const becamePaid = updateData.paymentStatus === 'paid' && authz.paymentStatus !== 'paid';
+      await syncAttendanceIncomeSafely(db, id, sessionUser.id ?? null, { allowNewPost: becamePaid });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -111,11 +146,22 @@ export async function DELETE(
     // ---- 所有クラブ検証（他クラブのレコードは削除不可） ----
     const authz = await loadAndAuthorize(db, sessionUser, id);
     if (!authz.ok) return authz.res;
+    if (authz.isOwner && authz.locked) {
+      return NextResponse.json(
+        { error: '支払済み・出席確定済み、または終了した例会の登録は変更できません。主催クラブにお問い合わせください' },
+        { status: 400 },
+      );
+    }
 
     await db
       .update(attendances)
       .set({ deletedAt: new Date().toISOString() } as any)
       .where(and(eq(attendances.id, id), isNull(attendances.deletedAt)));
+
+    // 自動計上した参加費も取り消す
+    if (authz.paymentStatus === 'paid') {
+      await syncAttendanceIncomeSafely(db, id, sessionUser.id ?? null, { allowNewPost: false });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

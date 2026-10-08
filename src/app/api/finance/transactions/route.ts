@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { transactions } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageFinance } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // GET /api/finance/transactions?clubId=xxx&type=income&from=2024-01-01&to=2024-12-31
@@ -11,6 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会計情報の参照は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
@@ -49,6 +53,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会計の登録は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const db = await getDbFromContext();
     const body = await request.json();

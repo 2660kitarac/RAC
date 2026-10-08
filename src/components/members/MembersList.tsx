@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import {
-  Plus, Search, Download, Edit, UserX, UserCheck, Trash2, KeyRound
+  Plus, Search, Download, Edit, UserX, UserCheck, Trash2, KeyRound, Copy, Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,27 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
 
   // パスワード再設定ダイアログ
   const [passwordTarget, setPasswordTarget] = useState<{ id: string; name: string; email: string } | null>(null);
+  // 会員追加時に発行した仮パスワード（この画面でだけ表示する）
+  const [issued, setIssued] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<'password' | 'message' | null>(null);
+
+  const copyText = (text: string, key: 'password' | 'message') => {
+    // HTTPS 以外や古いブラウザでは clipboard が使えない（その場合は長押しでコピーしてもらう）
+    if (!navigator.clipboard?.writeText) {
+      toast.error('この端末では自動コピーできません。長押しでコピーしてください');
+      return;
+    }
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopiedKey(key);
+        toast.success('コピーしました');
+        setTimeout(() => setCopiedKey(null), 2000);
+      })
+      .catch(() => toast.error('コピーに失敗しました'));
+  };
+
+  const loginMessage = (i: { name: string; email: string; password: string }) =>
+    `${i.name} さん\nRAC Cloud のアカウントを作成しました。\n\nログイン画面：${typeof window !== 'undefined' ? window.location.origin : ''}/login\nメールアドレス：${i.email}\n仮パスワード：${i.password}\n\nログイン後、設定画面からご自身のパスワードに変更してください。`;
 
   const [form, setForm] = useState({
     name: '', name_kana: '', email: '', phone: '',
@@ -135,8 +156,11 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
         });
         const newData = await res.json();
         if (!res.ok) throw new Error(newData.error);
-        setMembers(prev => [...prev, { ...form, id: newData.id, is_active: true } as unknown as User]);
+        setMembers(prev => [...prev, { ...form, id: newData.member?.id, is_active: true } as unknown as User]);
         toast.success('会員を追加しました');
+        if (newData.temporaryPassword) {
+          setIssued({ name: form.name, email: form.email, password: newData.temporaryPassword });
+        }
       }
       setShowDialog(false);
     } catch (error: unknown) {
@@ -516,6 +540,48 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
               {deleteLoading ? '削除中...' : '削除する'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 会員追加時の仮パスワード表示 */}
+      <Dialog open={!!issued} onOpenChange={open => { if (!open) setIssued(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-green-600" />
+              仮パスワードを発行しました
+            </DialogTitle>
+          </DialogHeader>
+          {issued && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {issued.name} さんに、次のメールアドレスと仮パスワードをお伝えください。
+                この画面を閉じると再表示できません（忘れた場合は「パスワード再設定」から再発行できます）。
+              </p>
+              <div className="space-y-1.5">
+                <Label>メールアドレス</Label>
+                <p className="text-sm break-all">{issued.email}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>仮パスワード</Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 font-mono text-base tracking-wider select-all">
+                    {issued.password}
+                  </code>
+                  <Button variant="outline" size="sm" className="h-10" onClick={() => copyText(issued.password, 'password')}>
+                    {copiedKey === 'password' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <Button variant="outline" className="h-11 sm:h-10" onClick={() => copyText(loginMessage(issued), 'message')}>
+                  {copiedKey === 'message' ? <Check className="h-4 w-4 mr-1.5 text-green-600" /> : <Copy className="h-4 w-4 mr-1.5" />}
+                  案内文をコピー（LINE等に貼り付け）
+                </Button>
+                <Button className="h-11 sm:h-10" onClick={() => setIssued(null)}>閉じる</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -46,6 +46,11 @@ export async function POST(
       muRegistrationSlug: null,
       muRegistrationUrl: null,
       status: 'draft',
+      // 終了処理の状態は引き継がない（引き継ぐとコピー先が「終了済み」扱いになり申込を受け付けられない）
+      finishedAt: null,
+      finishedBy: null,
+      attendanceFinalized: false,
+      closingNote: null,
       createdBy: session.user.id,
       createdAt: now,
       updatedAt: now,

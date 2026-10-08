@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { annualFees, users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageFinance } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // GET /api/finance/annual-fees?clubId=xxx&fiscalYear=2024&paymentStatus=unpaid
@@ -11,6 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会計情報の参照は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
@@ -62,6 +66,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会計の登録は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const db = await getDbFromContext();
     const body = await request.json();
@@ -76,6 +84,14 @@ export async function POST(request: NextRequest) {
     if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     const resolvedClubId = writeScope.clubId;
     if (!resolvedClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
+
+    // 対象会員が同じクラブに所属しているか確認（他クラブ会員の情報参照を防ぐ）
+    const [member] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.clubId, resolvedClubId), isNull(users.deletedAt)))
+      .limit(1);
+    if (!member) return NextResponse.json({ error: '対象の会員が見つかりません' }, { status: 404 });
 
     const id = randomUUID();
     await db.insert(annualFees).values({

@@ -183,9 +183,10 @@ export function getPaginationRange(page: number, pageSize: number) {
 // 年度計算
 // ============================================================
 export function getFiscalYear(date: Date = new Date()): number {
-  // 7月始まりの年度
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
+  // 7月始まりの年度（日本時間で判定。サーバーが UTC でも6/30→7/1 の切り替わりがずれないように）
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const month = jst.getUTCMonth() + 1;
+  const year = jst.getUTCFullYear();
   return month >= 7 ? year : year - 1;
 }
 

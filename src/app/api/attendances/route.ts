@@ -4,7 +4,9 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, users, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageClub, canMutateClubRecord } from '@/lib/auth/tenant';
+import { calculateFee } from '@/lib/utils';
+import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
@@ -110,15 +112,25 @@ export async function GET(request: NextRequest) {
 
 // POST /api/attendances - 出席登録
 // MU登録（外部フォーム）からの呼び出しは未認証でも許可
+//
+// 権限の考え方:
+//  - 例会を主催するクラブの運営ロール（と地区スタッフ）… 代理登録として入力値をそのまま使う
+//  - それ以外（未ログインの外部参加者・一般会員・他クラブ）… MU登録のみ可。
+//    本人以外の userId・支払状況・出席確定・金額はクライアントの値を信用せず、
+//    参加費はサーバー側で例会の設定から計算する
+const MEMBER_TYPES = ['RAC', 'RC', 'OB_OG', 'GUEST', 'OTHER'];
+const PARTICIPATION_TYPES = ['meeting_only', 'meeting_and_party', 'party_only', 'absent'];
+
 export async function POST(request: NextRequest) {
   try {
-    // registrationType が 'mu' の場合は未認証でも許可（外部参加者登録）
     const body = await request.json();
     const isMuRegistration = body.registrationType === 'mu';
 
-    if (!isMuRegistration) {
-      const session = await auth();
-      if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    const session = await auth();
+    const sessionUser = (session?.user ?? null) as { id?: string; role?: string; clubId?: string | null } | null;
+
+    if (!isMuRegistration && !sessionUser) {
+      return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     }
 
     const db = await getDbFromContext();
@@ -130,7 +142,7 @@ export async function POST(request: NextRequest) {
       participationType, afterPartyFeeAmount,
     } = body;
 
-    if (!meetingId) {
+    if (!meetingId || typeof meetingId !== 'string') {
       return NextResponse.json({ error: 'meetingId は必須です' }, { status: 400 });
     }
 
@@ -144,11 +156,24 @@ export async function POST(request: NextRequest) {
     // 運営側からの代理登録（認証済み）は締切判定をスキップし、遅延フラグのみ付与する。
     const [meetingRow] = await db
       .select({
+        clubId: meetings.clubId,
         registrationDeadline: meetings.registrationDeadline,
-        deadlinePolicy: (meetings as any).deadlinePolicy,
+        deadlinePolicy: meetings.deadlinePolicy,
         status: meetings.status,
-        finishedAt: (meetings as any).finishedAt,
+        finishedAt: meetings.finishedAt,
         date: meetings.date,
+        feeRac: meetings.feeRac,
+        feeRc: meetings.feeRc,
+        feeObog: meetings.feeObog,
+        feeGuest: meetings.feeGuest,
+        mealFee: meetings.mealFee,
+        ownClubFee: meetings.ownClubFee,
+        hasAfterParty: meetings.hasAfterParty,
+        afterPartyFeeRac: meetings.afterPartyFeeRac,
+        afterPartyFeeRc: meetings.afterPartyFeeRc,
+        afterPartyFeeObog: meetings.afterPartyFeeObog,
+        afterPartyFeeGuest: meetings.afterPartyFeeGuest,
+        afterPartyAllowPartyOnly: meetings.afterPartyAllowPartyOnly,
       })
       .from(meetings)
       .where(and(eq(meetings.id, meetingId), isNull(meetings.deletedAt)))
@@ -156,6 +181,16 @@ export async function POST(request: NextRequest) {
 
     if (!meetingRow) {
       return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
+    }
+
+    // 主催クラブの運営ロール（または地区スタッフ）による代理登録か
+    const isTrustedStaff = !!sessionUser
+      && canManageClub(sessionUser.role)
+      && canMutateClubRecord(sessionUser, meetingRow.clubId);
+
+    // MU登録以外（運営側の登録）は主催クラブの運営ロールのみ
+    if (!isMuRegistration && !isTrustedStaff) {
+      return NextResponse.json({ error: 'この例会に登録する権限がありません' }, { status: 403 });
     }
 
     const deadlineCheck = evaluateDeadline(meetingRow as any);
@@ -167,32 +202,98 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const id = randomUUID();
-    await db.insert(attendances).values({
-      id,
+    const common = {
       meetingId,
-      userId: userId || null,
       externalName: externalName || null,
       externalEmail: externalEmail || null,
       externalPhone: externalPhone || null,
       clubId: clubId || null,
       clubName: clubName || null,
-      memberType: memberType || 'RAC',
-      attendanceStatus: attendanceStatus || 'undecided',
-      registrationType: registrationType || 'member',
-      mealRequired: deadlineCheck.mealAllowed ? (mealRequired ?? false) : false,
       isLateRegistration: deadlineCheck.isLate,
       registeredAfterDeadlineDays: deadlineCheck.daysLate,
-      feeAmount: feeAmount ?? 0,
-      paymentStatus: paymentStatus || 'unpaid',
-      paymentMethod: paymentMethod || null,
       receiptRequired: receiptRequired ?? false,
       receiptNameType: receiptNameType || null,
       receiptName: receiptName || null,
       note: note || null,
-      participationType: participationType || 'meeting_only',
-      afterPartyFeeAmount: afterPartyFeeAmount ?? 0,
-    } as any);
+    };
+
+    let values: Record<string, unknown>;
+
+    if (isTrustedStaff) {
+      // 運営側の代理登録：入力値をそのまま使う（従来どおり）
+      values = {
+        ...common,
+        userId: userId || null,
+        memberType: memberType || 'RAC',
+        attendanceStatus: attendanceStatus || 'undecided',
+        registrationType: registrationType || 'member',
+        mealRequired: deadlineCheck.mealAllowed ? (mealRequired ?? false) : false,
+        feeAmount: feeAmount ?? 0,
+        paymentStatus: paymentStatus || 'unpaid',
+        paymentMethod: paymentMethod || null,
+        participationType: participationType || 'meeting_only',
+        afterPartyFeeAmount: afterPartyFeeAmount ?? 0,
+      };
+    } else {
+      // 外部参加者・一般会員のMU登録：本人以外としては登録させない
+      const ownUserId = sessionUser?.id && userId && userId === sessionUser.id ? sessionUser.id : null;
+      const isOwnClubMember = !!ownUserId && !!sessionUser?.clubId && sessionUser.clubId === meetingRow.clubId;
+
+      const pType = participationType || 'meeting_only';
+      if (!PARTICIPATION_TYPES.includes(pType)) {
+        return NextResponse.json({ error: '参加形態が正しくありません' }, { status: 400 });
+      }
+      if (pType === 'absent' && !isOwnClubMember) {
+        return NextResponse.json({ error: '欠席登録は主催クラブの会員のみ行えます' }, { status: 400 });
+      }
+      const withParty = pType === 'meeting_and_party' || pType === 'party_only';
+      if (withParty && !meetingRow.hasAfterParty) {
+        return NextResponse.json({ error: 'この例会には懇親会がありません' }, { status: 400 });
+      }
+      if (pType === 'party_only' && !meetingRow.afterPartyAllowPartyOnly) {
+        return NextResponse.json({ error: 'この例会は懇親会のみの参加を受け付けていません' }, { status: 400 });
+      }
+
+      const mType = isOwnClubMember ? 'RAC' : (MEMBER_TYPES.includes(memberType) ? memberType : 'GUEST');
+      const isAbsent = pType === 'absent';
+      const meal = !isAbsent && deadlineCheck.mealAllowed ? !!mealRequired : false;
+
+      // 参加費はサーバー側で例会の設定から計算する（画面の計算と同じ式）
+      const meetingFee = (isAbsent || pType === 'party_only')
+        ? 0
+        : calculateFee(mType, {
+            fee_rac: meetingRow.feeRac, fee_rc: meetingRow.feeRc,
+            fee_obog: meetingRow.feeObog, fee_guest: meetingRow.feeGuest,
+            own_club_fee: meetingRow.ownClubFee,
+          }, meal, meetingRow.mealFee, isOwnClubMember);
+      const partyFeeByType: Record<string, number> = {
+        RAC: meetingRow.afterPartyFeeRac, RC: meetingRow.afterPartyFeeRc,
+        OB_OG: meetingRow.afterPartyFeeObog, GUEST: meetingRow.afterPartyFeeGuest,
+      };
+      const partyFee = withParty ? (partyFeeByType[mType] ?? meetingRow.afterPartyFeeGuest ?? 0) : 0;
+
+      values = {
+        ...common,
+        userId: ownUserId,
+        memberType: mType,
+        attendanceStatus: isAbsent ? 'absent' : 'undecided',
+        registrationType: 'mu',
+        mealRequired: meal,
+        feeAmount: meetingFee,
+        paymentStatus: isAbsent ? 'exempt' : 'unpaid',
+        paymentMethod: null,
+        participationType: pType,
+        afterPartyFeeAmount: partyFee,
+      };
+    }
+
+    const id = randomUUID();
+    await db.insert(attendances).values({ id, ...values } as any);
+
+    // 受付での手動追加など、支払済みで登録したときは会計にも計上する
+    if (values.paymentStatus === 'paid') {
+      await syncAttendanceIncomeSafely(db, id, sessionUser?.id ?? null, { allowNewPost: true });
+    }
 
     return NextResponse.json({
       id,

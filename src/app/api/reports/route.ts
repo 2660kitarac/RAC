@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { meetingReports } from '@/lib/db/schema';
+import { meetingReports, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { resolveClubScope, canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
@@ -59,11 +59,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '権限がありません' }, { status: 403 });
     }
 
-    // ボディの clubId は信頼しない（IDOR 対策）
+    // ボディの clubId は信頼しない（IDOR 対策）。報告書のクラブは例会の所有クラブで決める
     const scope = resolveClubScope(session.user, clubId);
     if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
-    const resolvedClubId = scope.clubId;
-    if (!resolvedClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
+    const [meetingRow] = await db
+      .select({ clubId: meetings.clubId })
+      .from(meetings)
+      .where(and(eq(meetings.id, meetingId), isNull(meetings.deletedAt)))
+      .limit(1);
+    if (!meetingRow) return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
+    if (!canMutateClubRecord(session.user, meetingRow.clubId)) {
+      return NextResponse.json({ error: '他クラブの例会の報告書は作成できません' }, { status: 403 });
+    }
+    const resolvedClubId = meetingRow.clubId;
 
     // 既存の報告書があれば更新
     const existing = await db

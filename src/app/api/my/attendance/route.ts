@@ -6,9 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings, users } from '@/lib/db/schema';
-import { eq, and, isNull, gte, asc, count } from 'drizzle-orm';
+import { eq, and, or, isNull, gte, asc, count, ne, notInArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { evaluateDeadline } from '@/lib/meetings/deadline';
+import { evaluateDeadline, todayJst } from '@/lib/meetings/deadline';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
 
     // 今後の例会一覧＋自分の出席状況
     const clubId = session.user.clubId;
-    const todayStr = new Date().toISOString().split('T')[0];
+    // 日本時間の「今日」（UTC で計算すると 0〜9時の間は前日の例会が「今後」に残る）
+    const todayStr = todayJst();
 
     const upcomingMeetings = await db
       .select({
@@ -197,6 +198,11 @@ export async function POST(request: NextRequest) {
           .where(and(
             eq(attendances.meetingId, meetingId),
             isNull(attendances.deletedAt),
+            // 欠席・キャンセル待ちは定員に数えない。自分の既存登録（参加形態の変更）も除く
+            notInArray(attendances.participationType, ['absent', 'waitlist']),
+            ne(attendances.attendanceStatus, 'absent'),
+            // userId が空の外部参加者も数える（SQL では NULL <> x が偽になるため明示）
+            or(isNull(attendances.userId), ne(attendances.userId, session.user.id)),
           ));
         if ((currentCount?.val || 0) >= capacity) {
           // 定員超過 → キャンセル待ちとして登録
@@ -220,6 +226,13 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (existing[0]) {
+      // 支払済みの登録は本人では変更できない（会計の記録とずれないように）
+      if (existing[0].paymentStatus === 'paid') {
+        return NextResponse.json(
+          { error: '支払済みのため変更できません。変更が必要な場合は主催クラブにお問い合わせください' },
+          { status: 400 },
+        );
+      }
       // 更新
       await db.update(attendances).set({
         participationType: participationType as any,
@@ -227,6 +240,10 @@ export async function POST(request: NextRequest) {
         feeAmount,
         note: note || null,
         attendanceStatus: participationType === 'absent' ? 'absent' : 'undecided',
+        // 欠席⇔参加の切り替えで支払状況を合わせる（欠席→参加で「免除」のまま残らないように）
+        paymentStatus: participationType === 'absent'
+          ? 'exempt'
+          : (existing[0].paymentStatus === 'exempt' ? 'unpaid' : existing[0].paymentStatus),
         // 遅延登録フラグは「一度立ったら消さない」＝運営が把握できるようにする
         ...(deadlineCheck.isLate
           ? {

@@ -79,19 +79,6 @@ export async function middleware(req: NextRequest) {
   // 公開パス判定
   const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p));
 
-  // /api/debug-mw へのアクセスはデバッグ情報を返す（本番では削除）
-  if (pathname === '/api/debug-mw') {
-    const cookieHeader = req.headers.get('cookie') || '';
-    const cookieNames: string[] = [];
-    req.cookies.getAll().forEach(c => cookieNames.push(c.name));
-    return NextResponse.json({
-      hasSession: hasSessionCookie(req),
-      cookieHeader: cookieHeader.substring(0, 200),
-      cookieNamesViaAPI: cookieNames,
-      pathname,
-    });
-  }
-
   // セッション cookie 確認
   const hasSession = hasSessionCookie(req);
 
@@ -102,12 +89,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 認証済み + /login or /register → /dashboard へリダイレクト
-  if (hasSession && (pathname === '/login' || pathname === '/register')) {
-    const url = req.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
-  }
+  // ※ 以前は「cookie があれば /login → /dashboard」へ転送していたが、
+  //   cookie が残っていてもセッションが無効（期限切れ・アカウント無効化など）の場合、
+  //   画面側の /login 転送と往復して無限リダイレクトになるため行わない。
+  //   ログイン済みの人が /login を開いた場合はログイン画面が表示される。
 
   // 認証済み + /pending → そのまま通す（pending画面はサーバー側でstatusを確認）
 

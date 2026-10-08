@@ -18,6 +18,10 @@ export default async function DashboardRootLayout({
   if (!session?.user) {
     redirect('/login');
   }
+  // 初期パスワードのままの人は、先にパスワードを設定してもらう
+  if (session.user.mustChangePassword) {
+    redirect('/change-password');
+  }
 
   let profile = null;
   let districtLabel: string | null = null;

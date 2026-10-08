@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { muVisits } from '@/lib/db/schema';
+import { muVisits, transactions } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+import { canMutateClubRecord, isDistrictScope, canManageClub } from '@/lib/auth/tenant';
 
 /**
  * 対象MU訪問レコードを取得し、操作権限を検証する。
@@ -13,9 +13,17 @@ async function loadAndAuthorize(
   db: any,
   sessionUser: any,
   id: string,
-): Promise<{ ok: true; clubId: string | null } | { ok: false; res: NextResponse }> {
+): Promise<{ ok: true; clubId: string | null; transactionId: string | null } | { ok: false; res: NextResponse }> {
+  // 精算状況・金額の変更や削除は会計に影響するため、運営ロールに限定する
+  if (!canManageClub(sessionUser?.role)) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: 'MU訪問履歴を操作する権限がありません' }, { status: 403 }),
+    };
+  }
+
   const [record] = await db
-    .select({ id: muVisits.id, clubId: muVisits.clubId })
+    .select({ id: muVisits.id, clubId: muVisits.clubId, transactionId: muVisits.transactionId })
     .from(muVisits)
     .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt)))
     .limit(1);
@@ -37,7 +45,7 @@ async function loadAndAuthorize(
     };
   }
 
-  return { ok: true, clubId: record.clubId };
+  return { ok: true, clubId: record.clubId, transactionId: record.transactionId ?? null };
 }
 
 // PATCH /api/mu-visits/[id] - 精算済みに更新 or 内容修正
@@ -62,10 +70,11 @@ export async function PATCH(
     const now = new Date().toISOString();
     const updateData: Record<string, unknown> = { updatedAt: now };
 
-    // clubId / userId はクライアントから変更させない（テナント移動の防止）
+    // clubId / userId / transactionId はクライアントから変更させない
+    // （テナント移動や、他の会計レコードへの付け替えを防ぐ）
     const allowedFields = [
       'visitedClubName', 'visitDate', 'feeAmount', 'note',
-      'settlementStatus', 'settledAt', 'settledBy', 'transactionId',
+      'settlementStatus', 'settledAt', 'settledBy',
     ];
     for (const field of allowedFields) {
       if (field in body) updateData[field] = body[field];
@@ -86,6 +95,17 @@ export async function PATCH(
       .update(muVisits)
       .set(updateData as any)
       .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt), scopeCondition));
+
+    // 立替金額を直したときは、自動計上した会計の金額もそろえる
+    if (authz.transactionId && 'feeAmount' in body) {
+      const amount = Number(body.feeAmount);
+      if (Number.isFinite(amount) && amount >= 0) {
+        await db
+          .update(transactions)
+          .set({ amount, updatedAt: now } as any)
+          .where(and(eq(transactions.id, authz.transactionId), isNull(transactions.deletedAt)));
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -116,10 +136,19 @@ export async function DELETE(
       ? undefined
       : eq(muVisits.clubId, sessionUser.clubId);
 
+    const deletedAt = new Date().toISOString();
     await db
       .update(muVisits)
-      .set({ deletedAt: new Date().toISOString() } as any)
+      .set({ deletedAt } as any)
       .where(and(eq(muVisits.id, id), isNull(muVisits.deletedAt), scopeCondition));
+
+    // 自動計上した立替の会計レコードも取り消す（帳簿に残らないように）
+    if (authz.transactionId) {
+      await db
+        .update(transactions)
+        .set({ deletedAt } as any)
+        .where(and(eq(transactions.id, authz.transactionId), isNull(transactions.deletedAt)));
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

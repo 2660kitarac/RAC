@@ -5,6 +5,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { isDistrictStaff } from '@/lib/auth/tenant';
 import AwardsDashboard from '@/components/awards/AwardsDashboard';
+import { getFiscalYear } from '@/lib/utils';
 
 export const metadata = { title: '表彰ダッシュボード' };
 
@@ -43,7 +44,7 @@ export default async function AwardsDistrictDashboardPage() {
     );
   }
 
-  const currentYear = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  const currentYear = getFiscalYear();
 
   const clubList = await db
     .select({ id: clubs.id, name: clubs.name, shortName: clubs.shortName })
@@ -63,7 +64,7 @@ export default async function AwardsDistrictDashboardPage() {
         <p className="text-sm text-gray-500 mt-1">{currentYear}年度 地区表彰点数管理</p>
       </div>
       <AwardsDashboard
-        clubs={clubList}
+        clubs={clubList.map(c => ({ id: c.id, name: c.name, short_name: c.shortName }))}
         scoreItems={scoreItems}
         scores={scores}
         districtId={districtId}

@@ -4,7 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
-import { canAssignRole, canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+import { canAssignRole, canMutateClubRecord, isDistrictScope, canManageAccount } from '@/lib/auth/tenant';
 import { canResetPasswordFor, validatePassword } from '@/lib/auth/password';
 
 type SessionUser = { id?: string | null; role?: string | null; clubId?: string | null };
@@ -45,6 +45,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // 本人以外を操作する場合は自クラブ限定（地区スタッフ・admin は全クラブ可）
     if (!isSelf && !isAdmin && !canMutateClubRecord(sessionUser, target.clubId)) {
       return NextResponse.json({ error: '他クラブのユーザーは操作できません' }, { status: 403 });
+    }
+    // 上位アカウント（system_owner・地区管理者など）は同格以上のロールしか操作できない
+    if (!isSelf && !canManageAccount(sessionUser.role, target.role)) {
+      return NextResponse.json({ error: 'このアカウントは操作できません' }, { status: 403 });
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -144,6 +148,19 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const db = await getDbFromContext();
+    const [target] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(and(eq(users.id, id), isNull(users.deletedAt)))
+      .limit(1);
+    if (!target) {
+      return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
+    }
+    // 上位アカウントは同格以上のロールしか削除できない
+    if (!canManageAccount(sessionUser.role, target.role)) {
+      return NextResponse.json({ error: 'このアカウントは削除できません' }, { status: 403 });
+    }
+
     await db.update(users)
       .set({ deletedAt: new Date().toISOString(), isActive: false })
       .where(and(eq(users.id, id), isNull(users.deletedAt)));

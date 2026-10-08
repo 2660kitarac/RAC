@@ -59,6 +59,18 @@ function alreadySent(attendanceId: string): boolean {
   return false;
 }
 
+/**
+ * DB の日時文字列をミリ秒に変換する。
+ * created_at は「YYYY-MM-DD HH:MM:SS」形式の日本時間（タイムゾーン表記なし）で保存されているため、
+ * そのまま Date.parse するとサーバーのタイムゾーン（Vercel は UTC）で解釈され、9時間ずれる。
+ * タイムゾーン表記がなければ +09:00 を補う。
+ */
+function parseJstTimestamp(value: unknown): number {
+  const str = String(value ?? '').trim().replace(' ', 'T');
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(str);
+  return Date.parse(hasZone ? str : `${str}+09:00`);
+}
+
 function clientKey(request: NextRequest): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -113,7 +125,7 @@ export async function POST(request: NextRequest) {
     if (!attendance) return ok('対象の登録が見つかりません');
 
     // 登録直後のみ送信を許可（過去レコードへのメール再送を防ぐ）
-    const createdMs = Date.parse(String(attendance.createdAt).replace(' ', 'T'));
+    const createdMs = parseJstTimestamp(attendance.createdAt);
     if (Number.isFinite(createdMs) && Date.now() - createdMs > REGISTRATION_WINDOW_MS) {
       return ok('送信可能な期間を過ぎています');
     }
@@ -159,16 +171,16 @@ export async function POST(request: NextRequest) {
 
     const totalFee = (attendance.feeAmount ?? 0) + (attendance.afterPartyFeeAmount ?? 0);
 
-    const subject = template.subjectTemplate.replace('{{meeting_title}}', meeting.title);
+    const subject = template.subjectTemplate.replaceAll('{{meeting_title}}', meeting.title);
     const body = template.bodyTemplate
-      .replace('{{name}}', name)
-      .replace('{{meeting_title}}', meeting.title)
-      .replace('{{date}}', formatDate(meeting.date))
-      .replace('{{start_time}}', meeting.startTime?.substring(0, 5) || '')
-      .replace('{{end_time}}', meeting.endTime?.substring(0, 5) || '')
-      .replace('{{venue_name}}', meeting.venueName || '')
-      .replace('{{fee_amount}}', formatCurrency(totalFee))
-      .replace('{{meal_required}}', attendance.mealRequired ? '希望する' : '希望しない');
+      .replaceAll('{{name}}', name)
+      .replaceAll('{{meeting_title}}', meeting.title)
+      .replaceAll('{{date}}', formatDate(meeting.date))
+      .replaceAll('{{start_time}}', meeting.startTime?.substring(0, 5) || '')
+      .replaceAll('{{end_time}}', meeting.endTime?.substring(0, 5) || '')
+      .replaceAll('{{venue_name}}', meeting.venueName || '')
+      .replaceAll('{{fee_amount}}', formatCurrency(totalFee))
+      .replaceAll('{{meal_required}}', attendance.mealRequired ? '希望する' : '希望しない');
 
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',

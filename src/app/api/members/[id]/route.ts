@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { canAssignRole, canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
+import { canAssignRole, canMutateClubRecord, isDistrictScope, canManageAccount } from '@/lib/auth/tenant';
 
 /** 会員情報を編集できるロール */
 const MEMBER_MANAGER_ROLES = [
@@ -42,6 +42,11 @@ async function loadAndAuthorize(db: any, sessionUser: SessionUser, id: string) {
   // 他クラブの会員は操作不可（本人は例外）
   if (!isSelf && !canMutateClubRecord(sessionUser, target.clubId)) {
     return { error: NextResponse.json({ error: '他クラブの会員は操作できません' }, { status: 403 }) };
+  }
+
+  // 上位アカウント（system_owner・地区管理者など）は同格以上のロールしか操作できない
+  if (!isSelf && !canManageAccount(sessionUser.role, target.role)) {
+    return { error: NextResponse.json({ error: 'このアカウントは操作できません' }, { status: 403 }) };
   }
 
   return { target, isSelf };

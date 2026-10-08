@@ -103,6 +103,11 @@ export default function ResetPasswordDialog({ member, onClose }: Props) {
 
   const copyPassword = () => {
     if (!issued) return;
+    // HTTPS 以外や古いブラウザでは clipboard が使えない（その場合は長押しでコピーしてもらう）
+    if (!navigator.clipboard?.writeText) {
+      toast.error('この端末では自動コピーできません。長押しでコピーしてください');
+      return;
+    }
     navigator.clipboard.writeText(issued)
       .then(() => {
         setCopied(true);
