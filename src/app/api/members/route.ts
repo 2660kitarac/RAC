@@ -3,8 +3,9 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull, like, or } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
-import { randomUUID } from 'crypto';
+import { resolveClubScope, canManageClub, canAssignRole } from '@/lib/auth/tenant';
+import { validatePassword } from '@/lib/auth/password';
+import { randomUUID, randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 
 // GET /api/members - 会員一覧
@@ -67,12 +68,28 @@ export async function POST(request: NextRequest) {
       name, nameKana, email, phone, role = 'member', memberType = 'RAC',
       position, joinedAt, birthDate, addressZip, address, occupation,
       allergy, dietaryNote, emergencyContactName, emergencyContactPhone, memo,
-      password = 'changeme123',
+      password,
     } = body;
 
-    if (!name || !email) return NextResponse.json({ error: '名前とメールは必須です' }, { status: 400 });
+    // 会員の追加はクラブ運営ロールのみ
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '会員を追加する権限がありません' }, { status: 403 });
+    }
+    // 自分より上位のロールや地区ロールは付与させない（権限昇格の防止）
+    if (typeof role !== 'string' || !canAssignRole(session.user.role, role, null)) {
+      return NextResponse.json({ error: 'このロールは付与できません' }, { status: 403 });
+    }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    if (!name || !email) return NextResponse.json({ error: '名前とメールは必須です' }, { status: 400 });
+    if (password !== undefined && password !== null && password !== '') {
+      const pwError = validatePassword(password);
+      if (pwError) return NextResponse.json({ error: pwError }, { status: 400 });
+    }
+
+    // パスワード未指定時は推測できないランダム値にする（固定の初期パスワードは使わない）。
+    // ログインさせる場合は、会員一覧の「パスワードリセット」で仮パスワードを発行する。
+    const initialPassword = password || randomBytes(24).toString('base64url');
+    const passwordHash = await bcrypt.hash(initialPassword, 10);
     const id = randomUUID();
     // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
     const writeScope = resolveClubScope(session.user, body.clubId);
@@ -89,7 +106,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ member: { id, name, email, role, memberType } });
   } catch (e: any) {
-    if (e.message?.includes('UNIQUE constraint')) {
+    // Postgres の一意制約違反は code 23505（旧 SQLite の文言も念のため残す）
+    if (e?.code === '23505' || e?.cause?.code === '23505' || e.message?.includes('UNIQUE constraint')) {
       return NextResponse.json({ error: 'このメールアドレスは既に登録されています' }, { status: 409 });
     }
     return NextResponse.json({ error: e.message }, { status: 500 });

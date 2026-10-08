@@ -54,9 +54,11 @@ export function resolveClubScope(
   }
 
   // クラブに属していないアカウント（個人会員で未所属など）は
-  // クラブ単位の参照を一切許可しない
+  // クラブ単位の参照を一切許可しない。
+  // ※ clubId:null をそのまま返すと、呼び出し側の「clubId があれば絞り込む」条件が
+  //   外れて全クラブのデータが返ってしまうため、拒否として扱う。
   if (!sessionClubId) {
-    return { clubId: null, crossClub: false, forbidden: false };
+    return { clubId: null, crossClub: false, forbidden: true };
   }
 
   // 自クラブ以外を要求した場合は拒否
@@ -170,5 +172,24 @@ export function canAssignRole(
   if (high(newRole) || high(targetCurrentRole)) return false;
   const districtish = (r: string | null | undefined) => isDistrictScope(r) || isDistrictOfficer(r);
   if (districtish(newRole) || districtish(targetCurrentRole)) return canManageDistrictOfficers(actorRole);
+  return true;
+}
+
+/**
+ * 他人のアカウント（プロフィール・状態・削除）を操作してよいか（上位アカウントの保護）
+ *  - system_owner はすべて可
+ *  - system_owner のアカウントは system_owner 以外は操作不可
+ *  - district_admin のアカウントは district_admin（と system_owner）のみ
+ *  - 地区系ロールのアカウントは地区スタッフのみ（クラブ側からは操作不可）
+ * ※ 所属クラブの一致（テナント検証）は別途 canMutateClubRecord 等で行うこと
+ */
+export function canManageAccount(
+  actorRole: string | null | undefined,
+  targetRole: string | null | undefined,
+): boolean {
+  if (actorRole === 'system_owner') return true;
+  if (targetRole === 'system_owner') return false;
+  if (targetRole === 'district_admin') return actorRole === 'district_admin';
+  if (isDistrictScope(targetRole) || isDistrictOfficer(targetRole)) return isDistrictScope(actorRole);
   return true;
 }

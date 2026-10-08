@@ -13,6 +13,35 @@ import {
   registrationText, sanitizeInput, sendMail, summaryColumns,
 } from '@/lib/event-registration/server';
 
+/* ---- 送信元ごとの連続申込の制限（サーバーレスではインスタンス単位の簡易的な歯止め） ---- */
+const CLIENT_LIMIT_MAX = 5;
+const CLIENT_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const clientHits = new Map<string, number[]>();
+
+function clientKey(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
+function isClientRateLimited(key: string): boolean {
+  const now = Date.now();
+  const hits = (clientHits.get(key) ?? []).filter(t => now - t < CLIENT_LIMIT_WINDOW_MS);
+  if (hits.length >= CLIENT_LIMIT_MAX) {
+    clientHits.set(key, hits);
+    return true;
+  }
+  hits.push(now);
+  clientHits.set(key, hits);
+  if (clientHits.size > 1000) {
+    for (const [k, v] of clientHits) if (!v.some(t => now - t < CLIENT_LIMIT_WINDOW_MS)) clientHits.delete(k);
+  }
+  return false;
+}
+
+
 type Ctx = { params: Promise<{ slug: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
@@ -87,6 +116,11 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
     const errors = validateInput(config, input);
     if (errors.length > 0) return NextResponse.json({ error: errors[0], errors }, { status: 400 });
+
+    // 同じ送信元からの連続申込を制限する（他クラブの枠を埋める・メール送信の悪用を防ぐ）
+    if (isClientRateLimited(`${form.id}:${clientKey(request)}`)) {
+      return NextResponse.json({ error: '短時間に申込が続いています。しばらくおいてから再度お試しください' }, { status: 429 });
+    }
 
     // いたずら・連続送信の歯止め（1フォームあたり10分間に30件まで）
     const [recent] = await db

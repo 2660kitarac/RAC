@@ -53,7 +53,8 @@ export async function districtClubIds(db: Db, districtId: string): Promise<strin
 /** 「この地区の人」の条件（users.districtId が地区 or 所属クラブが地区内） */
 function inDistrict(districtId: string, clubIds: string[]) {
   return clubIds.length > 0
-    ? or(eq(users.districtId, districtId), inArray(users.clubId, clubIds))
+    // 所属クラブでの判定は users.districtId が未設定の人だけ（別の地区に属する人を巻き込まない）
+    ? or(eq(users.districtId, districtId), and(isNull(users.districtId), inArray(users.clubId, clubIds)))
     : eq(users.districtId, districtId);
 }
 
@@ -112,7 +113,7 @@ export async function findUserByEmail(db: Db, email: string) {
   const [row] = await db
     .select({
       id: users.id, name: users.name, email: users.email, role: users.role,
-      clubId: users.clubId, districtId: users.districtId, isActive: users.isActive, deletedAt: users.deletedAt,
+      clubId: users.clubId, districtId: users.districtId, isActive: users.isActive, status: users.status, deletedAt: users.deletedAt,
     })
     .from(users)
     .where(sql`lower(${users.email}) = lower(${email})`)

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { isDistrictScope, canManageClub } from '@/lib/auth/tenant';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '@/lib/auth/password';
 
@@ -107,12 +108,18 @@ export async function PATCH(request: NextRequest) {
 
     if (target === 'club') {
       // クラブ設定更新（管理者のみ）
-      if (!['admin', 'district_admin'].includes(session.user.role || '')) {
+      // 地区スタッフは任意のクラブ、クラブ運営ロールは自クラブのみ
+      // （以前は存在しないロール 'admin' で判定しており、クラブアカウントが保存できなかった）
+      const role = session.user.role || '';
+      if (!isDistrictScope(role) && !canManageClub(role)) {
         return NextResponse.json({ error: '権限がありません' }, { status: 403 });
       }
       const { clubId, ...clubData } = data;
       const targetClubId = clubId || session.user.clubId;
       if (!targetClubId) return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
+      if (!isDistrictScope(role) && targetClubId !== session.user.clubId) {
+        return NextResponse.json({ error: '他クラブの設定は変更できません' }, { status: 403 });
+      }
 
       const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
       const allowedClubFields = ['name', 'shortName', 'email', 'phone', 'address', 'contactName', 'memo', 'muFeePersonalBurden'];
@@ -120,7 +127,7 @@ export async function PATCH(request: NextRequest) {
         if (field in clubData) updateData[field] = clubData[field];
       }
 
-      await db.update(clubs).set(updateData as any).where(eq(clubs.id, targetClubId));
+      await db.update(clubs).set(updateData as any).where(and(eq(clubs.id, targetClubId), isNull(clubs.deletedAt)));
       return NextResponse.json({ success: true, message: 'クラブ設定を更新しました' });
     }
 

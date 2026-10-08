@@ -18,6 +18,9 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 
+/** ログイン中のアカウント状態（ロール・有効/無効）をDBと照合する間隔 */
+const SESSION_RECHECK_MS = 5 * 60 * 1000;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
 
@@ -35,6 +38,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.status = (user as any).status;
         token.name = user.name;
         token.email = user.email;
+        token.checkedAt = Date.now();
+        return token;
+      }
+
+      // ログイン中のアカウント状態を定期的にDBと照合する。
+      // JWT は30日有効なため、照合しないと無効化・削除・ロール変更が次回ログインまで反映されない。
+      const checkedAt = typeof token.checkedAt === 'number' ? token.checkedAt : 0;
+      if (token.id && Date.now() - checkedAt > SESSION_RECHECK_MS) {
+        try {
+          const [current] = await db
+            .select({
+              role: users.role,
+              clubId: users.clubId,
+              status: users.status,
+              isActive: users.isActive,
+              name: users.name,
+              email: users.email,
+            })
+            .from(users)
+            .where(and(eq(users.id, token.id as string), isNull(users.deletedAt)))
+            .limit(1);
+
+          // 削除・無効化・却下されたアカウントはセッションを破棄する
+          if (!current || !current.isActive || current.status === 'rejected') return null;
+
+          token.role = current.role;
+          token.clubId = current.clubId;
+          token.status = current.status;
+          token.name = current.name;
+          token.email = current.email;
+          token.checkedAt = Date.now();
+        } catch (e) {
+          // DB 障害時はログアウトさせず、次回に再照合する
+          console.error('[Auth] session recheck error:', e);
+        }
       }
       return token;
     },
@@ -85,6 +123,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .limit(1);
 
           if (!user) return null;
+
+          // 先にパスワードを照合する（パスワードを知らない人に「承認待ち」などの状態を見せない）
+          const isValid = await bcrypt.compare(
+            credentials.password as string,
+            user.passwordHash
+          );
+          if (!isValid) return null;
+
           if (!user.isActive) return null;
 
           if (user.status === 'pending') {
@@ -93,13 +139,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.status === 'rejected') {
             throw new Error('ACCOUNT_REJECTED');
           }
-
-          const isValid = await bcrypt.compare(
-            credentials.password as string,
-            user.passwordHash
-          );
-
-          if (!isValid) return null;
 
           return {
             id: user.id,

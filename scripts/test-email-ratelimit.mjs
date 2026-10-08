@@ -28,16 +28,25 @@ t('att-1 3回目 → 拒否', alreadySent('att-1'), true);
 t('att-2 初回 → 送信可', alreadySent('att-2'), false);
 
 console.log('--- 登録直後判定 ---');
+// route.ts の parseJstTimestamp と同じ処理（created_at は日本時間・タイムゾーン表記なしで保存される）
+const parseJstTimestamp = (value) => {
+  const str = String(value ?? '').trim().replace(' ','T');
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(str);
+  return Date.parse(hasZone ? str : `${str}+09:00`);
+};
 const inWindow = (createdAt) => {
-  const ms = Date.parse(String(createdAt).replace(' ','T'));
+  const ms = parseJstTimestamp(createdAt);
   return !(Number.isFinite(ms) && Date.now()-ms > REGISTRATION_WINDOW_MS);
 };
-const fmt = (d) => new Date(d).toISOString().slice(0,19).replace('T',' ');
+// DB と同じ「日本時間の YYYY-MM-DD HH:MM:SS」を作る
+const fmt = (d) => new Date(new Date(d).getTime() + 9*3600_000).toISOString().slice(0,19).replace('T',' ');
 t('1分前の登録 → 送信可', inWindow(fmt(Date.now()-60_000)), true);
 t('14分前の登録 → 送信可', inWindow(fmt(Date.now()-14*60_000)), true);
 t('16分前の登録 → 拒否', inWindow(fmt(Date.now()-16*60_000)), false);
 t('1年前の登録 → 拒否', inWindow(fmt(Date.now()-365*24*3600_000)), false);
 t('日付パース不能 → 送信可（後段の存在確認に委ねる）', inWindow('invalid'), true);
+t('UTC表記の日時も正しく扱う（14分前）', inWindow(new Date(Date.now()-14*60_000).toISOString()), true);
+t('UTC表記の日時も正しく扱う（16分前）', inWindow(new Date(Date.now()-16*60_000).toISOString()), false);
 
 console.log(`\n${pass} passed / ${fail} failed`);
 process.exit(fail?1:0);

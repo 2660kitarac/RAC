@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, users } from '@/lib/db/schema';
 import { eq, and, isNull, desc, gte, lte } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageClub } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 // GET /api/meetings - 例会一覧
@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // クラブ運営ロールのみ
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const db = await getDbFromContext();
     const body = await request.json();

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { canManageClub } from '@/lib/auth/tenant';
+
+/** プロンプトに入れる文字列の長さを制限する（APIキーの悪用・過大な課金を防ぐ） */
+const clip = (v: unknown, max = 1000) => (typeof v === 'string' ? v.slice(0, max) : v == null ? '' : String(v).slice(0, max));
 
 function generateSampleReport(meeting: any, stats: any, notes: string): string {
   return `【例会報告】${meeting.title}
@@ -19,8 +23,23 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    // 報告文の生成はクラブ運営ロールのみ
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
-    const { meeting, stats, notes } = await request.json();
+    const raw = await request.json().catch(() => null);
+    if (!raw || typeof raw.meeting !== 'object' || raw.meeting === null) {
+      return NextResponse.json({ error: '例会情報が必要です' }, { status: 400 });
+    }
+    const m = raw.meeting as Record<string, unknown>;
+    const meeting = {
+      title: clip(m.title, 200), date: clip(m.date, 40), venue_name: clip(m.venue_name, 200),
+      theme: clip(m.theme, 300), committee: clip(m.committee, 200), description: clip(m.description, 2000),
+    };
+    const count = Number((raw.stats as Record<string, unknown> | undefined)?.participants_count);
+    const stats = { participants_count: Number.isFinite(count) ? count : 0 };
+    const notes = clip(raw.notes, 2000);
 
     if (!process.env.OPENAI_API_KEY) {
       const sampleReport = generateSampleReport(meeting, stats, notes);

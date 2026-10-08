@@ -7,7 +7,7 @@ function resolveClubScope(user, requested) {
     if (requested) return { clubId: requested, crossClub:false, forbidden:false };
     return { clubId:null, crossClub:true, forbidden:false };
   }
-  if (!s) return { clubId:null, crossClub:false, forbidden:false };
+  if (!s) return { clubId:null, crossClub:false, forbidden:true };
   if (requested && requested !== s) return { clubId:s, crossClub:false, forbidden:true };
   return { clubId:s, crossClub:false, forbidden:false };
 }
@@ -42,8 +42,8 @@ t('clubA会計が未指定 → 自クラブ強制', resolveClubScope(treasurerA,
 t('一般会員が他クラブ要求 → forbidden', resolveClubScope(memberA,'clubB').forbidden, true);
 t('地区owner が clubB 要求 → 許可', resolveClubScope(owner,'clubB'), {clubId:'clubB',crossClub:false,forbidden:false});
 t('地区owner 未指定 → 横断', resolveClubScope(owner,null), {clubId:null,crossClub:true,forbidden:false});
-t('未所属ユーザ → clubId null', resolveClubScope(orphan,null).clubId, null);
-t('未所属ユーザが clubA 要求 → forbidden ではないが clubId null', resolveClubScope(orphan,'clubA'), {clubId:null,crossClub:false,forbidden:false});
+t('未所属ユーザ → 拒否（全件参照の防止）', resolveClubScope(orphan,null), {clubId:null,crossClub:false,forbidden:true});
+t('未所属ユーザが clubA 要求 → 拒否', resolveClubScope(orphan,'clubA'), {clubId:null,crossClub:false,forbidden:true});
 
 console.log('--- canMutateClubRecord: 所有検証 ---');
 t('clubA会計が clubA レコード → 可', canMutateClubRecord(treasurerA,'clubA'), true);

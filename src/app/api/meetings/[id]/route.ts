@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const meeting = await db
       .select()
       .from(meetings)
-      .where(eq(meetings.id, id))
+      .where(and(eq(meetings.id, id), isNull(meetings.deletedAt)))
       .then((r: any[]) => r[0]);
 
     if (!meeting) return NextResponse.json({ error: '見つかりません' }, { status: 404 });

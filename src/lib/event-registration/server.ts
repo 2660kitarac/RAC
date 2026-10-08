@@ -232,7 +232,8 @@ export async function requireDistrictStaff(): Promise<
   const [me] = await db
     .select({ id: users.id, name: users.name, role: users.role, clubId: users.clubId, districtId: users.districtId })
     .from(users)
-    .where(and(eq(users.id, session.user.id), isNull(users.deletedAt)))
+    // 無効化・却下されたアカウントは古いセッションでも操作させない
+    .where(and(eq(users.id, session.user.id), isNull(users.deletedAt), eq(users.isActive, true), eq(users.status, 'active')))
     .limit(1);
   if (!me || !isDistrictStaff(me.role)) return { ok: false, status: 403, error: '地区役員のみ利用できます' };
 

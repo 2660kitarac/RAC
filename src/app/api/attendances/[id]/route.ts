@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { attendances, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { canMutateClubRecord } from '@/lib/auth/tenant';
+import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
 
 /**
  * 対象の出席レコードを取得し、操作権限を検証する。
@@ -14,10 +14,11 @@ async function loadAndAuthorize(
   db: any,
   sessionUser: any,
   id: string,
-): Promise<{ ok: true } | { ok: false; res: NextResponse }> {
+): Promise<{ ok: true; isOwner: boolean } | { ok: false; res: NextResponse }> {
   const [record] = await db
     .select({
       id: attendances.id,
+      userId: attendances.userId,
       attendanceClubId: attendances.clubId,
       meetingClubId: meetings.clubId,
     })
@@ -36,7 +37,14 @@ async function loadAndAuthorize(
   // 例会の所有クラブを優先して判定（MU登録では attendances.clubId は訪問元クラブが入る）
   const ownerClubId = record.meetingClubId ?? record.attendanceClubId;
 
-  if (!canMutateClubRecord(sessionUser, ownerClubId)) {
+  // 本人の登録は、他クラブの例会でも本人が取り消し・一部修正できる
+  const isOwner = !!record.userId && record.userId === sessionUser?.id;
+  if (isOwner && !(canManageClub(sessionUser?.role) && canMutateClubRecord(sessionUser, ownerClubId))) {
+    return { ok: true, isOwner: true };
+  }
+
+  // それ以外は、例会を主催するクラブの運営ロールのみ（一般会員が他人の支払状況等を変えられないように）
+  if (!canManageClub(sessionUser?.role) || !canMutateClubRecord(sessionUser, ownerClubId)) {
     return {
       ok: false,
       res: NextResponse.json(
@@ -46,7 +54,7 @@ async function loadAndAuthorize(
     };
   }
 
-  return { ok: true };
+  return { ok: true, isOwner: false };
 }
 
 // PATCH /api/attendances/[id] - 出席情報更新
@@ -79,7 +87,10 @@ export async function PATCH(
       // 参加者基本情報（管理者による修正用 Issue #2）
       'externalName', 'externalEmail', 'externalPhone', 'clubName',
     ];
-    for (const field of allowedFields) {
+    // 本人による修正は、金額・支払・出欠確定に関わらない項目に限る
+    const ownerFields = ['receiptRequired', 'receiptNameType', 'receiptName', 'note', 'externalPhone'];
+    const fields = authz.isOwner ? ownerFields : allowedFields;
+    for (const field of fields) {
       if (field in body) updateData[field] = body[field];
     }
 

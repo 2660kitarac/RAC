@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { receipts, attendances, annualFees, users, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageFinance } from '@/lib/auth/tenant';
 import { randomUUID } from 'crypto';
 
 /**
@@ -52,6 +52,11 @@ export async function POST(request: NextRequest) {
       clubNameOverrides,
     } = body;
 
+    // 領収書の発行は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '領収書を発行する権限がありません' }, { status: 403 });
+    }
+
     // ボディの clubId は信頼しない（他クラブ名義での作成を防ぐ）
     const writeScope = resolveClubScope(session.user, body.clubId);
     if (writeScope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
@@ -86,9 +91,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'meetingId は external/meeting_all モードで必須です' }, { status: 400 });
       }
 
-      // 例会情報取得
+      // 例会情報取得（発行元クラブの例会に限る）
       const meetingResult = await db.select({ title: meetings.title, date: meetings.date })
-        .from(meetings).where(eq(meetings.id, meetingId)).limit(1);
+        .from(meetings)
+        .where(and(eq(meetings.id, meetingId), eq(meetings.clubId, resolvedClubId), isNull(meetings.deletedAt)))
+        .limit(1);
       const meeting = meetingResult[0];
       if (!meeting) {
         return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
@@ -299,7 +306,13 @@ export async function GET(request: NextRequest) {
     const mode = url.searchParams.get('mode');
     const meetingId = url.searchParams.get('meetingId');
     const fiscalYear = url.searchParams.get('fiscalYear');
-    const resolvedClubId = url.searchParams.get('clubId') || session.user.clubId;
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
+    // クエリの clubId は信頼しない（他クラブの参加者・年会費情報の参照を防ぐ）
+    const scope = resolveClubScope(session.user, url.searchParams.get('clubId'));
+    if (scope.forbidden) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    const resolvedClubId = scope.clubId;
 
     if (!resolvedClubId) {
       return NextResponse.json({ error: 'clubId は必須です' }, { status: 400 });
@@ -308,6 +321,13 @@ export async function GET(request: NextRequest) {
     if (mode === 'external' || mode === 'meeting_all') {
       if (!meetingId) {
         return NextResponse.json({ error: 'meetingId は必須です' }, { status: 400 });
+      }
+      const [ownMeeting] = await db.select({ id: meetings.id })
+        .from(meetings)
+        .where(and(eq(meetings.id, meetingId), eq(meetings.clubId, resolvedClubId), isNull(meetings.deletedAt)))
+        .limit(1);
+      if (!ownMeeting) {
+        return NextResponse.json({ error: '例会が見つかりません' }, { status: 404 });
       }
 
       // 支払済み・領収書必要の制限を撤廃 #issue3

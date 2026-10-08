@@ -5,6 +5,8 @@
  * 'use client' を持たない純粋関数のみで構成する。
  */
 
+import { isDistrictOfficer } from './tenant';
+
 /** パスワードの最低文字数 */
 export const PASSWORD_MIN_LENGTH = 8;
 
@@ -58,8 +60,19 @@ export function canResetPasswordFor(
   const actorRole = actor?.role ?? null;
   const actorClubId = actor?.clubId ?? null;
 
-  // 地区スタッフは全会員に対して可能
+  // 地区スタッフは全会員に対して可能。
+  // ただし上位アカウントは、同格以上のロールからしか変更させない（乗っ取り防止）
   if (canResetAnyPassword(actorRole)) {
+    if (target.role === 'system_owner' && actorRole !== 'system_owner') {
+      return { allowed: false, reason: 'このアカウントのパスワードは変更できません' };
+    }
+    if (
+      target.role === 'district_admin' &&
+      actorRole !== 'system_owner' &&
+      actorRole !== 'district_admin'
+    ) {
+      return { allowed: false, reason: 'このアカウントのパスワードは変更できません' };
+    }
     return { allowed: true };
   }
 
@@ -73,8 +86,8 @@ export function canResetPasswordFor(
     return { allowed: false, reason: '他クラブの会員のパスワードは変更できません' };
   }
 
-  // 上位ロールのパスワードはクラブ側から変更させない（権限昇格の防止）
-  if (canResetAnyPassword(target.role)) {
+  // 上位ロール・地区役員のパスワードはクラブ側から変更させない（権限昇格の防止）
+  if (canResetAnyPassword(target.role) || isDistrictOfficer(target.role)) {
     return { allowed: false, reason: 'このアカウントのパスワードは変更できません' };
   }
 
@@ -115,7 +128,9 @@ export function generateTemporaryPassword(length = 10): string {
   const digits = '23456789';
   const all = letters + digits;
 
-  const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+  // 暗号論的乱数を使う（Math.random は予測可能なため仮パスワードには不適）
+  const rand = (n: number) => globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  const pick = (chars: string) => chars[rand(chars.length)];
 
   // 英字1文字・数字1文字を確保
   const chars = [pick(letters), pick(digits)];
@@ -125,7 +140,7 @@ export function generateTemporaryPassword(length = 10): string {
 
   // シャッフル（Fisher-Yates）
   for (let i = chars.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = rand(i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];
   }
 

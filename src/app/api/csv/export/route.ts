@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { users, meetings, attendances, annualFees } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { resolveClubScope } from '@/lib/auth/tenant';
+import { resolveClubScope, canManageClub } from '@/lib/auth/tenant';
 
 function toCSV(headers: string[], rows: Record<string, unknown>[]): string {
   const bom = '\uFEFF';
@@ -12,7 +12,9 @@ function toCSV(headers: string[], rows: Record<string, unknown>[]): string {
     headers.map(h => {
       const v = row[h];
       if (v === null || v === undefined) return '';
-      const s = String(v);
+      let s = String(v);
+      // Excel で開いたときに数式として実行されないよう、先頭が = + - @ 等の値は ' を付ける
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
       return s.includes(',') || s.includes('\n') || s.includes('"')
         ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(',')
@@ -24,6 +26,10 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会員名簿・出欠・年会費の書き出しはクラブ運営ロールのみ
+    if (!canManageClub(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
 
     const url = new URL(request.url);
     const type = url.searchParams.get('type');

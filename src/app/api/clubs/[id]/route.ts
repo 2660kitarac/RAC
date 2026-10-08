@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { clubs } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { isDistrictScope } from '@/lib/auth/tenant';
 
 // 注: 旧実装は存在しないロール 'admin' を含み、逆に district_representative /
@@ -24,7 +24,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
     // 自クラブ・地区スタッフは全項目、それ以外は公開情報のみに絞る
     // （メールアドレス・電話・住所・担当者名・メモの横断的な収集を防ぐ）
-    const result = await db.select().from(clubs).where(eq(clubs.id, id)).limit(1);
+    const result = await db.select().from(clubs).where(and(eq(clubs.id, id), isNull(clubs.deletedAt))).limit(1);
     if (!result.length) return NextResponse.json({ error: 'クラブが見つかりません' }, { status: 404 });
 
     if (isOwnClub || district) {
@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (field in body) updateData[field] = body[field];
     }
 
-    await db.update(clubs).set(updateData as any).where(eq(clubs.id, id));
+    await db.update(clubs).set(updateData as any).where(and(eq(clubs.id, id), isNull(clubs.deletedAt)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

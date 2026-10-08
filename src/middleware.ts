@@ -79,19 +79,6 @@ export async function middleware(req: NextRequest) {
   // 公開パス判定
   const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p));
 
-  // /api/debug-mw へのアクセスはデバッグ情報を返す（本番では削除）
-  if (pathname === '/api/debug-mw') {
-    const cookieHeader = req.headers.get('cookie') || '';
-    const cookieNames: string[] = [];
-    req.cookies.getAll().forEach(c => cookieNames.push(c.name));
-    return NextResponse.json({
-      hasSession: hasSessionCookie(req),
-      cookieHeader: cookieHeader.substring(0, 200),
-      cookieNamesViaAPI: cookieNames,
-      pathname,
-    });
-  }
-
   // セッション cookie 確認
   const hasSession = hasSessionCookie(req);
 

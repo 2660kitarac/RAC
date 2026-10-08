@@ -4,17 +4,26 @@ import { db } from '@/lib/db';
 import { attendances, transactions, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { canManageFinance, canMutateClubRecord } from '@/lib/auth/tenant';
 
 export async function POST(request: NextRequest) {
   try {
-    const { attendanceId } = await request.json();
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 会計への計上は会計権限のあるロールのみ
+    if (!canManageFinance(session.user.role)) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    }
+
+    const { attendanceId } = await request.json();
+    if (!attendanceId || typeof attendanceId !== 'string') {
+      return NextResponse.json({ error: 'attendanceId は必須です' }, { status: 400 });
+    }
 
     const [attendance] = await db
       .select()
       .from(attendances)
-      .where(eq(attendances.id, attendanceId))
+      .where(and(eq(attendances.id, attendanceId), isNull(attendances.deletedAt)))
       .limit(1);
 
     if (!attendance || attendance.feeAmount === 0) {
@@ -28,6 +37,10 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!meeting) return NextResponse.json({ success: false, message: '例会が見つかりません' });
+    // 他クラブの例会の参加費は計上させない
+    if (!canMutateClubRecord(session.user, meeting.clubId)) {
+      return NextResponse.json({ error: '他クラブの例会は操作できません' }, { status: 403 });
+    }
 
     // 重複チェック（Drizzle ORM で）
     const existing = await db
