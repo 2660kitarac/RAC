@@ -208,6 +208,24 @@
     margin-bottom: 0;
   }
 
+  /* カード全体を押せるようにする：行の見出しリンクに .rac-row-link を付ける
+     （その行にほかのボタン・リンクがない場合だけ使うこと） */
+  .rac-table tbody tr:has(.rac-row-link) {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .rac-table .rac-row-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .rac-table tbody tr:has(.rac-row-link):active {
+    background: rgb(243 244 246);
+  }
+
   /* 並び順：見出しを一番上、操作ボタンを一番下に固定する */
   .rac-table td[data-cell="primary"] {
     order: -1;

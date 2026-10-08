@@ -16,12 +16,25 @@ export const metadata: Metadata = {
   },
   description: 'ローターアクトクラブの例会管理、出席管理、会計管理を一元化するSaaSシステム',
   keywords: ['ローターアクト', 'RAC', 'クラブ管理', '例会管理'],
+  // iPhone で「ホーム画面に追加」したときの名前・表示（アイコンは app/apple-icon.png）
+  applicationName: 'RAC Cloud',
+  appleWebApp: {
+    capable: true,
+    title: 'RAC Cloud',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    icon: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  // iPhone の切り欠き・ホームバー部分まで使い、各画面の余白（safe-area）で調整する
+  viewportFit: 'cover',
+  themeColor: '#ffffff',
 };
 
 export default function RootLayout({
