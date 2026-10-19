@@ -9,6 +9,7 @@
  * 金額と入力チェックはサーバーと同じ calcFees / validateInput を使う。
  */
 
+import { shareUrl } from '@/lib/app-url';
 import * as React from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -1071,7 +1072,7 @@ function AttendeeCard({
 function SuccessPanel({ editPath, mailed, total, form }: { editPath: string; mailed: boolean; total: number; form: Config }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const editUrl = typeof window !== 'undefined' ? `${window.location.origin}${editPath}` : editPath;
+  const editUrl = typeof window !== 'undefined' ? shareUrl(editPath) : editPath;
 
   const copy = async () => {
     try {

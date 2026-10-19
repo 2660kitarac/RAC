@@ -56,6 +56,7 @@ export default async function EmailComposePage({ searchParams }: { searchParams:
       feeGuest: meetings.feeGuest,
       registrationDeadline: meetings.registrationDeadline,
       muRegistrationUrl: meetings.muRegistrationUrl,
+      muRegistrationSlug: meetings.muRegistrationSlug,
       description: meetings.description,
     })
     .from(meetings)

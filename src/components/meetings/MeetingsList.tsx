@@ -1,5 +1,6 @@
 'use client';
 
+import { muRegistrationUrl } from '@/lib/app-url';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -175,9 +176,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {meetings.map(meeting => {
-                      const muUrl = (meeting as any).mu_registration_slug
-                        ? `${typeof window !== 'undefined' ? window.location.origin : ''}/mu/${(meeting as any).mu_registration_slug}`
-                        : (meeting as any).mu_registration_url || null;
+                      const muUrl = muRegistrationUrl((meeting as any).mu_registration_slug, (meeting as any).mu_registration_url);
                       const isConfirming = confirmId === meeting.id;
                       const isDeleting = deletingId === meeting.id;
 
@@ -317,9 +316,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
           {/* モバイルカード */}
           <div className="md:hidden space-y-3">
             {meetings.map(meeting => {
-              const muUrl = (meeting as any).mu_registration_slug
-                ? `${typeof window !== 'undefined' ? window.location.origin : ''}/mu/${(meeting as any).mu_registration_slug}`
-                : (meeting as any).mu_registration_url || null;
+              const muUrl = muRegistrationUrl((meeting as any).mu_registration_slug, (meeting as any).mu_registration_url);
               const isConfirming = confirmId === meeting.id;
               const isDeleting = deletingId === meeting.id;
 

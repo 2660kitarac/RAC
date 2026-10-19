@@ -1,5 +1,6 @@
 'use client';
 
+import { muRegistrationUrl } from '@/lib/app-url';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import { isOwnClubAttendance } from '@/lib/meetings/own-club';
@@ -261,6 +262,9 @@ export default function MeetingDetail({
     }
   };
 
+  // 保存済みURLはプレビュー版のアドレスのことがあるため、本番アドレスで作り直す
+  const muUrl = muRegistrationUrl((meeting as any).mu_registration_slug, meeting.mu_registration_url);
+
   const copyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
     toast.success('URLをコピーしました');
@@ -409,24 +413,24 @@ export default function MeetingDetail({
       </div>
 
       {/* MU登録URL（タブ外・常時表示） */}
-      {meeting.mu_registration_url && (
+      {muUrl && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50">
           <ExternalLink className="h-4 w-4 text-blue-500 flex-shrink-0" />
           <span className="text-sm font-medium text-blue-700 flex-shrink-0">MU登録URL</span>
           <code className="flex-1 text-sm bg-white px-3 py-1.5 rounded border border-blue-200 text-blue-800 truncate min-w-0">
-            {meeting.mu_registration_url}
+            {muUrl}
           </code>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => copyUrl(meeting.mu_registration_url!)}
+            onClick={() => copyUrl(muUrl)}
             className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
           >
             <Copy className="h-4 w-4" />
             コピー
           </Button>
-          <QrCodeModal url={meeting.mu_registration_url} label="MU登録QRコード" />
-          <a href={meeting.mu_registration_url} target="_blank" rel="noopener noreferrer">
+          <QrCodeModal url={muUrl} label="MU登録QRコード" />
+          <a href={muUrl} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">
               <ExternalLink className="h-4 w-4" />
               開く

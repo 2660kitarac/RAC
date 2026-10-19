@@ -1,5 +1,6 @@
 'use client';
 
+import { shareUrl } from '@/lib/app-url';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -75,7 +76,7 @@ export default function MembersList({ members: initialMembers, clubs, currentUse
   };
 
   const loginMessage = (i: { name: string; email: string; password: string }) =>
-    `${i.name} さん\nRAC Cloud のアカウントを作成しました。\n\nログイン画面：${typeof window !== 'undefined' ? window.location.origin : ''}/login\nメールアドレス：${i.email}\n仮パスワード：${i.password}\n\nログイン後、設定画面からご自身のパスワードに変更してください。`;
+    `${i.name} さん\nRAC Cloud のアカウントを作成しました。\n\nログイン画面：${shareUrl('/login')}\nメールアドレス：${i.email}\n仮パスワード：${i.password}\n\nログイン後、設定画面からご自身のパスワードに変更してください。`;
 
   const [form, setForm] = useState({
     name: '', name_kana: '', email: '', phone: '',
