@@ -4,6 +4,7 @@
  *  - 地区役員の権限確認
  *  - 操作履歴の記録・控えメールの送信
  */
+import { shareOrigin } from '@/lib/app-url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
@@ -271,10 +272,9 @@ export async function logAction(
 
 /** アプリのURL（メール・画面に出す申込URLの組み立て用） */
 export function appBaseUrl(request: Request): string {
-  const env = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  if (env) return env;
+  // プレビュー版から申込まれても、メールには本番のアドレスを書く
   const u = new URL(request.url);
-  return `${u.protocol}//${u.host}`;
+  return shareOrigin(`${u.protocol}//${u.host}`);
 }
 
 /** 申込内容のテキスト（控えメール・通知メール用） */

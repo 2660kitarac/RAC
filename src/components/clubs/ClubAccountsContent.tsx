@@ -1,5 +1,6 @@
 'use client';
 
+import { shareOrigin } from '@/lib/app-url';
 import { useState } from 'react';
 import { Plus, Building2, Key, Eye, EyeOff, CheckCircle, Trash2, X, Copy, LogIn, ExternalLink, List } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -266,7 +267,7 @@ export default function ClubAccountsContent({ clubs, clubAccounts: initialAccoun
 
   // ログインURL生成
   const getLoginUrl = (club: Club) => {
-    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    const base = shareOrigin();
     if (club.slug) return `${base}/club/${club.slug}/login`;
     return `${base}/login`;
   };

@@ -3,6 +3,7 @@
 /**
  * 申込フォーム管理画面（地区役員用）で共通に使う小さな部品・関数
  */
+import { shareOrigin } from '@/lib/app-url';
 import { useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,8 @@ export function newKey(prefix: string): string {
 /** 画面のオリジン（https://〜）。サーバー描画時は空文字 */
 const noopSubscribe = () => () => {};
 export function useOrigin(): string {
-  return useSyncExternalStore(noopSubscribe, () => window.location.origin, () => '');
+  // 申込URLとして配るため、プレビュー版で開いていても本番のアドレスを返す
+  return useSyncExternalStore(noopSubscribe, () => shareOrigin(window.location.origin), () => '');
 }
 
 /** 申込ページのURL */

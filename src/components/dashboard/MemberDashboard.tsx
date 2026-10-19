@@ -1,5 +1,6 @@
 'use client';
 
+import { muRegistrationUrl } from '@/lib/app-url';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, MapPin, Clock, ExternalLink, Copy, Check,
@@ -120,7 +121,8 @@ function checkDeadline(meeting: {
 // ─── MU URL コピーボタン ─────────────────────────────────
 function MuShareButton({ url, slug }: { url: string | null; slug: string | null }) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = url || (slug ? `https://mu.rotary.org/${slug}` : null);
+  // 保存済みURLはプレビュー版のアドレスのことがあるため、slug から本番アドレスで作り直す
+  const shareUrl = muRegistrationUrl(slug, url);
 
   if (!shareUrl) return null;
 

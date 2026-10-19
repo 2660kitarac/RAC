@@ -1,5 +1,6 @@
 'use client';
 
+import { muRegistrationUrl } from '@/lib/app-url';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -104,10 +105,8 @@ export default function MeetingForm({
   const [copySearch, setCopySearch] = useState('');
 
   // 編集モード時のMU登録URL（作成済みのslugから生成）
-  const existingMuUrl = mode === 'edit' && (meeting as any)?.mu_registration_slug
-    ? (typeof window !== 'undefined'
-        ? `${window.location.origin}/mu/${(meeting as any).mu_registration_slug}`
-        : (meeting as any)?.mu_registration_url || null)
+  const existingMuUrl = mode === 'edit'
+    ? muRegistrationUrl((meeting as any)?.mu_registration_slug, (meeting as any)?.mu_registration_url)
     : null;
 
   const copyMuUrl = (url: string) => {
@@ -199,8 +198,8 @@ export default function MeetingForm({
     
     try {
       const slug = (meeting as any)?.mu_registration_slug || generateSlug();
-      const baseUrl = window.location.origin;
-      const registrationUrl = `${baseUrl}/mu/${slug}`;
+      // プレビュー版から保存しても本番のアドレスで記録する
+      const registrationUrl = muRegistrationUrl(slug)!;
 
       const commonPayload = {
         title: data.title,
@@ -933,20 +932,20 @@ export default function MeetingForm({
             <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <code className="w-full text-xs sm:text-sm sm:flex-1 bg-white px-3 py-2 rounded border border-blue-200 text-blue-800 break-all">
-                  {existingMuUrl || (meeting as any)?.mu_registration_url}
+                  {existingMuUrl}
                 </code>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => copyMuUrl(existingMuUrl || (meeting as any)?.mu_registration_url || '')}
+                  onClick={() => copyMuUrl(existingMuUrl || '')}
                   className="w-full border-blue-300 text-blue-700 hover:bg-blue-100 sm:w-auto sm:flex-shrink-0"
                 >
                   <Copy className="h-4 w-4" />
                   コピー
                 </Button>
                 <a
-                  href={existingMuUrl || (meeting as any)?.mu_registration_url || '#'}
+                  href={existingMuUrl || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full sm:w-auto"

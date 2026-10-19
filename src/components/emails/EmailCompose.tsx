@@ -1,5 +1,6 @@
 'use client';
 
+import { muRegistrationUrl } from '@/lib/app-url';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -51,26 +52,35 @@ export default function EmailCompose({
     if (selectedTemplateId && selectedMeeting) {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (template) {
+        // 画面には DB の列名（camelCase）で渡ってくるため、snake_case と両方を読む
+        const m = selectedMeeting as Record<string, unknown>;
+        const v = (camel: string, snake: string) => m[camel] ?? m[snake] ?? '';
+        const deadline = v('registrationDeadline', 'registration_deadline');
         const vars: Record<string, string | number | null> = {
-          meeting_title: String(selectedMeeting.title || ''),
-          theme: String(selectedMeeting.theme || ''),
-          date: selectedMeeting.date ? formatDate(String(selectedMeeting.date)) : '',
-          start_time: String(selectedMeeting.start_time || '').substring(0, 5),
-          end_time: String(selectedMeeting.end_time || '').substring(0, 5),
-          venue_name: String(selectedMeeting.venue_name || ''),
-          venue_address: String(selectedMeeting.venue_address || ''),
-          description: String(selectedMeeting.description || ''),
-          fee_rac: String(selectedMeeting.fee_rac || 0),
-          fee_rc: String(selectedMeeting.fee_rc || 0),
-          fee_obog: String(selectedMeeting.fee_obog || 0),
-          fee_guest: String(selectedMeeting.fee_guest || 0),
-          registration_deadline: selectedMeeting.registration_deadline
-            ? formatDate(String(selectedMeeting.registration_deadline))
-            : '',
-          mu_registration_url: String(selectedMeeting.mu_registration_url || ''),
+          meeting_title: String(v('title', 'title')),
+          theme: String(v('theme', 'theme')),
+          date: v('date', 'date') ? formatDate(String(v('date', 'date'))) : '',
+          start_time: String(v('startTime', 'start_time')).substring(0, 5),
+          end_time: String(v('endTime', 'end_time')).substring(0, 5),
+          venue_name: String(v('venueName', 'venue_name')),
+          venue_address: String(v('venueAddress', 'venue_address')),
+          description: String(v('description', 'description')),
+          fee_rac: String(v('feeRac', 'fee_rac') || 0),
+          fee_rc: String(v('feeRc', 'fee_rc') || 0),
+          fee_obog: String(v('feeObog', 'fee_obog') || 0),
+          fee_guest: String(v('feeGuest', 'fee_guest') || 0),
+          registration_deadline: deadline ? formatDate(String(deadline)) : '',
+          // 保存済みURLはプレビュー版のアドレスのことがあるため、本番アドレスで作り直す
+          mu_registration_url: muRegistrationUrl(
+            (v('muRegistrationSlug', 'mu_registration_slug') as string) || null,
+            (v('muRegistrationUrl', 'mu_registration_url') as string) || null,
+          ) || '',
         };
-        setSubject(replaceTemplateVariables(template.subject_template, vars));
-        setBody(replaceTemplateVariables(template.body_template, vars));
+        const t = template as unknown as Record<string, unknown>;
+        const subjectTpl = String(t.subjectTemplate ?? t.subject_template ?? '');
+        const bodyTpl = String(t.bodyTemplate ?? t.body_template ?? '');
+        setSubject(replaceTemplateVariables(subjectTpl, vars));
+        setBody(replaceTemplateVariables(bodyTpl, vars));
       }
     }
   }, [selectedTemplateId, selectedMeetingId]);
@@ -274,7 +284,7 @@ export default function EmailCompose({
                   <SelectContent>
                     <SelectItem value="all">全員 ({members.length}名)</SelectItem>
                     <SelectItem value="rac">
-                      大阪北RACメンバー ({members.filter(m => m.member_type === 'RAC').length}名)
+                      自クラブ会員（RAC） ({members.filter(m => m.member_type === 'RAC').length}名)
                     </SelectItem>
                     <SelectItem value="rc">
                       RC ({members.filter(m => m.member_type === 'RC').length}名)
