@@ -284,7 +284,7 @@ export default function EmailCompose({
                   <SelectContent>
                     <SelectItem value="all">全員 ({members.length}名)</SelectItem>
                     <SelectItem value="rac">
-                      大阪北RACメンバー ({members.filter(m => m.member_type === 'RAC').length}名)
+                      自クラブ会員（RAC） ({members.filter(m => m.member_type === 'RAC').length}名)
                     </SelectItem>
                     <SelectItem value="rc">
                       RC ({members.filter(m => m.member_type === 'RC').length}名)

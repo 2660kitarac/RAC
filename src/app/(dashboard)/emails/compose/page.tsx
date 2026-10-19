@@ -87,7 +87,8 @@ export default async function EmailComposePage({ searchParams }: { searchParams:
     <EmailCompose
       templates={templates as any}
       meetings={meetingRows as any}
-      members={memberRows as any}
+      // 画面側は member_type（snake_case）で読むため、ここで合わせる
+      members={memberRows.map(r => ({ id: r.id, name: r.name, email: r.email, member_type: r.memberType }))}
       selectedMeeting={selectedMeeting as any || null}
       clubId={clubId || ''}
       userId={profile?.id || userId}

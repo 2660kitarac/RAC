@@ -63,10 +63,12 @@ export function muRegistrationUrl(
 ): string | null {
   if (slug) return shareUrl(`/mu/${slug}`, currentOrigin);
   if (!storedUrl) return null;
-  // slug がない古いデータ：保存済みURLのパス部分だけを使い、アドレスを本番に差し替える
+  // slug がない古いデータ：このアプリのMU登録ページを指すURLだけ、アドレスを本番に差し替える
+  // （外部のフォームなど、別サイトへのリンクはそのまま使う）
   try {
     const u = new URL(storedUrl);
-    return shareUrl(`${u.pathname}${u.search}`, currentOrigin);
+    const isOurs = u.hostname.endsWith('.vercel.app') || u.pathname.startsWith('/mu/');
+    return isOurs ? shareUrl(`${u.pathname}${u.search}`, currentOrigin) : storedUrl;
   } catch {
     return storedUrl;
   }
