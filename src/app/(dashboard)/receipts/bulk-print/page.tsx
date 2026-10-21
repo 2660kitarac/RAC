@@ -3,13 +3,12 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, inArray, like, type SQL } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
-import { ReceiptPrintSlip, type ReceiptPrintData } from '@/components/receipts/ReceiptPrintSlip';
+import { ReceiptPreview, ReceiptPrintSheets, ReceiptStyles, type ReceiptSlipData } from '@/components/receipts/ReceiptSlip';
 import { isDistrictScope, canManageFinance } from '@/lib/auth/tenant';
 import { receiptPrintColumns } from '@/lib/receipts/print-columns';
 
-type PrintRow = ReceiptPrintData & { id: string };
+type PrintRow = ReceiptSlipData & { id: string };
 
 export const metadata = { title: '領収書 一括印刷' };
 
@@ -71,127 +70,37 @@ export default async function BulkPrintPage({
       .orderBy(receipts.receiptNumber);
   }
 
-  // A4縦に5枚ずつページ分割
-  const RECEIPTS_PER_PAGE = 5;
-  const pages: PrintRow[][] = [];
-  for (let i = 0; i < receiptList.length; i += RECEIPTS_PER_PAGE) {
-    pages.push(receiptList.slice(i, i + RECEIPTS_PER_PAGE));
-  }
-
   return (
     <div className="min-h-screen bg-gray-100 print:min-h-0 print:bg-white">
       {/* 操作バー（印刷時非表示 / Client Component） */}
       <PrintToolbar
         backHref="/receipts"
-        note={`${receiptList.length}件の領収書（A4縦・1ページに5枚）`}
+        note={`${receiptList.length}件（A4縦・1ページに5枚）`}
         printLabel="全件印刷 / PDF保存"
         sticky
         maxWidthClass="max-w-3xl"
       />
 
+      {/* 画面プレビュー（印刷と同じレイアウトを縮小表示。印刷時は非表示） */}
       {receiptList.length === 0 ? (
-        <div className="screen-only flex items-center justify-center min-h-64">
-          <div className="text-center text-gray-400">
-            <p className="text-lg">印刷する領収書がありません</p>
-            <p className="text-sm mt-1">一括発行後にこのページを開いてください</p>
+        <div className="rs-screen flex min-h-64 items-center justify-center p-6 text-center text-gray-500">
+          <div>
+            <p className="text-lg">印刷できる領収書がありません</p>
+            <p className="mt-1 text-sm">一括発行してから、このページを開いてください</p>
           </div>
         </div>
       ) : (
-        <>
-          {/* 画面プレビュー（印刷時非表示） */}
-          <div className="screen-only max-w-3xl mx-auto p-6 space-y-3">
-            <div className="text-sm text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-              📄 印刷時はA4縦1枚に5枚ずつ並んで出力されます
-            </div>
-            {receiptList.map((receipt) => (
-              <ReceiptCardScreen key={receipt.id} receipt={receipt} />
-            ))}
-          </div>
-
-          {/* 印刷用レイアウト（画面では非表示・印刷時のみ） */}
-          <div className="print-root">
-            {pages.map((pageReceipts, pageIndex) => (
-              <div key={pageIndex} className="print-page">
-                {pageReceipts.map((receipt, slipIndex) => (
-                  <ReceiptPrintSlip
-                    key={receipt.id}
-                    receipt={receipt}
-                    withCutLine={slipIndex < pageReceipts.length - 1}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="rs-screen mx-auto max-w-3xl space-y-3 p-4 sm:p-6">
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-gray-700">
+            印刷すると、A4縦1枚に5枚ずつ並び、間に切り取り線が入ります。
+          </p>
+          {receiptList.map((r) => <ReceiptPreview key={r.id} receipt={r} />)}
+        </div>
       )}
 
-      <style>{`
-        /* ===== 印刷設定 ===== */
-        @page {
-          size: A4 portrait;
-          margin: 8mm 10mm;
-        }
-
-        /* 画面表示時：印刷専用ブロックを隠す */
-        .print-root {
-          display: none;
-        }
-
-        @media print {
-          /* 画面専用要素を隠す */
-          .screen-only {
-            display: none !important;
-          }
-
-          /* 印刷専用ブロックを表示 */
-          .print-root {
-            display: block !important;
-            width: 190mm;
-            margin: 0 auto;
-          }
-
-          /* 1ページ＝領収書5枚分。高さ固定しない（先頭見切れ防止） */
-          .print-page {
-            width: 190mm;
-            display: block;
-            overflow: visible;
-          }
-
-          /* 2ページ目以降の先頭で改ページ */
-          .print-page + .print-page {
-            page-break-before: always;
-            break-before: page;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/** 画面表示用カード */
-function ReceiptCardScreen({ receipt }: { receipt: PrintRow }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <p className="text-xs text-gray-400">No. {receipt.receiptNumber}</p>
-          {receipt.receiptClubName && (
-            <p className="text-sm font-bold text-gray-700">{receipt.receiptClubName}</p>
-          )}
-          <p className="text-lg font-bold text-gray-900">{receipt.receiptName} 様</p>
-        </div>
-        <p className="text-2xl font-bold text-gray-900">¥{receipt.amount.toLocaleString()}</p>
-      </div>
-      <div className="flex items-center justify-between text-sm text-gray-600">
-        <div>
-          <span className="text-xs text-gray-400 mr-1">但し書き:</span>
-          {receipt.description}
-          {receipt.meetingTitle && <span className="text-xs text-gray-400 ml-1">（{receipt.meetingTitle}）</span>}
-        </div>
-        <div className="text-right text-xs text-gray-400">
-          {formatDate(receipt.issuedDate)} / {receipt.clubName}
-        </div>
-      </div>
+      {/* 印刷用（A4縦に5枚ずつ。画面では非表示） */}
+      <ReceiptPrintSheets receipts={receiptList} />
+      <ReceiptStyles />
     </div>
   );
 }

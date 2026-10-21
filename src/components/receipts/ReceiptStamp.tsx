@@ -23,14 +23,59 @@ interface ReceiptStampProps {
   size?: string;
 }
 
-/** 印影テキストを丸印に収まるよう整形（最大8文字） */
-function normalizeStampText(text: string): string[] {
-  const t = text.replace(/\s+/g, '').slice(0, 8);
-  if (t.length <= 2) return [t];
-  if (t.length <= 4) return [t.slice(0, Math.ceil(t.length / 2)), t.slice(Math.ceil(t.length / 2))];
-  // 5文字以上は3行に分割
-  const per = Math.ceil(t.length / 3);
-  return [t.slice(0, per), t.slice(per, per * 2), t.slice(per * 2)].filter(Boolean);
+/**
+ * 印影テキストを丸印に収まるよう行に分ける（最大8文字）
+ * 英数字のまとまり（RAC など）は途中で改行しない。
+ *   例：大阪北RAC → 大阪北 / RAC、池田くれはRAC → 池田 / くれは / RAC
+ */
+export function normalizeStampText(text: string): string[] {
+  // 絵文字などで文字が途中で切れないよう、コードポイント単位で数える
+  const t = Array.from(text.replace(/\s+/gu, '')).slice(0, 8).join('');
+  const tokens = t.match(/[A-Za-z0-9]+|[^A-Za-z0-9]/gu) ?? [];
+  // 英数字は幅が狭いので 0.6 文字分として数える
+  const width = (tok: string) => (/^[A-Za-z0-9]+$/.test(tok) ? tok.length * 0.6 : 1);
+  const total = tokens.reduce((n, tok) => n + width(tok), 0);
+  const lineCount = total <= 2.5 ? 1 : total <= 5 ? 2 : 3;
+  if (lineCount === 1) return [t];
+
+  // 英数字のまとまりは独立した行にし、残りの漢字・かなを残りの行に均等に割り振る
+  const asciiIdx = tokens.findIndex(tok => /^[A-Za-z0-9]+$/.test(tok));
+  const lines: string[] = [];
+  if (asciiIdx >= 0 && asciiIdx === tokens.length - 1 && tokens.length > 1) {
+    const kanji = tokens.slice(0, -1).join('');
+    const rest = lineCount - 1;
+    if (rest === 2 && kanji.length > 1) {
+      // 2行に分けるときは、漢字とかなの切れ目など読みやすい位置で分ける（池田くれは → 池田 / くれは）
+      const script = (c: string) => (/[\u3040-\u309f]/.test(c) ? 'h' : /[\u30a0-\u30ff]/.test(c) ? 'k' : 'c');
+      const chars = Array.from(kanji);
+      let best = Math.ceil(chars.length / 2);
+      let bestCost = Infinity;
+      for (let i = 1; i < chars.length; i++) {
+        const cost = Math.max(i, chars.length - i) + (script(chars[i - 1]) === script(chars[i]) ? 0.5 : 0);
+        if (cost < bestCost) { bestCost = cost; best = i; }
+      }
+      lines.push(chars.slice(0, best).join(''), chars.slice(best).join(''));
+    } else {
+      const per = Math.ceil(kanji.length / rest);
+      for (let i = 0; i < kanji.length; i += per) lines.push(kanji.slice(i, i + per));
+    }
+    lines.push(tokens[tokens.length - 1]);
+    return lines;
+  }
+  const per = Math.ceil(total / lineCount);
+  let cur = '';
+  let curW = 0;
+  for (const tok of tokens) {
+    if (curW + width(tok) > per && cur) { lines.push(cur); cur = ''; curW = 0; }
+    cur += tok; curW += width(tok);
+  }
+  if (cur) lines.push(cur);
+  // 丸に収まるのは3行まで。超えたら最後の行にまとめる
+  while (lines.length > 3) {
+    const last = lines.pop()!;
+    lines[lines.length - 1] += last;
+  }
+  return lines;
 }
 
 export default function ReceiptStamp({ stamp, size = '16mm' }: ReceiptStampProps) {
@@ -58,7 +103,10 @@ export default function ReceiptStamp({ stamp, size = '16mm' }: ReceiptStampProps
   if (text && text.trim()) {
     const lines = normalizeStampText(text);
     // 行数に応じて文字サイズを調整（size に対する相対値）
-    const fontRatio = lines.length === 1 ? 0.34 : lines.length === 2 ? 0.26 : 0.2;
+    // 一番長い行が丸に収まるよう文字の大きさを決める（英数字は細いので0.6文字分）
+    const longest = Math.max(...lines.map(l => Array.from(l).reduce((n, c) => n + (/[A-Za-z0-9]/.test(c) ? 0.6 : 1), 0)));
+    const byLines = lines.length === 1 ? 0.34 : lines.length === 2 ? 0.27 : 0.21;
+    const fontRatio = Math.min(byLines, 0.62 / Math.max(longest, 1));
     return (
       <div
         style={{
