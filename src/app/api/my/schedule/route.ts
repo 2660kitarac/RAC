@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, attendances, districtEvents, users, clubs } from '@/lib/db/schema';
-import { eq, and, isNull, gte, lte, asc, inArray } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, asc, inArray, ne } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,15 +34,16 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     const clubId     = userRecord?.clubId ?? (session.user as any).clubId ?? null;
-    const districtId = userRecord?.districtId ?? null;
+    let districtId   = userRecord?.districtId ?? null;
     const memberType = userRecord?.memberType ?? 'RAC';
 
-    // クラブ名取得
+    // クラブ名取得（会員に地区が設定されていなければ、所属クラブの地区で地区行事を出す）
     let clubName = '';
     if (clubId) {
-      const [c] = await db.select({ name: clubs.name, shortName: clubs.shortName })
+      const [c] = await db.select({ name: clubs.name, shortName: clubs.shortName, districtId: clubs.districtId })
         .from(clubs).where(eq(clubs.id, clubId)).limit(1);
       clubName = c?.shortName || c?.name || '';
+      if (!districtId) districtId = c?.districtId ?? null;
     }
 
     // 例会一覧取得（muRegistrationUrl含む）
@@ -50,6 +51,11 @@ export async function GET(request: NextRequest) {
       ? await db.select({
           id: meetings.id,
           title: meetings.title,
+          meetingNumber: meetings.meetingNumber,
+          theme: meetings.theme,
+          committee: meetings.committee,
+          description: meetings.description,
+          programDetail: meetings.programDetail,
           date: meetings.date,
           startTime: meetings.startTime,
           endTime: meetings.endTime,
@@ -57,6 +63,9 @@ export async function GET(request: NextRequest) {
           venueAddress: meetings.venueAddress,
           status: meetings.status,
           registrationDeadline: meetings.registrationDeadline,
+          deadlinePolicy: meetings.deadlinePolicy,
+          finishedAt: meetings.finishedAt,
+          mealFee: meetings.mealFee,
           muRegistrationUrl: meetings.muRegistrationUrl,
           muRegistrationSlug: meetings.muRegistrationSlug,
           feeRac: meetings.feeRac,
@@ -66,6 +75,7 @@ export async function GET(request: NextRequest) {
           hasAfterParty: meetings.hasAfterParty,
           afterPartyVenue: meetings.afterPartyVenue,
           afterPartyStartTime: meetings.afterPartyStartTime,
+          afterPartyFeeType: meetings.afterPartyFeeType,
           afterPartyFeeRac: meetings.afterPartyFeeRac,
           afterPartyFeeRc: meetings.afterPartyFeeRc,
           afterPartyFeeObog: meetings.afterPartyFeeObog,
@@ -76,6 +86,8 @@ export async function GET(request: NextRequest) {
           .where(and(
             eq(meetings.clubId, clubId),
             isNull(meetings.deletedAt),
+            // 下書きの例会は会員には見せない
+            ne(meetings.status, 'draft'),
             gte(meetings.date, startDate),
             lte(meetings.date, endDate),
           ))
@@ -114,7 +126,12 @@ export async function GET(request: NextRequest) {
           title: districtEvents.title,
           date: districtEvents.date,
           startTime: districtEvents.startTime,
+          endTime: districtEvents.endTime,
           venueName: districtEvents.venueName,
+          venueAddress: districtEvents.venueAddress,
+          registrationFee: districtEvents.registrationFee,
+          registrationDeadline: districtEvents.registrationDeadline,
+          description: districtEvents.description,
           eventType: districtEvents.eventType,
           isAwardTarget: districtEvents.isAwardTarget,
         })
@@ -144,7 +161,8 @@ export async function GET(request: NextRequest) {
 
     // 参加統計
     const today = now.toISOString().split('T')[0];
-    const pastMeetings = enrichedMeetings.filter(m => m.date < today);
+    // 中止になった例会は参加率の母数に入れない
+    const pastMeetings = enrichedMeetings.filter(m => m.date < today && m.status !== 'cancelled');
     const attendedCount = pastMeetings.filter(
       m => m.myAttendance &&
         m.myAttendance.participationType !== 'absent' &&
@@ -157,7 +175,7 @@ export async function GET(request: NextRequest) {
       districtEvents: enrichedEvents,
       stats: {
         year: targetYear,
-        totalMeetings: clubMeetings.length,
+        totalMeetings: clubMeetings.filter(m => m.status !== 'cancelled').length,
         pastMeetings: totalPast,
         attendedCount,
         attendanceRate: totalPast > 0 ? Math.round((attendedCount / totalPast) * 100) : null,
