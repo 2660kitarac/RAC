@@ -4,7 +4,7 @@ import { generateTemporaryPassword } from '@/lib/auth/password';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { resolveClubScope, canAssignRole } from '@/lib/auth/tenant';
+import { resolveClubScope, canAssignRole, canManageClub } from '@/lib/auth/tenant';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 
@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 取得もロールで制限（ページの対応表と同じ範囲。#50）
+    if (!canManageClub(session.user.role)) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     // 自クラブ以外を見るには管理者権限が必要
     const url = new URL(request.url);

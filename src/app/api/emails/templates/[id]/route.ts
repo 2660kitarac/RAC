@@ -41,6 +41,8 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 取得もロールで制限（ページの対応表と同じ範囲。#50）
+    if (!canManageClub(session.user.role)) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     const { id } = await params;
     const db = await getDbFromContext();
