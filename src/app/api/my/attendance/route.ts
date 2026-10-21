@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     const memberType = userRecord?.memberType || 'RAC';
-    const clubId = userRecord?.clubId || null;
+    // スケジュール表示（/api/my/schedule）と同じ決め方にする（表示金額と登録金額をずらさない）
+    const clubId = userRecord?.clubId || (session.user as any).clubId || null;
 
     // 参加費計算
     let feeAmount = 0;
@@ -236,11 +237,16 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
+      // MU登録フォームなどでお弁当を頼んでいた場合は、参加形態を変えてもお弁当代を残す
+      const keepsMeal = !!(existing[0] as any).mealRequired
+        && participationType !== 'absent' && participationType !== 'waitlist';
+      const updatedFee = feeAmount + (keepsMeal ? (meeting.mealFee || 0) : 0);
+
       // 更新
       await db.update(attendances).set({
         participationType: participationType as any,
         afterPartyFeeAmount: afterPartyFeeAmount as any,
-        feeAmount,
+        feeAmount: updatedFee,
         note: note || null,
         attendanceStatus: participationType === 'absent' ? 'absent' : 'undecided',
         // 欠席⇔参加の切り替えで支払状況を合わせる（欠席→参加で「免除」のまま残らないように）
