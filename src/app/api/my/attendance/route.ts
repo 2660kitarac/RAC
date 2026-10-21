@@ -174,7 +174,10 @@ export async function POST(request: NextRequest) {
     let feeAmount = 0;
     let afterPartyFeeAmount = 0;
     if (participationType !== 'absent' && participationType !== 'waitlist') {
-      if (memberType === 'RAC') feeAmount = meeting.feeRac || 0;
+      // 自クラブの会員は「自クラブ会員の登録料」（未設定なら0円）。MU登録フォーム・当日受付と同じルール
+      const isOwnClub = !!clubId && clubId === meeting.clubId;
+      if (isOwnClub) feeAmount = meeting.ownClubFee ?? 0;
+      else if (memberType === 'RAC') feeAmount = meeting.feeRac || 0;
       else if (memberType === 'RC') feeAmount = meeting.feeRc || 0;
       else if (memberType === 'OB_OG') feeAmount = meeting.feeObog || 0;
       else feeAmount = meeting.feeGuest || 0;

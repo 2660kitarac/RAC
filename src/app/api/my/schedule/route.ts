@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
           feeRc: meetings.feeRc,
           feeObog: meetings.feeObog,
           feeGuest: meetings.feeGuest,
+          ownClubFee: meetings.ownClubFee,
           hasAfterParty: meetings.hasAfterParty,
           afterPartyVenue: meetings.afterPartyVenue,
           afterPartyStartTime: meetings.afterPartyStartTime,
