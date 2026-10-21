@@ -34,6 +34,8 @@ export interface MyMeeting {
   feeRc: number;
   feeObog: number;
   feeGuest: number;
+  /** 自クラブ会員の登録料（null = 0円） */
+  ownClubFee?: number | null;
   hasAfterParty: boolean;
   afterPartyVenue: string | null;
   afterPartyStartTime: string | null;
@@ -152,12 +154,16 @@ export function checkDeadline(meeting: MyMeeting) {
   });
 }
 
-/** 会員区分ごとの参加費（例会・懇親会） */
+/**
+ * 参加費（例会・懇親会）
+ * 会員のトップページに出るのは自クラブの例会だけなので、例会の登録料は「自クラブ会員の登録料」（未設定なら0円）。
+ * 懇親会費は会員区分ごと（MU登録フォームと同じ）。
+ */
 export function feesFor(meeting: MyMeeting, memberType: string) {
   const pick = (rac: number, rc: number, obog: number, guest: number) =>
     memberType === 'RAC' ? rac : memberType === 'RC' ? rc : memberType === 'OB_OG' ? obog : guest;
   return {
-    meeting: pick(meeting.feeRac, meeting.feeRc, meeting.feeObog, meeting.feeGuest) || 0,
+    meeting: meeting.ownClubFee ?? 0,
     party: pick(meeting.afterPartyFeeRac, meeting.afterPartyFeeRc, meeting.afterPartyFeeObog, meeting.afterPartyFeeGuest) || 0,
   };
 }

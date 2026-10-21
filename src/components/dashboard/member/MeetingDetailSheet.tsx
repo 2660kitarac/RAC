@@ -172,7 +172,7 @@ function MeetingBody(props: Omit<MeetingDetailSheetProps, 'item' | 'onClose'> & 
         {meeting.committee && (
           <Section icon={Users} title="担当委員会"><p className="break-words">{meeting.committee}</p></Section>
         )}
-        <Section icon={Wallet} title={`参加費（${memberType === 'OB_OG' ? 'OB・OG' : memberType}）`}>
+        <Section icon={Wallet} title="参加費（自クラブ会員）">
           <p className="tabular-nums">
             例会 {fees.meeting > 0 ? formatCurrency(fees.meeting) : '無料'}
             {meeting.mealFee > 0 && <span className="text-gray-500">（お弁当 +{formatCurrency(meeting.mealFee)}）</span>}
