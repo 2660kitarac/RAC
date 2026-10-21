@@ -225,6 +225,8 @@ export const receipts = pgTable('receipts', {
   clubId: text('club_id').notNull().references(() => clubs.id),
   meetingId: text('meeting_id').references(() => meetings.id),
   attendanceId: text('attendance_id').references(() => attendances.id),
+  // 領収書の持ち主（会員）。会員画面で本人の領収書だけを出すために使う。外部参加者などは空（#43）
+  userId: text('user_id').references(() => users.id),
   transactionId: text('transaction_id'),
   receiptNumber: text('receipt_number').notNull(),
   receiptName: text('receipt_name').notNull(),
