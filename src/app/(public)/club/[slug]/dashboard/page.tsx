@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Calendar, Receipt, CreditCard, History, LogOut, ChevronRight, User, Users, Clock, MapPin } from 'lucide-react';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS } from '@/types';
+import { ownReceiptsCondition } from '@/lib/receipts/owner';
 
 export default async function MemberDashboardPage({
   params,
@@ -98,7 +99,8 @@ export default async function MemberDashboardPage({
       description: receipts.description,
     })
       .from(receipts)
-      .where(and(eq(receipts.clubId, clubId), isNull(receipts.deletedAt)))
+      // 本人の発行済み領収書だけ（#43。以前は自クラブの全員分・取消済みも出ていた）
+      .where(and(eq(receipts.clubId, clubId), ownReceiptsCondition(profile.id)))
       .orderBy(desc(receipts.issuedDate))
       .limit(3)
     : Promise.resolve([]),

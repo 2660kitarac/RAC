@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { ownReceiptsCondition } from '@/lib/receipts/owner';
 import { redirect, notFound } from 'next/navigation';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
@@ -54,9 +55,8 @@ export default async function ReceiptPrintPage({
       and(
         eq(receipts.id, receiptId),
         eq(receipts.clubId, profile.clubId!),
-        // 一覧（マイ領収書）と同じく、発行済みで削除されていないものだけ印刷できる
-        eq(receipts.status, 'issued'),
-        isNull(receipts.deletedAt),
+        // 一覧（マイ領収書）と同じく、本人の発行済み領収書だけ印刷できる（#43）。それ以外は 404
+        ownReceiptsCondition(profile.id),
       )
     )
     .then((r:any[])=>r[0]);
