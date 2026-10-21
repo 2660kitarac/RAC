@@ -1,12 +1,15 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { receipts, meetings, clubs } from '@/lib/db/schema';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, like, type SQL } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
-import { ReceiptPrintSlip } from '@/components/receipts/ReceiptPrintSlip';
+import { ReceiptPrintSlip, type ReceiptPrintData } from '@/components/receipts/ReceiptPrintSlip';
 import { isDistrictScope, canManageFinance } from '@/lib/auth/tenant';
+import { receiptPrintColumns } from '@/lib/receipts/print-columns';
+
+type PrintRow = ReceiptPrintData & { id: string };
 
 export const metadata = { title: '領収書 一括印刷' };
 
@@ -39,97 +42,38 @@ export default async function BulkPrintPage({
   const canQuery = canManageFinance(session.user.role) && (districtScope || !!clubId);
   const clubScope = districtScope || !clubId ? undefined : eq(receipts.clubId, clubId);
 
-  let receiptList: any[] = [];
-
+  // 取得方法ごとの絞り込み条件（該当なしなら null）
+  let target: SQL | undefined | null = null;
   if (params.ids && canQuery) {
     // IDリストで直接指定
     const ids = params.ids.split(',').filter(Boolean);
-    if (ids.length > 0) {
-      const conditions = and(inArray(receipts.id, ids), clubScope, eq(receipts.status, 'issued'), isNull(receipts.deletedAt));
-
-      receiptList = await db
-        .select({
-          id: receipts.id,
-          receiptNumber: receipts.receiptNumber,
-          receiptName: receipts.receiptName,
-          receiptClubName: receipts.receiptClubName,
-          amount: receipts.amount,
-          description: receipts.description,
-          issuedDate: receipts.issuedDate,
-          meetingTitle: meetings.title,
-          clubName: clubs.name,
-          clubAddress: clubs.address,
-          clubPhone: clubs.phone,
-          stampImageUrl: clubs.stampImageUrl,
-          stampText: clubs.stampText,
-          stampEnabled: clubs.stampEnabled,
-        })
-        .from(receipts)
-        .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
-        .leftJoin(clubs, eq(receipts.clubId, clubs.id))
-        .where(conditions);
-    }
+    if (ids.length > 0) target = and(inArray(receipts.id, ids), clubScope);
   } else if (params.meetingId && canQuery) {
     // 例会IDで発行済み領収書を取得
-    receiptList = await db
-      .select({
-        id: receipts.id,
-        receiptNumber: receipts.receiptNumber,
-        receiptName: receipts.receiptName,
-        amount: receipts.amount,
-        description: receipts.description,
-        issuedDate: receipts.issuedDate,
-        meetingTitle: meetings.title,
-        clubName: clubs.name,
-        clubAddress: clubs.address,
-        clubPhone: clubs.phone,
-        stampImageUrl: clubs.stampImageUrl,
-        stampText: clubs.stampText,
-        stampEnabled: clubs.stampEnabled,
-      })
-      .from(receipts)
-      .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
-      .leftJoin(clubs, eq(receipts.clubId, clubs.id))
-      .where(and(
-        eq(receipts.meetingId, params.meetingId),
-        clubScope,
-        eq(receipts.status, 'issued'),
-        isNull(receipts.deletedAt),
-      ));
+    target = and(eq(receipts.meetingId, params.meetingId), clubScope);
   } else if (params.fiscalYear && clubId && canQuery) {
-    // 年会費で絞り込み（但し書きに年度が含まれるもの）
+    // 年会費で絞り込み（但し書きに「年会費」と年度が含まれるもの）
+    target = and(
+      eq(receipts.clubId, clubId),
+      like(receipts.description, '%年会費%'),
+      like(receipts.description, `%${params.fiscalYear}%`),
+    );
+  }
+
+  let receiptList: PrintRow[] = [];
+  if (target !== null) {
     receiptList = await db
-      .select({
-        id: receipts.id,
-        receiptNumber: receipts.receiptNumber,
-        receiptName: receipts.receiptName,
-        amount: receipts.amount,
-        description: receipts.description,
-        issuedDate: receipts.issuedDate,
-        meetingTitle: meetings.title,
-        clubName: clubs.name,
-        clubAddress: clubs.address,
-        clubPhone: clubs.phone,
-        stampImageUrl: clubs.stampImageUrl,
-        stampText: clubs.stampText,
-        stampEnabled: clubs.stampEnabled,
-      })
+      .select(receiptPrintColumns)
       .from(receipts)
       .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
       .leftJoin(clubs, eq(receipts.clubId, clubs.id))
-      .where(and(
-        eq(receipts.clubId, clubId),
-        eq(receipts.status, 'issued'),
-        isNull(receipts.deletedAt),
-      ))
-      .then((rows: any[]) =>
-        rows.filter(r => r.description?.includes('年会費') && r.description?.includes(params.fiscalYear!))
-      );
+      .where(and(target, eq(receipts.status, 'issued'), isNull(receipts.deletedAt)))
+      .orderBy(receipts.receiptNumber);
   }
 
   // A4縦に5枚ずつページ分割
   const RECEIPTS_PER_PAGE = 5;
-  const pages: any[][] = [];
+  const pages: PrintRow[][] = [];
   for (let i = 0; i < receiptList.length; i += RECEIPTS_PER_PAGE) {
     pages.push(receiptList.slice(i, i + RECEIPTS_PER_PAGE));
   }
@@ -225,7 +169,7 @@ export default async function BulkPrintPage({
 }
 
 /** 画面表示用カード */
-function ReceiptCardScreen({ receipt }: { receipt: any }) {
+function ReceiptCardScreen({ receipt }: { receipt: PrintRow }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between mb-2">

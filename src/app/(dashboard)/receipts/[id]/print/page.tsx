@@ -8,6 +8,7 @@ import PrintToolbar from '@/components/receipts/PrintToolbar';
 import ReceiptStamp from '@/components/receipts/ReceiptStamp';
 import { ReceiptPrintSlip } from '@/components/receipts/ReceiptPrintSlip';
 import { canPrintReceipt } from '@/lib/auth/tenant';
+import { receiptPrintColumns } from '@/lib/receipts/print-columns';
 
 export const metadata = { title: '領収書印刷' };
 
@@ -24,28 +25,15 @@ export default async function AdminReceiptPrintPage({
 
   const receipt = await db
     .select({
-      id: receipts.id,
-      receiptNumber: receipts.receiptNumber,
-      receiptName: receipts.receiptName,
-      receiptClubName: receipts.receiptClubName,
-      amount: receipts.amount,
-      description: receipts.description,
-      issuedDate: receipts.issuedDate,
+      ...receiptPrintColumns,
       status: receipts.status,
       clubId: receipts.clubId,
-      meetingTitle: meetings.title,
-      clubName: clubs.name,
-      clubAddress: clubs.address,
-      clubPhone: clubs.phone,
-      stampImageUrl: clubs.stampImageUrl,
-      stampText: clubs.stampText,
-      stampEnabled: clubs.stampEnabled,
     })
     .from(receipts)
     .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
     .leftJoin(clubs, eq(receipts.clubId, clubs.id))
     .where(and(eq(receipts.id, id), isNull(receipts.deletedAt)))
-    .then((r: any[]) => r[0]);
+    .then((r) => r[0]);
 
   // 他クラブ・取消済みの領収書は印刷させない。存在が分からないよう 404 にする（IDOR 対策）
   if (!receipt || !canPrintReceipt(session.user, receipt)) notFound();

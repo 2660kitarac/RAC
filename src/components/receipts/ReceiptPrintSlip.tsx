@@ -4,14 +4,14 @@ import ReceiptStamp, { type StampConfig } from '@/components/receipts/ReceiptSta
 export interface ReceiptPrintData extends StampConfig {
   receiptNumber: string;
   receiptName: string;
-  receiptClubName?: string | null;
+  receiptClubName: string | null;
   amount: number;
   description: string | null;
   issuedDate: string | null;
-  meetingTitle?: string | null;
+  meetingTitle: string | null;
   clubName: string | null;
-  clubAddress?: string | null;
-  clubPhone?: string | null;
+  clubAddress: string | null;
+  clubPhone: string | null;
 }
 
 /** 領収書1枚の枠の高さ。5枚 + 切り取り線4本 = 276mm で、A4縦（上下余白8mm）の印刷可能高さ281mmに収まる */
