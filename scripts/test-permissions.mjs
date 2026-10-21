@@ -73,6 +73,24 @@ t('クラブアカウントが自クラブ会員をリセット → 可', m.canR
 t('クラブアカウントが自クラブの地区役員をリセット → 不可', m.canResetPasswordFor(clubA, { role: 'district_pr_chair', clubId: 'A' }).allowed, false);
 t('一般会員が他会員をリセット → 不可', m.canResetPasswordFor(memberA, { role: 'member', clubId: 'A' }).allowed, false);
 
+console.log('--- 領収書の印刷（canPrintReceipt） ---');
+const issuedA = { clubId: 'A', status: 'issued' };
+const issuedB = { clubId: 'B', status: 'issued' };
+const cancelledA = { clubId: 'A', status: 'cancelled' };
+t('クラブアカウントが自クラブの発行済みを印刷 → 可', m.canPrintReceipt(clubA, issuedA), true);
+t('自クラブの一般会員は管理画面から印刷不可（会員画面のマイ領収書を使う）', m.canPrintReceipt(memberA, issuedA), false);
+t('自クラブの会計は発行済みを印刷 → 可', m.canPrintReceipt({ id: 'ta', role: 'treasurer', clubId: 'A' }, issuedA), true);
+t('自クラブの会長は発行済みを印刷 → 可', m.canPrintReceipt({ id: 'pa', role: 'president', clubId: 'A' }, issuedA), true);
+t('自クラブの幹事（会計権限なし）は印刷不可', m.canPrintReceipt({ id: 'sa', role: 'secretary', clubId: 'A' }, issuedA), false);
+t('クラブアカウントが他クラブの領収書を印刷 → 不可', m.canPrintReceipt(clubA, issuedB), false);
+t('クラブ未所属の会員 → 不可（全クラブ印刷の防止）', m.canPrintReceipt(orphan, issuedA), false);
+t('地区ロール外の地区役員（会計）→ 不可', m.canPrintReceipt(dTreasurer, issuedA), false);
+t('取消済みは自クラブでも印刷不可', m.canPrintReceipt(clubA, cancelledA), false);
+t('地区管理者は他クラブの発行済みも印刷可', m.canPrintReceipt(dAdmin, issuedB), true);
+t('システムオーナーでも取消済みは印刷不可', m.canPrintReceipt(owner, cancelledA), false);
+t('クラブ未設定の領収書は地区スタッフ以外は不可', m.canPrintReceipt(clubA, { clubId: null, status: 'issued' }), false);
+t('未ログイン相当 → 不可', m.canPrintReceipt(null, issuedA), false);
+
 console.log('--- 仮パスワード ---');
 const pw = m.generateTemporaryPassword(10);
 t('仮パスワードは10文字・英字と数字を含む', pw.length === 10 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw), true);
