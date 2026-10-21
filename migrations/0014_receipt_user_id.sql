@@ -3,18 +3,23 @@
 --  - 会員画面（マイ領収書・会員トップページ）で本人の領収書だけを出すために使う
 --  - 外部参加者の領収書など、会員がいない領収書は空のまま
 --  - 既存データを埋め戻す。user_id が空の行だけを更新するので、何度実行しても問題ない
+--  - リリース時は「適用 → PR マージ・デプロイ完了 → もう一度適用」の順で2回実行する（適用からデプロイまでの間に旧コードが発行した領収書も結び付けるため）
 -- ============================================================
+
+BEGIN;
 
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
 CREATE INDEX IF NOT EXISTS idx_receipts_user ON receipts(user_id);
 
--- 1. 出欠から発行した領収書：出欠記録の会員IDを入れる（外部参加者は空のまま）
+-- 1. 出欠から発行した領収書：出欠記録の会員IDを入れる（例会が領収書と同じクラブのものに限る。外部参加者は空のまま）
 UPDATE receipts r
 SET user_id = a.user_id
 FROM attendances a
+JOIN meetings m ON m.id = a.meeting_id
 WHERE r.user_id IS NULL
   AND r.attendance_id = a.id
-  AND a.user_id IS NOT NULL;
+  AND a.user_id IS NOT NULL
+  AND m.club_id = r.club_id;
 
 -- 2. 年会費の領収書：条件を満たす会員がちょうど1人のときだけ結び付ける
 --    - 同じクラブの支払済み・未削除の年会費レコードがある
@@ -47,6 +52,8 @@ SET user_id = uc.user_id
 FROM unique_candidates uc
 WHERE r.id = uc.receipt_id
   AND r.user_id IS NULL;
+
+COMMIT;
 
 -- ============================================================
 -- 適用後の確認用 SQL（マイグレーションの一部ではない。必要に応じて個別に実行）
