@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import SettingsPage from '@/components/settings/SettingsPage';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '設定' };
 
 export default async function Settings() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/settings')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

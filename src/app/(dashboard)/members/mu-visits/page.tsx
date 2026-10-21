@@ -6,12 +6,15 @@ import { eq, and, isNull, desc } from 'drizzle-orm';
 import Link from 'next/link';
 import { ArrowLeft, MapPin } from 'lucide-react';
 import MuVisitsTable from '@/components/members/MuVisitsTable';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'MU訪問管理' };
 
 export default async function MuVisitsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/members/mu-visits')) redirect('/dashboard');
 
   const clubId = session.user.clubId;
   if (!clubId) redirect('/dashboard');

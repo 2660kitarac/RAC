@@ -5,6 +5,7 @@ import { meetings, users } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import MeetingForm from '@/components/meetings/MeetingForm';
 import { toMeetingFormValues } from '@/lib/meetings/form-mapping';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '例会編集' };
 
@@ -12,6 +13,8 @@ export default async function MeetingEditPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/[id]')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

@@ -4,12 +4,15 @@ import { users, emailTemplates } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import EmailTemplatesManager from '@/components/emails/EmailTemplatesManager';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'メールテンプレート管理' };
 
 export default async function EmailTemplatesPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/emails/templates')) redirect('/dashboard');
 
   const db = await getDbFromContext();
   const clubId = session.user.clubId;

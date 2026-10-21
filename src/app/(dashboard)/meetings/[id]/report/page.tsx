@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, meetingReports, attendances, transactions } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import MeetingReportEditor from '@/components/reports/MeetingReportEditor';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '例会報告書' };
 
@@ -11,6 +12,8 @@ export default async function MeetingReportPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/[id]')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

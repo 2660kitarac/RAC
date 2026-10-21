@@ -4,6 +4,7 @@ import { users, emailTemplates, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, desc, or } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import EmailCompose from '@/components/emails/EmailCompose';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'メール作成' };
 
@@ -11,6 +12,8 @@ export default async function EmailComposePage({ searchParams }: { searchParams:
   const { meeting_id } = await searchParams;
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/emails/compose')) redirect('/dashboard');
 
   const db = await getDbFromContext();
   const userId = session.user.id;

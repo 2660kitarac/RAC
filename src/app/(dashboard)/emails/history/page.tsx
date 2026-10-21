@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { formatDateTime } from '@/lib/utils';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'メール送信履歴' };
 
@@ -19,6 +20,8 @@ export default async function EmailHistoryPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/emails/history')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

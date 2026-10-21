@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import ClubsList from '@/components/clubs/ClubsList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'クラブ管理' };
 
 export default async function ClubsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/clubs')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

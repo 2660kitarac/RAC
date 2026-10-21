@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings } from '@/lib/db/schema';
 import { eq, and, isNull, gte, inArray, asc } from 'drizzle-orm';
 import ReceptionPage from '@/components/attendances/ReceptionPage';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '当日受付' };
 
 export default async function MeetingReceptionPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/reception')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 
