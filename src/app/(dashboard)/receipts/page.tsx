@@ -6,6 +6,7 @@ import { eq, and, isNull, count, desc, gte } from 'drizzle-orm';
 import ReceiptsList from '@/components/receipts/ReceiptsList';
 import { Pagination } from '@/components/ui/pagination';
 import type { UserRole } from '@/types';
+import { canManageFinance, resolveClubScope } from '@/lib/auth/tenant';
 
 export const metadata = { title: '領収書管理' };
 
@@ -21,6 +22,8 @@ export default async function ReceiptsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // 領収書の一覧は会計権限のロールだけ（一般会員は会員画面のマイ領収書を使う。#46）
+  if (!canManageFinance(session.user.role)) redirect('/dashboard');
 
   const db = await getDbFromContext();
 
@@ -28,7 +31,11 @@ export default async function ReceiptsPage({
   const page = Math.max(1, parseInt(params.page || '1', 10));
   const offset = (page - 1) * PAGE_SIZE;
 
-  const clubId = session.user.clubId;
+  // クラブの範囲（IDOR 対策）。地区スタッフは全クラブ、それ以外は自クラブのみ。
+  // クラブ未所属のアカウントは全クラブ分が出てしまうため開かせない
+  const clubScope = resolveClubScope(session.user, null);
+  if (clubScope.forbidden) redirect('/dashboard');
+  const clubId = clubScope.clubId;
 
   // 表示範囲
   //  - meeting_id 指定あり → その例会の領収書のみ（例会ごとの管理）

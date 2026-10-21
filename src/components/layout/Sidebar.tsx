@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import type { User } from '@/types';
 import { USER_ROLE_LABELS } from '@/types';
 import { isDistrictStaff, isDistrictOfficer } from '@/lib/hooks/useAuth';
+import { canManageFinance } from '@/lib/auth/tenant';
 import { signOut } from '@/app/actions/auth';
 
 interface NavItem {
@@ -104,13 +105,16 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
         { label: 'ニコニコ管理', href: '/finance/donations', icon: Heart },
       ],
     },
-    {
-      label: '領収書管理',
-      icon: Receipt,
-      children: [
-        { label: '領収書一覧', href: '/receipts', icon: Receipt },
-      ],
-    },
+    // 領収書は会計権限のロールだけ（#46）
+    ...(canManageFinance(role)
+      ? [{
+          label: '領収書管理',
+          icon: Receipt,
+          children: [
+            { label: '領収書一覧', href: '/receipts', icon: Receipt },
+          ],
+        }]
+      : []),
     {
       label: 'メール管理',
       icon: Mail,

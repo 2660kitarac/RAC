@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils';
 import type { User, Meeting, Attendance, Email } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS } from '@/types';
+import { canManageFinance } from '@/lib/auth/tenant';
 
 interface DeadlineAlert {
   id: string;
@@ -370,7 +371,10 @@ export default function DashboardContent({
             <QuickAction href="/meetings/new" icon={Calendar} label="例会を作成" color="blue" />
             <QuickAction href="/meetings/reception" icon={Users} label="当日受付" color="green" />
             <QuickAction href="/emails/compose" icon={Mail} label="メールを作成" color="purple" />
-            <QuickAction href="/receipts" icon={Receipt} label="領収書を発行" color="orange" />
+            {/* 領収書は会計権限のロールだけ（#46） */}
+            {canManageFinance(user?.role) && (
+              <QuickAction href="/receipts" icon={Receipt} label="領収書を発行" color="orange" />
+            )}
           </div>
         </CardContent>
       </Card>

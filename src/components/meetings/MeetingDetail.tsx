@@ -995,18 +995,23 @@ export default function MeetingDetail({
                 </Button>
               </Link>
             )}
-            <Link href={`/receipts?meeting_id=${meeting.id}`}>
-              <Button variant="outline">
-                <Receipt className="h-4 w-4" />
-                この例会の領収書
-              </Button>
-            </Link>
-            <Link href={`/receipts/bulk-print?meetingId=${meeting.id}`} target="_blank">
-              <Button variant="outline">
-                <Printer className="h-4 w-4" />
-                領収書を一括印刷
-              </Button>
-            </Link>
+            {/* 領収書は会計権限のロールだけ（#46） */}
+            {canFinance && (
+              <>
+                <Link href={`/receipts?meeting_id=${meeting.id}`}>
+                  <Button variant="outline">
+                    <Receipt className="h-4 w-4" />
+                    この例会の領収書
+                  </Button>
+                </Link>
+                <Link href={`/receipts/bulk-print?meetingId=${meeting.id}`} target="_blank">
+                  <Button variant="outline">
+                    <Printer className="h-4 w-4" />
+                    領収書を一括印刷
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </TabsContent>
 
