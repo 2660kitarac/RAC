@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, receipts, meetings } from '@/lib/db/schema';
-import { eq, and, isNull, desc, count } from 'drizzle-orm';
+import { eq, and, isNull, desc, count, or, sql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -55,6 +55,11 @@ export default async function MyReceiptsPage({
       .where(
         and(
           eq(receipts.clubId, profile.clubId!),
+          // 自分の領収書だけ：自分の出席登録に紐づくもの、または（年会費など）出席登録に紐づかず宛名が自分のもの
+          or(
+            sql`${receipts.attendanceId} in (select a.id from attendances a where a.user_id = ${userId} and a.deleted_at is null)`,
+            and(isNull(receipts.attendanceId), eq(receipts.receiptName, profile.name)),
+          ),
           eq(receipts.status, 'issued'),
           isNull(receipts.deletedAt)
         )
@@ -69,6 +74,11 @@ export default async function MyReceiptsPage({
       .where(
         and(
           eq(receipts.clubId, profile.clubId!),
+          // 自分の領収書だけ：自分の出席登録に紐づくもの、または（年会費など）出席登録に紐づかず宛名が自分のもの
+          or(
+            sql`${receipts.attendanceId} in (select a.id from attendances a where a.user_id = ${userId} and a.deleted_at is null)`,
+            and(isNull(receipts.attendanceId), eq(receipts.receiptName, profile.name)),
+          ),
           eq(receipts.status, 'issued'),
           isNull(receipts.deletedAt)
         )
