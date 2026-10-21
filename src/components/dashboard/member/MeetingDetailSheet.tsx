@@ -135,9 +135,16 @@ function MeetingBody(props: Omit<MeetingDetailSheetProps, 'item' | 'onClose'> & 
     <div className="space-y-5">
       {/* 自分の出欠 */}
       {myType && (
-        <p className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold', PARTICIPATION_COLORS[myType])}>
-          {PARTICIPATION_LABELS[myType]}で登録済み
-        </p>
+        <div className="space-y-2">
+          <p className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold', PARTICIPATION_COLORS[myType])}>
+            {PARTICIPATION_LABELS[myType]}で登録済み
+          </p>
+          {meeting.myAttendance?.note && (
+            <p className="whitespace-pre-wrap break-words rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              メモ：{meeting.myAttendance.note}
+            </p>
+          )}
+        </div>
       )}
 
       {!isPast && !isCancelled && (

@@ -161,7 +161,8 @@ export async function GET(request: NextRequest) {
 
     // 参加統計
     const today = now.toISOString().split('T')[0];
-    const pastMeetings = enrichedMeetings.filter(m => m.date < today);
+    // 中止になった例会は参加率の母数に入れない
+    const pastMeetings = enrichedMeetings.filter(m => m.date < today && m.status !== 'cancelled');
     const attendedCount = pastMeetings.filter(
       m => m.myAttendance &&
         m.myAttendance.participationType !== 'absent' &&
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
       districtEvents: enrichedEvents,
       stats: {
         year: targetYear,
-        totalMeetings: clubMeetings.length,
+        totalMeetings: clubMeetings.filter(m => m.status !== 'cancelled').length,
         pastMeetings: totalPast,
         attendedCount,
         attendanceRate: totalPast > 0 ? Math.round((attendedCount / totalPast) * 100) : null,

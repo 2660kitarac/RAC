@@ -34,13 +34,24 @@ function markOf(item: ScheduleItem, today: string): Mark {
   return 'meeting';
 }
 
+/** 読み上げ用の状態（色だけに頼らない） */
+const MARK_TEXT: Record<Mark, string> = {
+  'meeting-yes': '例会・参加登録済み',
+  'meeting-no': '例会・欠席',
+  'meeting-todo': '例会・出欠未回答',
+  meeting: '例会',
+  district: '地区行事',
+  cancelled: '例会・中止',
+};
+
 const MARK_CLASS: Record<Mark, string> = {
   'meeting-yes': 'bg-blue-600',
   'meeting-no': 'bg-gray-400',
   'meeting-todo': 'border-2 border-orange-500 bg-white',
   meeting: 'bg-blue-300',
   district: 'bg-amber-400',
-  cancelled: 'bg-gray-300',
+  // 中止は欠席と見分けられるよう、色ではなく形（斜線入りの白抜き）で表す
+  cancelled: 'border border-gray-400 bg-[linear-gradient(135deg,transparent_45%,rgb(156_163_175)_45%,rgb(156_163_175)_55%,transparent_55%)]',
 };
 
 export default function MonthCalendar({
@@ -95,7 +106,7 @@ export default function MonthCalendar({
       </div>
 
       {/* 日付 */}
-      <div className={cn('grid grid-cols-7 gap-y-1', loading && 'opacity-50')} role="grid">
+      <div className={cn('grid grid-cols-7 gap-y-1', loading && 'opacity-50')}>
         {cells.map((ymd, i) => {
           if (!ymd) return <div key={`e${i}`} />;
           const dayItems = byDay.get(ymd) ?? [];
@@ -103,7 +114,10 @@ export default function MonthCalendar({
           const isToday = ymd === today;
           const isSelected = ymd === selected;
           const isPast = ymd < today;
-          const label = `${Number(ymd.slice(8))}日${dayItems.length ? `、予定${dayItems.length}件` : ''}`;
+          const label = [
+            `${month + 1}月${Number(ymd.slice(8))}日${isToday ? '（今日）' : ''}`,
+            ...dayItems.map(it => MARK_TEXT[markOf(it, today)]),
+          ].join('、');
           return (
             <button
               key={ymd}
@@ -156,6 +170,7 @@ export default function MonthCalendar({
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-400" />欠席</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-300" />例会</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />地区行事</span>
+        <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS.cancelled)} />中止</span>
       </div>
     </div>
   );

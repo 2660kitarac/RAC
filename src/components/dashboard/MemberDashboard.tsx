@@ -25,7 +25,7 @@ import MonthCalendar from './member/MonthCalendar';
 import MeetingDetailSheet from './member/MeetingDetailSheet';
 import {
   PARTICIPATION_COLORS, PARTICIPATION_LABELS, PARTICIPATION_SHORT, DAYS_JA,
-  fiscalYearOf, formatMonthDay, hhmm, localYmd, needsAnswer, parseYmd,
+  checkDeadline, fiscalYearOf, formatMonthDay, hhmm, localYmd, needsAnswer, parseYmd,
   type MyMeeting, type ScheduleItem, type ScheduleResponse, type Stats,
 } from './member/types';
 
@@ -146,9 +146,9 @@ function NextMeeting({
             </span>
             で登録済みです。変更もここからできます。
           </p>
-        ) : (
+        ) : checkDeadline(meeting).allowed ? (
           <p className="text-sm font-semibold text-gray-900">出欠を登録してください</p>
-        )}
+        ) : null}
         <AttendancePanel
           meeting={meeting}
           memberType={memberType}
@@ -287,13 +287,15 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
   const current = byYear[currentFy];
   const memberType = current?.meta?.memberType || initialMemberType;
   const nextMeeting = allMeetings.find(m => m.date >= today && m.status === 'open') ?? null;
+  const hasCurrent = !!current;
+  const hasNextMeeting = !!nextMeeting;
 
   // 今年度の残りに予定がなければ、来年度も読み込んでおく（5〜6月に次の例会が出ないのを防ぐ）
   useEffect(() => {
     // サーバーからの読み込み（状態の更新は通信が終わってから行われる）
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (current && !nextMeeting) void loadYear(currentFy + 1);
-  }, [current, nextMeeting, currentFy, loadYear]);
+    if (hasCurrent && !hasNextMeeting) void loadYear(currentFy + 1);
+  }, [hasCurrent, hasNextMeeting, currentFy, loadYear]);
 
   const todoMeetings = allMeetings.filter(m => needsAnswer(m, today));
   const openItem = openKey ? allItems.find(it => `${it.kind}-${it.id}` === openKey) ?? null : null;
@@ -454,13 +456,12 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
       <section aria-labelledby="schedule-title" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 id="schedule-title" className="text-base font-bold text-gray-900">スケジュール</h2>
-          <div className="flex rounded-lg bg-gray-100 p-0.5" role="tablist" aria-label="表示方法">
+          <div className="flex rounded-lg bg-gray-100 p-0.5" role="group" aria-label="表示方法">
             {([['calendar', 'カレンダー', CalendarDays], ['list', '一覧', List]] as const).map(([v, label, Icon]) => (
               <button
                 key={v}
                 type="button"
-                role="tab"
-                aria-selected={view === v}
+                aria-pressed={view === v}
                 onClick={() => changeView(v)}
                 className={cn(
                   'flex h-9 items-center gap-1 rounded-md px-3 text-sm font-medium',
@@ -487,8 +488,16 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
               onNext={() => moveMonth(1)}
               loading={!byYear[cursorFy] && !failedYears.includes(cursorFy)}
             />
+            {failedYears.includes(cursorFy) && (
+              <p className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                この月の予定を読み込めませんでした。
+                <button type="button" onClick={() => { void loadYear(cursorFy); }} className="font-semibold underline">
+                  もう一度読み込む
+                </button>
+              </p>
+            )}
             {!today.startsWith(monthPrefix) && (
-              <button type="button" onClick={goToday} className="mt-2 text-sm font-medium text-blue-700">
+              <button type="button" onClick={goToday} className="mt-1 inline-flex h-11 items-center text-sm font-medium text-blue-700">
                 今月に戻る
               </button>
             )}
