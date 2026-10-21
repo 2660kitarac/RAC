@@ -5,6 +5,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
 import { ReceiptPreview, ReceiptPrintSheets, ReceiptStyles } from '@/components/receipts/ReceiptSlip';
+import { receiptPrintColumns } from '@/lib/receipts/print-columns';
 
 export default async function ReceiptPrintPage({
   params,
@@ -29,23 +30,7 @@ export default async function ReceiptPrintPage({
 
   // 領収書取得（自クラブのものに限定）
   const receipt = await db
-    .select({
-      id: receipts.id,
-      receiptNumber: receipts.receiptNumber,
-      receiptName: receipts.receiptName,
-      receiptClubName: receipts.receiptClubName,
-      amount: receipts.amount,
-      description: receipts.description,
-      issuedDate: receipts.issuedDate,
-      status: receipts.status,
-      meetingTitle: meetings.title,
-      clubName: clubs.name,
-      clubAddress: clubs.address,
-      clubPhone: clubs.phone,
-      stampImageUrl: clubs.stampImageUrl,
-      stampText: clubs.stampText,
-      stampEnabled: clubs.stampEnabled,
-    })
+    .select(receiptPrintColumns)
     .from(receipts)
     .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
     .leftJoin(clubs, eq(receipts.clubId, clubs.id))
@@ -58,7 +43,7 @@ export default async function ReceiptPrintPage({
         isNull(receipts.deletedAt),
       )
     )
-    .then((r:any[])=>r[0]);
+    .then((r) => r[0]);
 
   if (!receipt) notFound();
 

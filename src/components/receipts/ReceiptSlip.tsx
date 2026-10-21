@@ -22,6 +22,7 @@
  *   └────────────────────────────────────────────────────────────┘
  */
 import ReceiptStamp, { type StampConfig } from './ReceiptStamp';
+import { formatReceiptAmount, formatReceiptDate, receiptNameSize, receiptPurpose } from '@/lib/receipts/slip-format';
 
 /**
  * 印刷・プレビューに使う領収書のデータ。
@@ -44,21 +45,8 @@ export interface ReceiptSlipData extends StampConfig {
   clubPhone: string | null;
 }
 
-/** 2026-10-21 → 2026年10月21日（タイムゾーンの影響を受けないよう文字列から作る） */
-function formatIssuedDate(ymd: string | null): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd || '');
-  if (!m) return ymd || '';
-  return `${m[1]}年${Number(m[2])}月${Number(m[3])}日`;
-}
-
-function formatAmount(n: number): string {
-  return `¥${Math.max(0, Math.round(n || 0)).toLocaleString('ja-JP')}`;
-}
-
 export function ReceiptSlip({ receipt }: { receipt: ReceiptSlipData }) {
-  // 「例会参加費として　11月第2例会（第1397回）」（例会名に括弧が入っても二重括弧にしない）
-  const purpose = [receipt.description ? `${receipt.description}として` : '', receipt.meetingTitle || '']
-    .filter(Boolean).join('　');
+  const purpose = receiptPurpose(receipt.description, receipt.meetingTitle);
   return (
     <article className="rs-slip" aria-label={`領収書 ${receipt.receiptNumber}`}>
       <div className="rs-main">
@@ -66,18 +54,20 @@ export function ReceiptSlip({ receipt }: { receipt: ReceiptSlipData }) {
 
         <div className="rs-to">
           {receipt.receiptClubName && <p className="rs-to-club rs-clip">{receipt.receiptClubName}</p>}
-          <p className="rs-to-name">
-            <span className="rs-clip">{receipt.receiptName}</span>
+          {/* 宛名は省略しない。長いほど文字を小さくし、それでも長ければ2行まで折り返す */}
+          <p className={`rs-to-name rs-name-${receiptNameSize(receipt.receiptName)}`}>
+            <span className="rs-name-text">{receipt.receiptName}</span>
             <span className="rs-sama">様</span>
           </p>
         </div>
 
         <div className="rs-amount">
           <span className="rs-amount-label">金額</span>
-          <span className="rs-amount-value">{formatAmount(receipt.amount)}<span className="rs-amount-dash">－</span></span>
+          <span className="rs-amount-value">{formatReceiptAmount(receipt.amount)}<span className="rs-amount-dash">－</span></span>
         </div>
 
-        <p className="rs-purpose rs-clip">
+        {/* 但し書きは2行まで（それ以上は「…」） */}
+        <p className="rs-purpose">
           <span className="rs-purpose-label">但し</span>
           {purpose}
         </p>
@@ -87,7 +77,7 @@ export function ReceiptSlip({ receipt }: { receipt: ReceiptSlipData }) {
       <div className="rs-side">
         <div className="rs-meta">
           <p className="rs-no rs-clip">No. {receipt.receiptNumber}</p>
-          <p className="rs-date">{formatIssuedDate(receipt.issuedDate)}</p>
+          <p className="rs-date">{formatReceiptDate(receipt.issuedDate)}</p>
         </div>
 
         <div className="rs-issuer">
@@ -127,7 +117,8 @@ export function ReceiptPrintSheets({ receipts }: { receipts: ReceiptSlipData[] }
       {pages.map((page, p) => (
         <div key={p} className="rs-page">
           {page.map((r, i) => (
-            <div key={`${r.id ?? r.receiptNumber}-${i}`}>
+            // 領収書と下の切り取り線はページをまたがせない
+            <div key={`${r.id ?? r.receiptNumber}-${i}`} className="rs-unit">
               <ReceiptSlip receipt={r} />
               {i < page.length - 1 && <CutLine />}
             </div>
@@ -190,7 +181,7 @@ const RECEIPT_CSS = `
   letter-spacing: 0.45em;
   line-height: 1;
 }
-.rs-to { margin-top: calc(var(--u) * 3); }
+.rs-to { margin-top: calc(var(--u) * 2); }
 .rs-to-club { font-size: calc(var(--u) * 2.7); color: var(--sub); }
 .rs-to-name {
   display: flex; align-items: baseline; gap: calc(var(--u) * 2);
@@ -201,14 +192,17 @@ const RECEIPT_CSS = `
   font-weight: 700;
   line-height: 1.15;
 }
-.rs-to-name .rs-clip { flex: 1; }
+.rs-name-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rs-name-m { font-size: calc(var(--u) * 4); }
+.rs-name-s { font-size: calc(var(--u) * 2.9); line-height: 1.1; }
+.rs-name-s .rs-name-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rs-sama { flex: none; font-size: calc(var(--u) * 3.6); font-weight: 400; }
 
 .rs-amount {
-  margin-top: calc(var(--u) * 2.6);
+  margin-top: calc(var(--u) * 2);
   display: flex; align-items: center;
   border: calc(var(--u) * 0.35) solid var(--rule);
-  height: calc(var(--u) * 9);
+  height: calc(var(--u) * 8);
 }
 .rs-amount-label {
   flex: none; align-self: stretch; display: flex; align-items: center;
@@ -229,7 +223,11 @@ const RECEIPT_CSS = `
 }
 .rs-amount-dash { margin-left: calc(var(--u) * 0.5); }
 
-.rs-purpose { margin-top: calc(var(--u) * 2.2); font-size: calc(var(--u) * 3.1); }
+.rs-purpose {
+  flex: none; /* 縮めない（2行目が「上記正に〜」に隠れないように） */
+  margin-top: calc(var(--u) * 1.5); font-size: calc(var(--u) * 3); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .rs-purpose-label { margin-right: calc(var(--u) * 2.5); color: var(--sub); }
 .rs-note { margin-top: auto; font-size: calc(var(--u) * 2.6); color: var(--sub); }
 
@@ -264,8 +262,11 @@ const RECEIPT_CSS = `
 .rs-cut-line { flex: 1; border-top: calc(var(--u) * 0.35) dashed #8f8f8f; }
 
 /* 画面プレビュー：表示幅に合わせて縮小（1mm = 幅 ÷ 190） */
-.rs-preview { container-type: inline-size; width: 100%; }
-.rs-preview .rs-slip { --u: calc(100cqw / 190); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.rs-preview { container-type: inline-size; width: 100%; overflow-x: auto; }
+/* 小さい画面でも読めるよう 1mm = 2px より小さくしない（そのときは横にスクロール） */
+.rs-preview .rs-slip { --u: max(calc(100cqw / 190), 2px); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+/* コンテナクエリの単位に対応していないブラウザ（古い Safari など） */
+@supports not (width: 1cqw) { .rs-preview .rs-slip { --u: 3px; } }
 
 /* 印刷 */
 .rs-print { display: none; }
@@ -274,7 +275,7 @@ const RECEIPT_CSS = `
   .rs-screen { display: none !important; }
   /* 単位は印刷部分全体で決める（切り取り線は .rs-slip の外にあるため。枠の中だけだと点線と高さが消える） */
   .rs-print { --u: 1mm; display: block !important; width: 190mm; margin: 0 auto; }
-  .rs-print .rs-slip { break-inside: avoid; page-break-inside: avoid; }
+  .rs-print .rs-unit { break-inside: avoid; page-break-inside: avoid; }
   .rs-page + .rs-page { break-before: page; page-break-before: always; }
 }
 `;

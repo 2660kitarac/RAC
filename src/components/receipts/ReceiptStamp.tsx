@@ -56,8 +56,10 @@ export function normalizeStampText(text: string): string[] {
       }
       lines.push(chars.slice(0, best).join(''), chars.slice(best).join(''));
     } else {
-      const per = Math.ceil(kanji.length / rest);
-      for (let i = 0; i < kanji.length; i += per) lines.push(kanji.slice(i, i + per));
+      // コードポイント単位で分ける（サロゲートペアの文字を途中で切らない）
+      const chars = Array.from(kanji);
+      const per = Math.ceil(chars.length / rest);
+      for (let i = 0; i < chars.length; i += per) lines.push(chars.slice(i, i + per).join(''));
     }
     lines.push(tokens[tokens.length - 1]);
     return lines;
