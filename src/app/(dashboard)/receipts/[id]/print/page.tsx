@@ -6,6 +6,7 @@ import { redirect, notFound } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
 import ReceiptStamp from '@/components/receipts/ReceiptStamp';
+import { ReceiptPrintSlip } from '@/components/receipts/ReceiptPrintSlip';
 
 export const metadata = { title: '領収書印刷' };
 
@@ -72,17 +73,7 @@ export default async function AdminReceiptPrintPage({
       <div className="print-root">
         <div className="print-page">
           {copies.map((r, i) => (
-            <div key={i} className="receipt-slip-wrapper">
-              <div className="receipt-slip-print">
-                <ReceiptPrintContent receipt={r} />
-              </div>
-              {/* 領収書間の切り取り線（最後の1枚以外） */}
-              {i < copies.length - 1 && (
-                <div className="cut-line-print">
-                  ✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-                </div>
-              )}
-            </div>
+            <ReceiptPrintSlip key={i} receipt={r} withCutLine={i < copies.length - 1} />
           ))}
         </div>
       </div>
@@ -117,41 +108,6 @@ export default async function AdminReceiptPrintPage({
             width: 190mm;
             display: block;
             overflow: visible;
-          }
-
-          /* 1枚のラッパー（領収書 + 切り取り線） */
-          .receipt-slip-wrapper {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-
-          /* 領収書本体: 1枚 = 48mm */
-          .receipt-slip-print {
-            width: 190mm;
-            height: 48mm;
-            box-sizing: border-box;
-            padding: 3mm 5mm;
-            border: 0.5pt solid #999;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-
-          /* 切り取り線: 5mm */
-          .cut-line-print {
-            height: 5mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 6.5pt;
-            color: #aaa;
-            line-height: 1;
-            letter-spacing: 0;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
         }
       `}</style>
@@ -204,72 +160,5 @@ function ReceiptContent({ receipt }: { receipt: any }) {
         <ReceiptStamp stamp={receipt} size="64px" />
       </div>
     </>
-  );
-}
-
-/** 印刷用コンパクトレイアウト（1枚 48mm × 190mm に収める） */
-function ReceiptPrintContent({ receipt }: { receipt: any }) {
-  return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      fontSize: '8pt',
-      fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", "Yu Gothic", sans-serif',
-    }}>
-      {/* ヘッダー行: タイトル + No */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1mm' }}>
-        <div style={{ fontSize: '13pt', fontWeight: 'bold', letterSpacing: '4px' }}>領 収 書</div>
-        <div style={{ fontSize: '7pt', color: '#666' }}>No. {receipt.receiptNumber}</div>
-      </div>
-
-      {/* 宛名 */}
-      <div style={{ borderBottom: '1.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm' }}>
-        {receipt.receiptClubName && (
-          <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>{receipt.receiptClubName}</div>
-        )}
-        <span style={{ fontSize: '11pt', fontWeight: 'bold' }}>{receipt.receiptName}</span>
-        <span style={{ fontSize: '9pt' }}> 様</span>
-      </div>
-
-      {/* 金額 */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm', marginBottom: '1.5mm' }}>
-        <span style={{ fontSize: '7pt', color: '#666' }}>金額</span>
-        <span style={{ fontSize: '14pt', fontWeight: 'bold' }}>
-          ¥{receipt.amount.toLocaleString()} -
-        </span>
-      </div>
-
-      {/* 但し書き */}
-      <div style={{ backgroundColor: '#f5f5f5', padding: '1.5mm 2mm', marginBottom: '1.5mm', borderRadius: '1mm' }}>
-        <span style={{ fontSize: '7pt', color: '#666' }}>但し書き: </span>
-        <span style={{ fontSize: '8pt' }}>{receipt.description}</span>
-        {receipt.meetingTitle && (
-          <span style={{ fontSize: '7pt', color: '#666' }}> （{receipt.meetingTitle}）</span>
-        )}
-      </div>
-
-      {/* フッター: 発行日 + クラブ名 + 印章 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto' }}>
-        <div>
-          <div style={{ fontSize: '7pt', color: '#666' }}>発行日</div>
-          <div style={{ fontSize: '8pt' }}>{formatDate(receipt.issuedDate)}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2mm' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 'bold', fontSize: '8pt' }}>{receipt.clubName}</div>
-            {receipt.clubAddress && (
-              <div style={{ fontSize: '6.5pt', color: '#666' }}>{receipt.clubAddress}</div>
-            )}
-            {receipt.clubPhone && (
-              <div style={{ fontSize: '6.5pt', color: '#666' }}>TEL: {receipt.clubPhone}</div>
-            )}
-          </div>
-          {/* 印章（電子印鑑） */}
-          <ReceiptStamp stamp={receipt} size="11mm" />
-        </div>
-      </div>
-    </div>
   );
 }
