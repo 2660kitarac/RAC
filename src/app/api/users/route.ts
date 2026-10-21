@@ -7,12 +7,15 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { resolveClubScope, canAssignRole } from '@/lib/auth/tenant';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 // GET /api/users?clubId=xxx&role=admin
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 取得もロールで制限。範囲は /users のページと同じ（対応表 page-access.ts。#50）
+    if (!canAccessPage(session.user.role, '/users')) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     // 自クラブ以外を見るには管理者権限が必要
     const url = new URL(request.url);

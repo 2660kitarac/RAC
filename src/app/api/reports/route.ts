@@ -5,12 +5,15 @@ import { meetingReports, meetings } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { resolveClubScope, canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 // GET /api/reports?meetingId=xxx&clubId=xxx
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    // 取得もロールで制限。範囲は /reports のページと同じ（対応表 page-access.ts。#50）
+    if (!canAccessPage(session.user.role, '/reports')) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     const db = await getDbFromContext();
     const url = new URL(request.url);
