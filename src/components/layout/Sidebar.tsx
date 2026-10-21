@@ -81,9 +81,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
       icon: Globe,
       children: [
         { label: 'MU登録者一覧', href: '/attendances', icon: Users },
-        ...((['club_account', 'system_owner', 'district_admin', 'club_admin', 'president'].includes(role || ''))
-          ? [{ label: '他クラブMU訪問管理', href: '/members/mu-visits', icon: MapPin }]
-          : []),
+        { label: '他クラブMU訪問管理', href: '/members/mu-visits', icon: MapPin },
       ],
     },
     {

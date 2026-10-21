@@ -12,7 +12,7 @@
 - 地区のページ（`district/*`）と `district-submissions` は `requireDistrictPage` / `getSubmitter` で制限済み
 - 領収書（`receipts/*`）は #41・#46 で制限済み
 - `meetings/new`・`meetings/[id]/resume`・`approvals`・`clubs/accounts` は個別に制限済み
-- 下記 18 ページが未制限（当初 19 ページとしたが `settings` は対象外にした）
+- 下記 19 ページが未制限（`settings` は対象外にし、`meetings/new` を追加）
 
 ## 2. ページごとに開けるロール
 
@@ -22,31 +22,32 @@
 |---|---|---|
 | `/finance` | 会長・会計・クラブ管理者・クラブアカウント・地区スタッフ | `canManageFinance`（tenant.ts） |
 | `/receipts` | 同上 | `canManageFinance`（サイドバー用。ページは制限済み） |
+| `/members/mu-visits` | system_owner・地区管理者・クラブアカウント・クラブ管理者・会長 | 新規 `canManageMuVisits`（サイドバーで出していた範囲。`/members` より先に判定） |
 | `/members` | クラブの役員（会長・幹事・会計・クラブ管理者・クラブアカウント）・地区スタッフ | `canManageClub`（tenant.ts） |
 | `/meetings` | 同上 | `canManageClub` |
 | `/clubs` | 同上 | `canManageClub`（`/clubs/accounts` はページ側でさらに限定済み） |
 | `/csv` | 同上 | `canManageClub` |
 | `/users` | system_owner・地区管理者・クラブアカウント・クラブ管理者 | 新規 `canManageAccounts` |
-| `/emails` | system_owner・地区管理者・クラブアカウント・クラブ管理者・会長・幹事 | 新規 `canSendEmails` |
+| `/emails` | クラブの役員・地区スタッフ | `canManageClub`（メールの API `/api/emails/*` と同じ範囲。レビューを受けて変更） |
 | `/reports` | system_owner・地区管理者・クラブアカウント・クラブ管理者・会長・幹事・会計・地区代表・地区幹事・ゾーン代表・提唱ロータリアン | 新規 `canViewReports` |
 
 `/settings` は対象外とする。プロフィール・パスワード変更など全員が使う項目があり、クラブ設定のタブは画面側でロールにより出し分け済みのため（実装中に確認して変更）。
 
-新規の3つのロール一覧は、クライアント側 `src/lib/hooks/useAuth.ts` の `isClubAccount`・`canSendEmails`・`canViewReports` と同じにする。
+`canManageAccounts`・`canViewReports` のロール一覧は、クライアント側 `src/lib/hooks/useAuth.ts` の `isClubAccount`・`canViewReports` と同じにする。
 
 ## 3. ページでの確認
 
-対象 18 ページで、`if (!session?.user) redirect('/login');` の直後に次を入れる。
+対象 19 ページで、`if (!session?.user) redirect('/login');` の直後に次を入れる。
 
 ```ts
 if (!canAccessPage(session.user.role, '<そのページのパス>')) redirect('/dashboard');
 ```
 
-対象：`finance/transactions`・`finance/annual-fees`・`finance/donations`・`members`・`members/mu-visits`・`users`・`emails/compose`・`emails/history`・`emails/templates`・`meetings`・`meetings/reception`・`meetings/[id]`・`meetings/[id]/attendances`・`meetings/[id]/edit`・`meetings/[id]/report`・`clubs`・`csv`・`reports`
+対象：`meetings/new`（レビューで追加）・`finance/transactions`・`finance/annual-fees`・`finance/donations`・`members`・`members/mu-visits`・`users`・`emails/compose`・`emails/history`・`emails/templates`・`meetings`・`meetings/reception`・`meetings/[id]`・`meetings/[id]/attendances`・`meetings/[id]/edit`・`meetings/[id]/report`・`clubs`・`csv`・`reports`
 
 ## 4. サイドバー
 
-`src/components/layout/Sidebar.tsx` のクラブ用メニュー（地区モード以外）を、同じ `canAccessPage` で絞り込む。子メニューは1つずつ判定し、子がすべて消えた親メニューは表示しない。#46 で入れた領収書専用の分岐は、この絞り込みに置き換える。
+`src/components/layout/Sidebar.tsx` のクラブ用メニューと、ダッシュボードのクイックアクション（`DashboardContent.tsx`）（地区モード以外）を、同じ `canAccessPage` で絞り込む。子メニューは1つずつ判定し、子がすべて消えた親メニューは表示しない。#46 で入れた領収書専用の分岐は、この絞り込みに置き換える。
 
 ## 5. テスト
 
