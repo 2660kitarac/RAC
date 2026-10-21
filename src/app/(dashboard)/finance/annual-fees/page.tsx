@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, annualFees } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import AnnualFeesList from '@/components/finance/AnnualFeesList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '年会費管理' };
 
 export default async function AnnualFeesPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/finance/annual-fees')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

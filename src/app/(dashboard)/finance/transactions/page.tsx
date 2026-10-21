@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { transactions, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte, count, desc } from 'drizzle-orm';
 import TransactionsList from '@/components/finance/TransactionsList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '収支管理' };
 
@@ -16,6 +17,8 @@ export default async function TransactionsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/finance/transactions')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

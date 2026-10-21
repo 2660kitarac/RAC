@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { transactions, meetings, users } from '@/lib/db/schema';
 import { eq, and, isNull, inArray, desc, asc } from 'drizzle-orm';
 import DonationsList from '@/components/finance/DonationsList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'ニコニコ・寄付管理' };
 
 export default async function DonationsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/finance/donations')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

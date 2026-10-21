@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils';
 import type { User, Meeting, Attendance, Email } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS } from '@/types';
-import { canManageFinance } from '@/lib/auth/tenant';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 interface DeadlineAlert {
   id: string;
@@ -368,13 +368,10 @@ export default function DashboardContent({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <QuickAction href="/meetings/new" icon={Calendar} label="例会を作成" color="blue" />
-            <QuickAction href="/meetings/reception" icon={Users} label="当日受付" color="green" />
-            <QuickAction href="/emails/compose" icon={Mail} label="メールを作成" color="purple" />
-            {/* 領収書は会計権限のロールだけ（#46） */}
-            {canManageFinance(user?.role) && (
-              <QuickAction href="/receipts" icon={Receipt} label="領収書を発行" color="orange" />
-            )}
+            {/* 開けないページへのボタンは出さない（ページの制限と同じ対応表。#46・#48） */}
+            {quickActions
+              .filter((a) => canAccessPage(user?.role, a.href))
+              .map((a) => <QuickAction key={a.href} {...a} />)}
           </div>
         </CardContent>
       </Card>
@@ -448,6 +445,13 @@ function AlertCard({
     </Link>
   );
 }
+
+const quickActions = [
+  { href: '/meetings/new', icon: Calendar, label: '例会を作成', color: 'blue' },
+  { href: '/meetings/reception', icon: Users, label: '当日受付', color: 'green' },
+  { href: '/emails/compose', icon: Mail, label: 'メールを作成', color: 'purple' },
+  { href: '/receipts', icon: Receipt, label: '領収書を発行', color: 'orange' },
+];
 
 function QuickAction({
   href, icon: Icon, label, color,

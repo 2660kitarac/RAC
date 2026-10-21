@@ -6,6 +6,7 @@ import { eq, and, isNull, asc, desc, ne } from 'drizzle-orm';
 import MeetingForm, { type CopyCandidate } from '@/components/meetings/MeetingForm';
 import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
 import { toCopiedMeetingFormValues } from '@/lib/meetings/form-mapping';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '例会作成' };
 
@@ -19,6 +20,8 @@ export default async function NewMeetingPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/new')) redirect('/dashboard');
 
   const { from: fromParam } = await searchParams;
   // 例会管理権限のないユーザーにはコピー機能を提供しない（多重防御）

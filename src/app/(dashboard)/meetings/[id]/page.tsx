@@ -6,11 +6,14 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import MeetingDetail from '@/components/meetings/MeetingDetail';
 import { displayAffiliation } from '@/lib/meetings/own-club';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export default async function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/[id]')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

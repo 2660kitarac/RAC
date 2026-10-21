@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, like, or, count, asc } from 'drizzle-orm';
 import MembersList from '@/components/members/MembersList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '会員管理' };
 
@@ -16,6 +17,8 @@ export default async function MembersPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/members')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

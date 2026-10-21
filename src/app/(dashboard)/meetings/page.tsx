@@ -4,6 +4,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, clubs, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte, count, desc } from 'drizzle-orm';
 import MeetingsList from '@/components/meetings/MeetingsList';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '例会管理' };
 
@@ -16,6 +17,8 @@ export default async function MeetingsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

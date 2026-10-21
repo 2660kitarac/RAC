@@ -5,11 +5,14 @@ import { meetings, attendances, users, clubs } from '@/lib/db/schema';
 import { displayAffiliation } from '@/lib/meetings/own-club';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import AttendanceManagement from '@/components/attendances/AttendanceManagement';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export default async function AttendanceManagementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/meetings/[id]')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

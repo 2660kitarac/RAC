@@ -4,12 +4,15 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users } from '@/lib/db/schema';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import UserRoleManagement from '@/components/users/UserRoleManagement';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: 'ユーザー権限管理' };
 
 export default async function UsersPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/users')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 

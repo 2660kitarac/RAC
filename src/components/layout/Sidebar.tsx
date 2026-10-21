@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import type { User } from '@/types';
 import { USER_ROLE_LABELS } from '@/types';
 import { isDistrictStaff, isDistrictOfficer } from '@/lib/hooks/useAuth';
-import { canManageFinance } from '@/lib/auth/tenant';
+import { canAccessPage } from '@/lib/auth/page-access';
 import { signOut } from '@/app/actions/auth';
 
 interface NavItem {
@@ -81,9 +81,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
       icon: Globe,
       children: [
         { label: 'MU登録者一覧', href: '/attendances', icon: Users },
-        ...((['club_account', 'system_owner', 'district_admin', 'club_admin', 'president'].includes(role || ''))
-          ? [{ label: '他クラブMU訪問管理', href: '/members/mu-visits', icon: MapPin }]
-          : []),
+        { label: '他クラブMU訪問管理', href: '/members/mu-visits', icon: MapPin },
       ],
     },
     {
@@ -105,16 +103,13 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
         { label: 'ニコニコ管理', href: '/finance/donations', icon: Heart },
       ],
     },
-    // 領収書は会計権限のロールだけ（#46）
-    ...(canManageFinance(role)
-      ? [{
-          label: '領収書管理',
-          icon: Receipt,
-          children: [
-            { label: '領収書一覧', href: '/receipts', icon: Receipt },
-          ],
-        }]
-      : []),
+    {
+      label: '領収書管理',
+      icon: Receipt,
+      children: [
+        { label: '領収書一覧', href: '/receipts', icon: Receipt },
+      ],
+    },
     {
       label: 'メール管理',
       icon: Mail,
@@ -234,6 +229,9 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
     },
   ];
 
+  // 開けないページの項目は出さない（ページ側の制限と同じ対応表。#46・#48）。子がすべて消えた親も出さない
+  const visibleNavItems = filterByPageAccess(navItems, role);
+
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
     return pathname.startsWith(href);
@@ -332,7 +330,7 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
         </nav>
       ) : (
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map(item => renderNavItem(item))}
+          {visibleNavItems.map(item => renderNavItem(item))}
         </nav>
       )}
 
@@ -362,4 +360,15 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
       </div>
     </aside>
   );
+}
+
+/** 開けないページの項目を除く。子を持つ項目は子ごとに判定し、子が残らなければ項目ごと除く */
+function filterByPageAccess(items: NavItem[], role: string | null | undefined): NavItem[] {
+  return items.flatMap((item) => {
+    if (item.children) {
+      const children = filterByPageAccess(item.children, role);
+      return children.length > 0 ? [{ ...item, children }] : [];
+    }
+    return !item.href || canAccessPage(role, item.href) ? [item] : [];
+  });
 }

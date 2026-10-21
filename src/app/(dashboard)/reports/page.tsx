@@ -5,12 +5,15 @@ import { users, meetingReports, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 export const metadata = { title: '例会報告書一覧' };
 
 export default async function ReportsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  // ロールで開けるページを制限（#48）
+  if (!canAccessPage(session.user.role, '/reports')) redirect('/dashboard');
 
   const db = await getDbFromContext();
 
