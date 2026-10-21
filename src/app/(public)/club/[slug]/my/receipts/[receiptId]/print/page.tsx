@@ -53,6 +53,7 @@ export default async function ReceiptPrintPage({
       and(
         eq(receipts.id, receiptId),
         eq(receipts.clubId, profile.clubId!),
+        eq(receipts.status, 'issued'),
           // 自分の領収書だけ：自分の出席登録に紐づくもの、または（年会費など）出席登録に紐づかず宛名が自分のもの
           or(
             sql`${receipts.attendanceId} in (select a.id from attendances a where a.user_id = ${userId} and a.deleted_at is null)`,

@@ -374,6 +374,7 @@ export default function MeetingDetail({
               meetingDate={meeting.date}
               status={meeting.status}
               finishedAt={(meeting as any).finished_at ?? null}
+              canPrintReceipts={canFinance}
             />
             <Link href={`/meetings/new?from=${meeting.id}`}>
               <Button variant="outline" size="sm" title="この例会の内容をコピーして新しい例会を作成">
@@ -1001,12 +1002,14 @@ export default function MeetingDetail({
                 この例会の領収書
               </Button>
             </Link>
+{canFinance && (
             <Link href={`/receipts/bulk-print?meetingId=${meeting.id}`} target="_blank">
               <Button variant="outline">
                 <Printer className="h-4 w-4" />
                 領収書を一括印刷
               </Button>
             </Link>
+            )}
           </div>
         </TabsContent>
 

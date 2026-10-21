@@ -46,11 +46,13 @@ type Props = {
   compact?: boolean;
   /** 終了処理後に呼ばれる（一覧の楽観更新用） */
   onFinished?: () => void;
+  /** 領収書の一括印刷を案内するか（会計権限のあるロールのみ） */
+  canPrintReceipts?: boolean;
 };
 
 export default function FinishMeetingButton({
   meetingId, meetingTitle, meetingDate, status,
-  finishedAt, compact = false, onFinished,
+  finishedAt, compact = false, onFinished, canPrintReceipts = false,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -227,12 +229,14 @@ export default function FinishMeetingButton({
                     </Button>
                   </Link>
                 )}
+{canPrintReceipts && (
                 <Link href={`/receipts/bulk-print?meetingId=${meetingId}`} className="block">
                   <Button variant="outline" className="w-full justify-start">
                     <Printer className="h-4 w-4" />
                     領収書をまとめて印刷する
                   </Button>
                 </Link>
+                )}
                 {readiness.unpaidCount > 0 && (
                   <Link href={`/emails/compose?meeting_id=${meetingId}`} className="block">
                     <Button variant="outline" className="w-full justify-start">

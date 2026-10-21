@@ -13,7 +13,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { formatDate } from '@/lib/utils';
 import type { Meeting, UserRole } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS, MeetingStatus } from '@/types';
-import { canManageMeetings } from '@/lib/hooks/useAuth';
+import { canManageMeetings, canManageFinance } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
 import FinishMeetingButton from '@/components/meetings/FinishMeetingButton';
 
@@ -36,6 +36,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const canManage = canManageMeetings(userRole);
+  const canFinance = canManageFinance(userRole);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -257,6 +258,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                                   meetingDate={meeting.date}
                                   status={meeting.status}
                                   finishedAt={(meeting as any).finished_at ?? null}
+                                  canPrintReceipts={canFinance}
                                   compact
                                 />
                               )}
@@ -378,6 +380,7 @@ export default function MeetingsList({ meetings, userRole, pagination, filters }
                           meetingDate={meeting.date}
                           status={meeting.status}
                           finishedAt={(meeting as any).finished_at ?? null}
+                          canPrintReceipts={canFinance}
                         />
                       </div>
                     )}

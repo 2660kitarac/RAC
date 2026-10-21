@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { formatDate, formatCurrency, exportToCSV } from '@/lib/utils';
 import type { UserRole } from '@/types';
 import { RECEIPT_STATUS_LABELS } from '@/types';
-import { canManageReceipts } from '@/lib/hooks/useAuth';
+import { canManageReceipts, canManageFinance } from '@/lib/hooks/useAuth';
 
 // Drizzle ORM が camelCase で返すため camelCase で定義
 interface ReceiptRow {
@@ -68,6 +68,8 @@ export default function ReceiptsList({
   const [loading, setLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const canManage = canManageReceipts(userRole);
+  // 印刷は会計権限のあるロールのみ（印刷画面側でも同じ確認をしている）
+  const canPrint = canManageFinance(userRole);
   const router = useRouter();
 
   // ── 一括発行ダイアログ ──
@@ -321,7 +323,8 @@ export default function ReceiptsList({
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={exportCSV}><Download className="h-4 w-4" />CSV</Button>
-          {/* 一括印刷モード切替 */}
+          {/* 一括印刷モード切替（会計権限のあるロールのみ） */}
+          {canPrint && (
           <Button
             variant={printSelectMode ? 'default' : 'outline'}
             size="sm"
@@ -338,6 +341,7 @@ export default function ReceiptsList({
             <Printer className="h-4 w-4" />
             {printSelectMode ? `${selectedForPrint.size}件を一括印刷` : '一括印刷'}
           </Button>
+          )}
           {printSelectMode && (
             <>
               <Button variant="outline" size="sm" onClick={selectAllForPrint}>全選択</Button>
@@ -511,7 +515,7 @@ export default function ReceiptsList({
                     </td>
                     <td className="px-4 py-3" data-cell="actions">
                       <div className="flex items-center gap-1">
-                        {receipt.status === 'issued' && !printSelectMode && (
+                        {canPrint && receipt.status === 'issued' && !printSelectMode && (
                           <Button
                             variant="ghost"
                             size="icon-sm"

@@ -29,8 +29,9 @@ interface ReceiptStampProps {
  *   例：大阪北RAC → 大阪北 / RAC、池田くれはRAC → 池田 / くれは / RAC
  */
 export function normalizeStampText(text: string): string[] {
-  const t = text.replace(/\s+/g, '').slice(0, 8);
-  const tokens = t.match(/[A-Za-z0-9]+|[^A-Za-z0-9]/g) ?? [];
+  // 絵文字などで文字が途中で切れないよう、コードポイント単位で数える
+  const t = Array.from(text.replace(/\s+/gu, '')).slice(0, 8).join('');
+  const tokens = t.match(/[A-Za-z0-9]+|[^A-Za-z0-9]/gu) ?? [];
   // 英数字は幅が狭いので 0.6 文字分として数える
   const width = (tok: string) => (/^[A-Za-z0-9]+$/.test(tok) ? tok.length * 0.6 : 1);
   const total = tokens.reduce((n, tok) => n + width(tok), 0);
@@ -46,7 +47,7 @@ export function normalizeStampText(text: string): string[] {
     if (rest === 2 && kanji.length > 1) {
       // 2行に分けるときは、漢字とかなの切れ目など読みやすい位置で分ける（池田くれは → 池田 / くれは）
       const script = (c: string) => (/[\u3040-\u309f]/.test(c) ? 'h' : /[\u30a0-\u30ff]/.test(c) ? 'k' : 'c');
-      const chars = [...kanji];
+      const chars = Array.from(kanji);
       let best = Math.ceil(chars.length / 2);
       let bestCost = Infinity;
       for (let i = 1; i < chars.length; i++) {
@@ -69,6 +70,11 @@ export function normalizeStampText(text: string): string[] {
     cur += tok; curW += width(tok);
   }
   if (cur) lines.push(cur);
+  // 丸に収まるのは3行まで。超えたら最後の行にまとめる
+  while (lines.length > 3) {
+    const last = lines.pop()!;
+    lines[lines.length - 1] += last;
+  }
   return lines;
 }
 
@@ -98,7 +104,7 @@ export default function ReceiptStamp({ stamp, size = '16mm' }: ReceiptStampProps
     const lines = normalizeStampText(text);
     // 行数に応じて文字サイズを調整（size に対する相対値）
     // 一番長い行が丸に収まるよう文字の大きさを決める（英数字は細いので0.6文字分）
-    const longest = Math.max(...lines.map(l => [...l].reduce((n, c) => n + (/[A-Za-z0-9]/.test(c) ? 0.6 : 1), 0)));
+    const longest = Math.max(...lines.map(l => Array.from(l).reduce((n, c) => n + (/[A-Za-z0-9]/.test(c) ? 0.6 : 1), 0)));
     const byLines = lines.length === 1 ? 0.34 : lines.length === 2 ? 0.27 : 0.21;
     const fontRatio = Math.min(byLines, 0.62 / Math.max(longest, 1));
     return (
