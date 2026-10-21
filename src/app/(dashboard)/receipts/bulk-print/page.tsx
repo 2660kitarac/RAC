@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
 import { ReceiptPrintSlip } from '@/components/receipts/ReceiptPrintSlip';
+import { isDistrictScope, canManageFinance } from '@/lib/auth/tenant';
 
 export const metadata = { title: '領収書 一括印刷' };
 
@@ -30,15 +31,21 @@ export default async function BulkPrintPage({
 
   const clubId = session.user.clubId;
 
+  // 印刷できる範囲（canPrintReceipt と同じルール。IDOR 対策）
+  //  - 会計権限のロールのみ。それ以外は何も印刷しない
+  //  - 地区スタッフはクラブ横断可（clubScope = undefined）
+  //  - それ以外は自クラブのみ。クラブ未所属なら何も印刷しない
+  const districtScope = isDistrictScope(session.user.role);
+  const canQuery = canManageFinance(session.user.role) && (districtScope || !!clubId);
+  const clubScope = districtScope || !clubId ? undefined : eq(receipts.clubId, clubId);
+
   let receiptList: any[] = [];
 
-  if (params.ids) {
+  if (params.ids && canQuery) {
     // IDリストで直接指定
     const ids = params.ids.split(',').filter(Boolean);
     if (ids.length > 0) {
-      const conditions = clubId
-        ? and(inArray(receipts.id, ids), eq(receipts.clubId, clubId), eq(receipts.status, 'issued'), isNull(receipts.deletedAt))
-        : and(inArray(receipts.id, ids), eq(receipts.status, 'issued'), isNull(receipts.deletedAt));
+      const conditions = and(inArray(receipts.id, ids), clubScope, eq(receipts.status, 'issued'), isNull(receipts.deletedAt));
 
       receiptList = await db
         .select({
@@ -62,7 +69,7 @@ export default async function BulkPrintPage({
         .leftJoin(clubs, eq(receipts.clubId, clubs.id))
         .where(conditions);
     }
-  } else if (params.meetingId && clubId) {
+  } else if (params.meetingId && canQuery) {
     // 例会IDで発行済み領収書を取得
     receiptList = await db
       .select({
@@ -85,11 +92,11 @@ export default async function BulkPrintPage({
       .leftJoin(clubs, eq(receipts.clubId, clubs.id))
       .where(and(
         eq(receipts.meetingId, params.meetingId),
-        eq(receipts.clubId, clubId),
+        clubScope,
         eq(receipts.status, 'issued'),
         isNull(receipts.deletedAt),
       ));
-  } else if (params.fiscalYear && clubId) {
+  } else if (params.fiscalYear && clubId && canQuery) {
     // 年会費で絞り込み（但し書きに年度が含まれるもの）
     receiptList = await db
       .select({

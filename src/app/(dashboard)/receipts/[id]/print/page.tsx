@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
 import ReceiptStamp from '@/components/receipts/ReceiptStamp';
 import { ReceiptPrintSlip } from '@/components/receipts/ReceiptPrintSlip';
+import { canPrintReceipt } from '@/lib/auth/tenant';
 
 export const metadata = { title: '領収書印刷' };
 
@@ -31,6 +32,7 @@ export default async function AdminReceiptPrintPage({
       description: receipts.description,
       issuedDate: receipts.issuedDate,
       status: receipts.status,
+      clubId: receipts.clubId,
       meetingTitle: meetings.title,
       clubName: clubs.name,
       clubAddress: clubs.address,
@@ -45,7 +47,8 @@ export default async function AdminReceiptPrintPage({
     .where(and(eq(receipts.id, id), isNull(receipts.deletedAt)))
     .then((r: any[]) => r[0]);
 
-  if (!receipt) notFound();
+  // 他クラブ・取消済みの領収書は印刷させない。存在が分からないよう 404 にする（IDOR 対策）
+  if (!receipt || !canPrintReceipt(session.user, receipt)) notFound();
 
   // A4縦に5枚収めるため、同じ領収書を5枚並べる
   const copies = Array(5).fill(receipt);

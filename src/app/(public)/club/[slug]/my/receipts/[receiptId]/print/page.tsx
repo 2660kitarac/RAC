@@ -53,7 +53,10 @@ export default async function ReceiptPrintPage({
     .where(
       and(
         eq(receipts.id, receiptId),
-        eq(receipts.clubId, profile.clubId!)
+        eq(receipts.clubId, profile.clubId!),
+        // 一覧（マイ領収書）と同じく、発行済みで削除されていないものだけ印刷できる
+        eq(receipts.status, 'issued'),
+        isNull(receipts.deletedAt),
       )
     )
     .then((r:any[])=>r[0]);

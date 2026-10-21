@@ -84,6 +84,22 @@ export function canMutateClubRecord(
   return sessionClubId === recordClubId;
 }
 
+/**
+ * 管理画面で領収書を印刷して良いか判定する（1枚印刷・一括印刷ページ用）。
+ *  - 会計権限のロール（canManageFinance）のみ。一般会員は会員画面のマイ領収書を使う
+ *  - 発行済み（issued）の領収書のみ。取消済みなどは印鑑つきで出さない
+ *  - クラブの範囲は canMutateClubRecord と同じ（地区スタッフはクラブ横断可、
+ *    それ以外は自クラブのみ。クラブ未所属は不可）
+ */
+export function canPrintReceipt(
+  user: SessionUserLike,
+  receipt: { clubId: string | null | undefined; status: string | null | undefined },
+): boolean {
+  if (!canManageFinance(user?.role)) return false;
+  if (receipt.status !== 'issued') return false;
+  return canMutateClubRecord(user, receipt.clubId);
+}
+
 /* ============================================================
  * ロール別の操作権限（サーバー側判定）
  *
