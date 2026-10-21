@@ -1,959 +1,569 @@
 'use client';
 
-import { muRegistrationUrl } from '@/lib/app-url';
-import { useState, useEffect, useCallback } from 'react';
+/**
+ * 会員用トップページ（スマホでの利用が中心）
+ *
+ *  ┌ あいさつ ─────────────────┐
+ *  │ 未回答のお知らせ（あれば）   │
+ *  ├ 次の例会 ─────────────────┤
+ *  │ 日付・時間・会場・出欠ボタン │
+ *  │ ［例会の詳細を見る］         │
+ *  ├ スケジュール ［カレンダー｜一覧］┤
+ *  │ 月のカレンダー → 選んだ日の予定 │
+ *  ├ 参加記録 ─────────────────┤
+ *
+ * 例会・地区行事を押すと、詳細（MeetingDetailSheet）が画面下から開く。
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Calendar, MapPin, Clock, ExternalLink, Copy, Check,
-  ChevronDown, ChevronUp, CheckCircle, XCircle, Hourglass,
-  PartyPopper, AlertCircle, TrendingUp, Star, Share2,
-  Users, Building2,
+  AlertCircle, Building2, CalendarDays, ChevronDown, ChevronRight, ChevronUp, Clock, List, MapPin, TrendingUp,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { formatDate, formatCurrency } from '@/lib/utils';
-import { evaluateDeadline } from '@/lib/meetings/deadline';
-import { MeetingParticipantsDialog } from '@/components/dashboard/MeetingParticipantsDialog';
+import { cn } from '@/lib/utils';
+import AttendancePanel from './member/AttendancePanel';
+import MonthCalendar from './member/MonthCalendar';
+import MeetingDetailSheet from './member/MeetingDetailSheet';
+import {
+  PARTICIPATION_COLORS, PARTICIPATION_LABELS, PARTICIPATION_SHORT, DAYS_JA,
+  fiscalYearOf, formatMonthDay, hhmm, localYmd, needsAnswer, parseYmd,
+  type MyMeeting, type ScheduleItem, type ScheduleResponse, type Stats,
+} from './member/types';
 
-// ─── 型定義 ──────────────────────────────────────────────
-interface MyMeeting {
-  id: string;
-  title: string;
-  date: string;
-  startTime: string | null;
-  endTime: string | null;
-  venueName: string | null;
-  venueAddress: string | null;
-  status: string;
-  registrationDeadline: string | null;
-  deadlinePolicy?: string | null;
-  finishedAt?: string | null;
-  muRegistrationUrl: string | null;
-  muRegistrationSlug: string | null;
-  feeRac: number;
-  feeRc: number;
-  feeObog: number;
-  feeGuest: number;
-  hasAfterParty: boolean;
-  afterPartyVenue: string | null;
-  afterPartyStartTime: string | null;
-  afterPartyFeeRac: number;
-  afterPartyFeeRc: number;
-  afterPartyFeeObog: number;
-  afterPartyFeeGuest: number;
-  capacity: number | null;
-  kind: 'meeting';
-  myAttendance: {
-    id: string;
-    participationType: string | null;
-    note: string | null;
-    isLateRegistration?: boolean | null;
-  } | null;
-}
-
-interface DistrictEvent {
-  id: string;
-  title: string;
-  date: string;
-  startTime: string | null;
-  venueName: string | null;
-  eventType: string;
-  isAwardTarget: boolean;
-  kind: 'district_event';
-}
-
-interface Stats {
-  year: number;
-  totalMeetings: number;
-  pastMeetings: number;
-  attendedCount: number;
-  attendanceRate: number | null;
-}
-
-interface Meta {
-  clubName: string;
-  memberType: string;
-  fiscalYear: number;
-}
-
-type ScheduleItem = (MyMeeting & { kind: 'meeting' }) | (DistrictEvent & { kind: 'district_event' });
-
-const PARTICIPATION_LABELS: Record<string, string> = {
-  meeting_only: '例会のみ参加',
-  meeting_and_party: '例会＋懇親会',
-  absent: '欠席',
-  waitlist: 'キャンセル待ち',
-};
-
-const PARTICIPATION_COLORS: Record<string, string> = {
-  meeting_only: 'bg-blue-100 text-blue-700 border-blue-200',
-  meeting_and_party: 'bg-purple-100 text-purple-700 border-purple-200',
-  absent: 'bg-red-100 text-red-600 border-red-200',
-  waitlist: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-};
-
-const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
-
-function getDayLabel(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return `（${DAYS_JA[d.getDay()]}）`;
-}
-
-/** 例会の登録可否・遅延登録判定（締切ポリシー対応） */
-function checkDeadline(meeting: {
-  registrationDeadline?: string | null;
-  deadlinePolicy?: string | null;
-  status?: string | null;
-  finishedAt?: string | null;
-  date?: string | null;
-}) {
-  return evaluateDeadline({
-    registrationDeadline: meeting.registrationDeadline ?? null,
-    deadlinePolicy: meeting.deadlinePolicy ?? null,
-    status: meeting.status ?? null,
-    finishedAt: meeting.finishedAt ?? null,
-    date: meeting.date ?? null,
-  });
-}
-
-// ─── MU URL コピーボタン ─────────────────────────────────
-function MuShareButton({ url, slug }: { url: string | null; slug: string | null }) {
-  const [copied, setCopied] = useState(false);
-  // 保存済みURLはプレビュー版のアドレスのことがあるため、slug から本番アドレスで作り直す
-  const shareUrl = muRegistrationUrl(slug, url);
-
-  if (!shareUrl) return null;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast.success('URLをコピーしました！友達に送ってください 🎉');
-      setTimeout(() => setCopied(false), 3000);
-    } catch {
-      toast.error('コピーに失敗しました');
-    }
-  };
-
-  return (
-    <div className="mt-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <Share2 className="h-4 w-4 text-blue-600 shrink-0" />
-        <p className="text-sm font-medium text-blue-800">友達・家族を誘う</p>
-      </div>
-      <p className="text-xs text-blue-600 mb-2">このURLを送ると、MUから直接申込できます</p>
-      {/* スマホではURL欄とコピーボタンを縦に積む */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1 min-w-0 bg-white rounded-lg px-3 py-2 border border-blue-200">
-          <p className="text-xs text-gray-600 truncate font-mono">{shareUrl}</p>
-        </div>
-        <Button
-          size="sm"
-          variant={copied ? 'default' : 'outline'}
-          className={`w-full sm:w-auto shrink-0 justify-center gap-1.5 text-xs transition-all ${copied ? 'bg-green-500 hover:bg-green-600 border-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? 'コピー済み' : 'URLをコピー'}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── 参加ボタン群 ─────────────────────────────────────────
-function AttendanceButtons({
-  meeting,
-  memberType,
-  submitting,
-  noteInputs,
-  noteOpen,
-  onRegister,
-  onNoteChange,
-  onNoteToggle,
-}: {
-  meeting: MyMeeting;
-  memberType: string;
-  submitting: string | null;
-  noteInputs: Record<string, string>;
-  noteOpen: Record<string, boolean>;
-  onRegister: (meetingId: string, type: string, isWaitlist?: boolean) => void;
-  onNoteChange: (meetingId: string, val: string) => void;
-  onNoteToggle: (meetingId: string) => void;
-}) {
-  const myType = meeting.myAttendance?.participationType ?? null;
-  const deadlineInfo = checkDeadline(meeting);
-  const isFull = meeting.capacity !== null && meeting.capacity <= 0; // countは別途
-
-  const getFee = (type: 'meeting' | 'party') => {
-    if (type === 'meeting') {
-      if (memberType === 'RAC') return meeting.feeRac;
-      if (memberType === 'RC') return meeting.feeRc;
-      if (memberType === 'OB_OG') return meeting.feeObog;
-      return meeting.feeGuest;
-    } else {
-      if (memberType === 'RAC') return meeting.afterPartyFeeRac;
-      if (memberType === 'RC') return meeting.afterPartyFeeRc;
-      if (memberType === 'OB_OG') return meeting.afterPartyFeeObog;
-      return meeting.afterPartyFeeGuest;
-    }
-  };
-
-  const meetingFee = getFee('meeting');
-  const partyFee = getFee('party');
-  const isSubmitting = submitting === meeting.id;
-
-  return (
-    <div className="space-y-2">
-      {/* 締切後でも登録可能（遅延登録）／不可の場合は理由を表示 */}
-      {deadlineInfo.deadlinePassed && deadlineInfo.allowed && (
-        <div className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>
-            <span className="font-medium">登録締切（{meeting.registrationDeadline}）を過ぎています。</span>
-            <br />
-            遅延登録として受け付けますが、運営の準備に影響するため次回は締切までにご登録ください。
-            {deadlineInfo.policy === 'meal_strict' && (
-              <>
-                <br />
-                <span className="font-medium">※食事の手配はできません。</span>
-              </>
-            )}
-          </span>
-        </div>
-      )}
-
-      {!deadlineInfo.allowed && (
-        <div className="flex items-start gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>{deadlineInfo.message}</span>
-        </div>
-      )}
-
-      {deadlineInfo.allowed && (
-        <>
-          <div className="flex flex-wrap gap-2">
-            {/* 例会のみ参加 */}
-            <button
-              onClick={() => onRegister(meeting.id, 'meeting_only')}
-              disabled={isSubmitting}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50 ${
-                myType === 'meeting_only'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-              }`}
-            >
-              <CheckCircle className="h-4 w-4" />
-              例会のみ
-              {meetingFee > 0 && <span className="text-xs opacity-60">{formatCurrency(meetingFee)}</span>}
-            </button>
-
-            {/* 例会＋懇親会 */}
-            {meeting.hasAfterParty && (
-              <button
-                onClick={() => onRegister(meeting.id, 'meeting_and_party')}
-                disabled={isSubmitting}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50 ${
-                  myType === 'meeting_and_party'
-                    ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300 hover:bg-purple-50'
-                }`}
-              >
-                <PartyPopper className="h-4 w-4" />
-                ＋懇親会
-                {(meetingFee + partyFee) > 0 && (
-                  <span className="text-xs opacity-60">{formatCurrency(meetingFee + partyFee)}</span>
-                )}
-              </button>
-            )}
-
-            {/* 欠席 */}
-            <button
-              onClick={() => onRegister(meeting.id, 'absent')}
-              disabled={isSubmitting}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50 ${
-                myType === 'absent'
-                  ? 'border-red-400 bg-red-50 text-red-600 shadow-sm'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-red-300 hover:bg-red-50'
-              }`}
-            >
-              <XCircle className="h-4 w-4" />
-              欠席
-            </button>
-          </div>
-
-          {/* 懇親会情報 */}
-          {meeting.hasAfterParty && (
-            <p className="text-xs text-purple-600 flex items-center gap-1 pl-1">
-              <PartyPopper className="h-3 w-3" />
-              懇親会：{meeting.afterPartyVenue || '場所未定'}
-              {meeting.afterPartyStartTime && ` ${meeting.afterPartyStartTime.substring(0, 5)}〜`}
-            </p>
-          )}
-
-          {/* メモ */}
-          <div>
-            <button
-              type="button"
-              onClick={() => onNoteToggle(meeting.id)}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
-            >
-              メモを追加（遅刻・早退など）
-              {noteOpen[meeting.id] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </button>
-            {(noteOpen[meeting.id] || noteInputs[meeting.id]) && (
-              <Textarea
-                value={noteInputs[meeting.id] || ''}
-                onChange={e => onNoteChange(meeting.id, e.target.value)}
-                placeholder="例：19時頃に遅れて参加します"
-                rows={2}
-                className="mt-1.5 text-sm"
-              />
-            )}
-          </div>
-        </>
-      )}
-
-      {/* 登録済みメモ */}
-      {myType && meeting.myAttendance?.note && (
-        <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex items-start gap-1.5">
-          <span>💬</span>
-          <span>{meeting.myAttendance.note}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── 次の例会カード ───────────────────────────────────────
-function NextMeetingCard({
-  meeting,
-  memberType,
-  submitting,
-  noteInputs,
-  noteOpen,
-  onRegister,
-  onNoteChange,
-  onNoteToggle,
-}: {
-  meeting: MyMeeting;
-  memberType: string;
-  submitting: string | null;
-  noteInputs: Record<string, string>;
-  noteOpen: Record<string, boolean>;
-  onRegister: (meetingId: string, type: string, isWaitlist?: boolean) => void;
-  onNoteChange: (meetingId: string, val: string) => void;
-  onNoteToggle: (meetingId: string) => void;
-}) {
-  const myType = meeting.myAttendance?.participationType ?? null;
-  const dateObj = new Date(meeting.date + 'T00:00:00');
-  const daysUntil = Math.ceil((dateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-  const mapQuery = encodeURIComponent(
-    [meeting.venueName, meeting.venueAddress].filter(Boolean).join(' ')
-  );
-
-  return (
-    <Card className="overflow-hidden border-0 shadow-md">
-      {/* ヘッダー帯 */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 sm:px-5 py-4 text-white">
-        {/* バッジが増えても横にはみ出さないよう折り返す */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 opacity-90" />
-            <span className="font-semibold text-base">次の例会</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {myType && (
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${PARTICIPATION_COLORS[myType]} bg-white/90`}>
-                {myType === 'meeting_only' && <CheckCircle className="h-3 w-3 inline mr-1" />}
-                {myType === 'meeting_and_party' && <PartyPopper className="h-3 w-3 inline mr-1" />}
-                {myType === 'absent' && <XCircle className="h-3 w-3 inline mr-1" />}
-                {myType === 'waitlist' && <Hourglass className="h-3 w-3 inline mr-1" />}
-                {PARTICIPATION_LABELS[myType]}
-              </span>
-            )}
-            {daysUntil >= 0 && daysUntil <= 14 && (
-              <span className="text-xs bg-white/20 rounded-full px-2.5 py-1 font-medium">
-                {daysUntil === 0 ? '今日！' : daysUntil === 1 ? '明日' : `あと${daysUntil}日`}
-              </span>
-            )}
-          </div>
-        </div>
-        <p className="mt-2 text-lg sm:text-xl font-bold leading-tight break-words">{meeting.title}</p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-blue-100">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
-            {formatDate(meeting.date)}{getDayLabel(meeting.date)}
-            {meeting.startTime && ` ${meeting.startTime.substring(0, 5)}`}
-            {meeting.endTime && `〜${meeting.endTime.substring(0, 5)}`}
-          </span>
-          {meeting.venueName && (
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
-              {meeting.venueName}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <CardContent className="p-4 space-y-4">
-        {/* 場所・地図 */}
-        {(meeting.venueName || meeting.venueAddress) && (
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 break-words">{meeting.venueName}</p>
-              {meeting.venueAddress && (
-                <p className="text-xs text-gray-500 mt-0.5 break-words">{meeting.venueAddress}</p>
-              )}
-            </div>
-            <a
-              href={`https://maps.google.com/maps?q=${mapQuery}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-tap="button"
-              className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-white border border-blue-200 rounded-lg px-3 py-2 sm:py-1.5 hover:bg-blue-50 transition-colors"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              地図
-            </a>
-          </div>
-        )}
-
-        {/* 出欠ボタン */}
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">出欠を登録</p>
-          <AttendanceButtons
-            meeting={meeting}
-            memberType={memberType}
-            submitting={submitting}
-            noteInputs={noteInputs}
-            noteOpen={noteOpen}
-            onRegister={onRegister}
-            onNoteChange={onNoteChange}
-            onNoteToggle={onNoteToggle}
-          />
-        </div>
-
-        {/* 参加者一覧（自クラブ＋MU） */}
-        <MeetingParticipantsDialog
-          meetingId={meeting.id}
-          meetingTitle={meeting.title}
-          meetingDate={meeting.date}
-        />
-
-        {/* MU URL共有 */}
-        <MuShareButton url={meeting.muRegistrationUrl} slug={meeting.muRegistrationSlug} />
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── 参加率ウィジェット ───────────────────────────────────
-function AttendanceStatsCard({ stats }: { stats: Stats }) {
-  const rate = stats.attendanceRate ?? 0;
-  const color = rate >= 80 ? 'text-green-600' : rate >= 50 ? 'text-yellow-600' : 'text-red-500';
-  const barColor = rate >= 80 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-400' : 'bg-red-400';
-  const emoji = rate >= 80 ? '🌟' : rate >= 50 ? '👍' : '💪';
-
-  return (
-    <Card className="border-0 shadow-md">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-green-600" />
-          {stats.year}年度 参加記録
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs text-gray-500">参加率</p>
-            <p className={`text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
-              {stats.attendanceRate !== null ? `${stats.attendanceRate}%` : '—'}
-              <span className="text-lg ml-1">{stats.attendanceRate !== null ? emoji : ''}</span>
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-500">参加回数</p>
-            <p className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums">
-              {stats.attendedCount}
-              <span className="text-sm font-normal text-gray-500"> / {stats.pastMeetings}回</span>
-            </p>
-          </div>
-        </div>
-
-        {/* プログレスバー */}
-        {stats.pastMeetings > 0 && (
-          <div>
-            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-                style={{ width: `${Math.min(rate, 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between mt-1">
-              <p className="text-xs text-gray-400">0%</p>
-              <p className="text-xs text-gray-400">100%</p>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <div className="bg-blue-50 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-blue-600">年度例会数</p>
-            <p className="font-bold text-blue-800 tabular-nums">{stats.totalMeetings}回</p>
-          </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-gray-500">残り例会数</p>
-            <p className="font-bold text-gray-700 tabular-nums">{stats.totalMeetings - stats.pastMeetings}回</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── 年間スケジュール：1件分の行 ───────────────────────────
-// futureItems/pastItems の .map() から呼ばれる独立コンポーネント。
-// フック（useState）を持つため、通常関数として.map()内で呼び出してはならない
-// （呼び出すとレンダーごとにフック呼び出し回数が変わりReactエラーになる）。
-function ScheduleItemRow({
-  item,
-  today,
-  memberType,
-  submitting,
-  noteInputs,
-  noteOpen,
-  onRegister,
-  onNoteChange,
-  onNoteToggle,
-}: {
-  item: ScheduleItem;
-  today: string;
-  memberType: string;
-  submitting: string | null;
-  noteInputs: Record<string, string>;
-  noteOpen: Record<string, boolean>;
-  onRegister: (meetingId: string, type: string) => void;
-  onNoteChange: (meetingId: string, val: string) => void;
-  onNoteToggle: (meetingId: string) => void;
-}) {
-  // 早期returnより前で無条件に呼ぶ（Rules of Hooks: フックを分岐の中に置かない）
-  const [expanded, setExpanded] = useState(false);
-
+// ─── 予定1件の行（カレンダーの日付一覧・一覧表示で共通） ─────────
+function ItemRow({ item, today, onOpen }: { item: ScheduleItem; today: string; onOpen: () => void }) {
+  const d = parseYmd(item.date);
+  const dow = d.getDay();
   const isPast = item.date < today;
-  const dateObj = new Date(item.date + 'T00:00:00');
-  const month = dateObj.getMonth() + 1;
-  const day = dateObj.getDate();
-  const dayOfWeek = DAYS_JA[dateObj.getDay()];
-  const isSun = dateObj.getDay() === 0;
-  const isSat = dateObj.getDay() === 6;
-
-  if (item.kind === 'district_event') {
-    return (
-      <div
-        className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
-          isPast ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-amber-50 border-amber-200'
-        }`}
-      >
-        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${isPast ? 'bg-gray-100' : 'bg-amber-100'}`}>
-          <p className="text-xs text-gray-500">{month}月</p>
-          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-            {day}
-          </p>
-          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-        </div>
-        <div className="flex-1 min-w-0 py-0.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-              地区行事
-            </span>
-            {item.isAwardTarget && (
-              <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                <Star className="h-2.5 w-2.5" />表彰
-              </span>
-            )}
-            <span className="text-xs text-gray-500">{item.eventType}</span>
-          </div>
-          <p className="font-semibold text-gray-900 text-sm mt-0.5 break-words">{item.title}</p>
-          {item.venueName && (
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-              <MapPin className="h-3 w-3" />{item.venueName}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // meeting
-  const myType = item.myAttendance?.participationType ?? null;
-  const isOpen = item.status === 'open';
-  const deadlineInfo = checkDeadline(item);
+  const isDistrict = item.kind === 'district_event';
+  const myType = item.kind === 'meeting' ? item.myAttendance?.participationType ?? null : null;
+  const todo = item.kind === 'meeting' && needsAnswer(item, today);
+  const cancelled = item.kind === 'meeting' && item.status === 'cancelled';
 
   return (
-    <div
-      className={`rounded-xl border transition-all ${
-        isPast
-          ? 'bg-gray-50 border-gray-100'
-          : isOpen
-          ? 'bg-white border-blue-200 shadow-sm'
-          : 'bg-white border-gray-200'
-      }`}
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors active:bg-gray-50',
+        isDistrict ? 'border-amber-200 bg-amber-50/60' : 'border-gray-200 bg-white',
+        isPast && 'opacity-60',
+      )}
     >
       <div
-        className="flex items-start gap-3 px-4 py-3 cursor-pointer"
-        onClick={() => !isPast && setExpanded(e => !e)}
-      >
-        {/* 日付バッジ */}
-        <div className={`shrink-0 text-center w-12 rounded-lg py-1.5 ${
-          isPast ? 'bg-gray-100' : isOpen ? 'bg-blue-100' : 'bg-gray-100'
-        }`}>
-          <p className="text-xs text-gray-500">{month}月</p>
-          <p className={`text-lg font-bold leading-tight ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-800'}`}>
-            {day}
-          </p>
-          <p className={`text-xs ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-400'}`}>{dayOfWeek}</p>
-        </div>
-
-        <div className="flex-1 min-w-0 py-0.5">
-          <div className="flex items-start justify-between gap-2">
-            <p className={`font-semibold text-sm truncate ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
-              {item.title}
-            </p>
-            {/* 出欠バッジ */}
-            {myType && (
-              <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${PARTICIPATION_COLORS[myType]}`}>
-                {myType === 'meeting_only' && '✓ 参加'}
-                {myType === 'meeting_and_party' && '✓ ＋懇'}
-                {myType === 'absent' && '✗ 欠席'}
-                {myType === 'waitlist' && '⌛ 待機'}
-              </span>
-            )}
-            {!myType && isOpen && !isPast && deadlineInfo.allowed && (
-              <span
-                className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
-                  deadlineInfo.deadlinePassed
-                    ? 'border-red-200 bg-red-50 text-red-600'
-                    : 'border-orange-200 bg-orange-50 text-orange-600'
-                }`}
-              >
-                {deadlineInfo.deadlinePassed ? '未回答（締切超過）' : '未回答'}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-            {item.startTime && (
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <Clock className="h-3 w-3" />{item.startTime.substring(0, 5)}
-              </span>
-            )}
-            {item.venueName && (
-              <span className="text-xs text-gray-400 flex items-center gap-1 truncate max-w-[60%] sm:max-w-[180px]">
-                <MapPin className="h-3 w-3 shrink-0" />{item.venueName}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {!isPast && isOpen && (
-          <div className="shrink-0 text-gray-300">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </div>
+        className={cn(
+          'w-11 shrink-0 rounded-lg py-1 text-center',
+          isDistrict ? 'bg-amber-100' : 'bg-blue-50',
         )}
+      >
+        <p className="text-[10px] leading-tight text-gray-500">{d.getMonth() + 1}月</p>
+        <p className={cn('text-lg font-bold leading-tight tabular-nums', dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-900')}>
+          {d.getDate()}
+        </p>
+        <p className="text-[10px] leading-tight text-gray-500">{DAYS_JA[dow]}</p>
       </div>
 
-      {/* 展開：出欠登録 + MU URL */}
-      {!isPast && expanded && (
-        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-gray-100">
-          {isOpen && (
-            <div className="pt-3">
-              <AttendanceButtons
-                meeting={item}
-                memberType={memberType}
-                submitting={submitting}
-                noteInputs={noteInputs}
-                noteOpen={noteOpen}
-                onRegister={onRegister}
-                onNoteChange={onNoteChange}
-                onNoteToggle={onNoteToggle}
-              />
-            </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold text-gray-500">
+          {isDistrict ? '地区行事' : '例会'}
+          {cancelled && <span className="ml-1.5 text-red-600">中止</span>}
+        </p>
+        <p className={cn('truncate text-sm font-semibold', cancelled ? 'text-gray-400 line-through' : 'text-gray-900')}>
+          {item.title}
+        </p>
+        <p className="mt-0.5 flex min-w-0 items-center gap-x-3 text-xs text-gray-500">
+          {item.startTime && (
+            <span className="flex shrink-0 items-center gap-1"><Clock className="h-3 w-3" />{hhmm(item.startTime)}</span>
           )}
-          <MuShareButton url={item.muRegistrationUrl} slug={item.muRegistrationSlug} />
-        </div>
-      )}
-    </div>
+          {item.venueName && (
+            <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{item.venueName}</span></span>
+          )}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        {myType && (
+          <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', PARTICIPATION_COLORS[myType])}>
+            {PARTICIPATION_SHORT[myType]}
+          </span>
+        )}
+        {todo && (
+          <span className="rounded-full border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+            未回答
+          </span>
+        )}
+        <ChevronRight className="h-4 w-4 text-gray-300" />
+      </div>
+    </button>
   );
 }
 
-// ─── 年間スケジュール ─────────────────────────────────────
-function YearlyScheduleCard({
-  meetings,
-  districtEvents,
-  memberType,
-  submitting,
-  noteInputs,
-  noteOpen,
-  onRegister,
-  onNoteChange,
-  onNoteToggle,
+// ─── 次の例会 ───────────────────────────────────────────────
+function NextMeeting({
+  meeting, today, memberType, submitting, note, onNoteChange, onRegister, onOpen,
 }: {
-  meetings: MyMeeting[];
-  districtEvents: DistrictEvent[];
+  meeting: MyMeeting;
+  today: string;
   memberType: string;
-  submitting: string | null;
-  noteInputs: Record<string, string>;
-  noteOpen: Record<string, boolean>;
-  onRegister: (meetingId: string, type: string) => void;
-  onNoteChange: (meetingId: string, val: string) => void;
-  onNoteToggle: (meetingId: string) => void;
+  submitting: boolean;
+  note: string;
+  onNoteChange: (v: string) => void;
+  onRegister: (type: string) => void;
+  onOpen: () => void;
 }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [showPast, setShowPast] = useState(false);
-
-  // 全イベントをマージして日付順ソート
-  const allItems: ScheduleItem[] = [
-    ...meetings.map(m => ({ ...m, kind: 'meeting' as const })),
-    ...districtEvents.map(e => ({ ...e, kind: 'district_event' as const })),
-  ].sort((a, b) => a.date.localeCompare(b.date));
-
-  const futureItems = allItems.filter(item => item.date >= today);
-  const pastItems = allItems.filter(item => item.date < today).reverse(); // 新しい順
-
-  const rowProps = { today, memberType, submitting, noteInputs, noteOpen, onRegister, onNoteChange, onNoteToggle };
+  const d = parseYmd(meeting.date);
+  const days = Math.round((d.getTime() - parseYmd(today).getTime()) / 86400000);
+  const myType = meeting.myAttendance?.participationType ?? null;
 
   return (
-    <Card className="border-0 shadow-md">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-blue-600" />
-          年間スケジュール
-          <Badge variant="secondary" className="ml-auto text-xs">{allItems.length}件</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {futureItems.length === 0 && pastItems.length === 0 && (
-          <p className="text-sm text-gray-400 py-8 text-center">予定が登録されていません</p>
-        )}
+    <section aria-labelledby="next-meeting" className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+      <div className="flex gap-4 bg-blue-600 px-4 py-4 text-white">
+        {/* 日付を大きく：一番知りたい情報 */}
+        <div className="shrink-0 text-center">
+          <p className="text-xs text-blue-100">{d.getMonth() + 1}月</p>
+          <p className="text-4xl font-bold leading-none tabular-nums">{d.getDate()}</p>
+          <p className="mt-1 text-xs text-blue-100">{DAYS_JA[d.getDay()]}曜日</p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p id="next-meeting" className="flex flex-wrap items-center gap-2 text-xs font-semibold text-blue-100">
+            次の例会
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-white">
+              {days === 0 ? '今日' : days === 1 ? '明日' : `あと${days}日`}
+            </span>
+          </p>
+          <p className="mt-1 break-words text-lg font-bold leading-snug">{meeting.title}</p>
+          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-blue-50">
+            {meeting.startTime && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{hhmm(meeting.startTime)}〜</span>}
+            {meeting.venueName && <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="break-words">{meeting.venueName}</span></span>}
+          </p>
+        </div>
+      </div>
 
-        {futureItems.map(item => (
-          <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
-        ))}
-
-        {/* 過去の例会（折りたたみ） */}
-        {pastItems.length > 0 && (
-          <div className="pt-2">
-            <button
-              onClick={() => setShowPast(v => !v)}
-              className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 py-2 transition-colors"
-            >
-              {showPast ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              {showPast ? '過去の例会を隠す' : `過去の例会 ${pastItems.length}件を表示`}
-            </button>
-            {showPast && (
-              <div className="space-y-2 mt-2">
-                {pastItems.map(item => (
-                  <ScheduleItemRow key={`${item.kind}-${item.id}`} item={item} {...rowProps} />
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="space-y-3 p-4">
+        {myType ? (
+          <p className="text-sm text-gray-700">
+            <span className={cn('mr-2 inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold', PARTICIPATION_COLORS[myType])}>
+              {PARTICIPATION_LABELS[myType]}
+            </span>
+            で登録済みです。変更もここからできます。
+          </p>
+        ) : (
+          <p className="text-sm font-semibold text-gray-900">出欠を登録してください</p>
         )}
-      </CardContent>
-    </Card>
+        <AttendancePanel
+          meeting={meeting}
+          memberType={memberType}
+          submitting={submitting}
+          note={note}
+          onNoteChange={onNoteChange}
+          onRegister={onRegister}
+        />
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex h-11 w-full items-center justify-center gap-1 rounded-xl border border-gray-200 text-sm font-semibold text-blue-700 active:bg-blue-50"
+        >
+          例会の詳細・参加者を見る
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </section>
   );
 }
 
-// ─── メインコンポーネント ──────────────────────────────────
+// ─── 参加記録 ───────────────────────────────────────────────
+function StatsCard({ stats }: { stats: Stats }) {
+  const rate = stats.attendanceRate;
+  const remaining = Math.max(stats.totalMeetings - stats.pastMeetings, 0);
+  return (
+    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+        <TrendingUp className="h-4 w-4 text-green-600" />
+        {stats.year}年度の参加記録
+      </h2>
+      <div className="mt-3 flex items-end gap-4">
+        <p className="text-3xl font-bold tabular-nums text-gray-900">
+          {rate !== null ? `${rate}%` : '—'}
+        </p>
+        <p className="pb-1 text-sm text-gray-500 tabular-nums">
+          {stats.attendedCount} / {stats.pastMeetings}回 参加・残り{remaining}回
+        </p>
+      </div>
+      {stats.pastMeetings > 0 && (
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-valuenow={rate ?? 0} aria-valuemin={0} aria-valuemax={100}>
+          <div
+            className={cn('h-full rounded-full', (rate ?? 0) >= 80 ? 'bg-green-500' : (rate ?? 0) >= 50 ? 'bg-yellow-400' : 'bg-red-400')}
+            style={{ width: `${Math.min(rate ?? 0, 100)}%` }}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── メイン ─────────────────────────────────────────────────
 interface MemberDashboardProps {
   userName: string;
   clubName: string;
   memberType: string;
 }
 
+type View = 'calendar' | 'list';
+
 export default function MemberDashboard({ userName, clubName, memberType: initialMemberType }: MemberDashboardProps) {
-  const [meetings, setMeetings] = useState<MyMeeting[]>([]);
-  const [districtEvents, setDistrictEvents] = useState<DistrictEvent[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
+  const today = useMemo(() => localYmd(), []);
+  const currentFy = fiscalYearOf(today);
+
+  // 年度ごとのデータ（月を移動して別の年度に入ったら、その年度を読み込む）
+  const [byYear, setByYear] = useState<Record<number, ScheduleResponse>>({});
+  const [failedYears, setFailedYears] = useState<number[]>([]);
+  const requested = useRef(new Set<number>());
+
+  // 前回の表示方法を覚えておく（端末ごと。読めない環境ではカレンダー）
+  const [view, setView] = useState<View>(() => {
+    try {
+      const v = typeof window !== 'undefined' ? window.localStorage.getItem('member-dashboard-view') : null;
+      return v === 'list' ? 'list' : 'calendar';
+    } catch {
+      return 'calendar';
+    }
+  });
+  const [cursor, setCursor] = useState(() => {
+    const d = parseYmd(today);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selected, setSelected] = useState<string>(today);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
-  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
-  const [noteOpen, setNoteOpen] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [showPast, setShowPast] = useState(false);
 
-  // データ取得
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/my/schedule').then(r => r.json()),
-      fetch('/api/my/attendance').then(r => r.json()),
-    ])
-      .then(([scheduleData, attendanceData]) => {
-        // スケジュールAPIの出席情報を正とする
-        setMeetings(scheduleData.meetings || []);
-        setDistrictEvents(scheduleData.districtEvents || []);
-        setStats(scheduleData.stats || null);
-        setMeta(scheduleData.meta || null);
+  const changeView = (v: View) => {
+    setView(v);
+    try { localStorage.setItem('member-dashboard-view', v); } catch { /* 無視 */ }
+  };
 
-        // メモ初期化
-        const notes: Record<string, string> = {};
-        for (const m of (scheduleData.meetings || [])) {
-          if (m.myAttendance?.note) notes[m.id] = m.myAttendance.note;
+  const loadYear = useCallback(async (fy: number) => {
+    if (requested.current.has(fy)) return;
+    requested.current.add(fy);
+    try {
+      const res = await fetch(`/api/my/schedule?year=${fy}`);
+      if (!res.ok) throw new Error();
+      const data: ScheduleResponse = await res.json();
+      setByYear(prev => ({ ...prev, [fy]: data }));
+      setFailedYears(prev => prev.filter(y => y !== fy));
+      setNotes(prev => {
+        const next = { ...prev };
+        for (const m of data.meetings || []) {
+          if (m.myAttendance?.note && next[m.id] === undefined) next[m.id] = m.myAttendance.note;
         }
-        setNoteInputs(notes);
-      })
-      .catch(() => toast.error('データの取得に失敗しました'))
-      .finally(() => setLoading(false));
+        return next;
+      });
+    } catch {
+      requested.current.delete(fy);
+      setFailedYears(prev => (prev.includes(fy) ? prev : [...prev, fy]));
+      toast.error('予定を読み込めませんでした。通信状態を確認して、画面を開き直してください');
+    }
   }, []);
 
-  const handleRegister = useCallback(async (meetingId: string, participationType: string, isWaitlist = false) => {
-    const finalType = isWaitlist ? 'waitlist' : participationType;
-    setSubmitting(meetingId);
-    try {
-      const res = await fetch('/api/my/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meetingId,
-          participationType: finalType,
-          note: noteInputs[meetingId] || null,
-        }),
-      });
-      const data = await res.json();
+  // 今年度と、表示中の月の年度を読み込む
+  const cursorFy = cursor.month >= 6 ? cursor.year : cursor.year - 1;
+  useEffect(() => {
+    // サーバーからの読み込み（状態の更新は通信が終わってから行われる）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadYear(currentFy);
+    void loadYear(cursorFy);
+  }, [currentFy, cursorFy, loadYear]);
 
-      if (res.status === 409 && data.canWaitlist) {
-        if (confirm('定員に達しています。キャンセル待ちとして登録しますか？')) {
-          await handleRegister(meetingId, participationType, true);
-        }
-        return;
-      }
-      if (!res.ok) throw new Error(data.error || '登録に失敗しました');
+  const allMeetings = useMemo(
+    () => Object.values(byYear).flatMap(d => d.meetings || []).sort((a, b) => a.date.localeCompare(b.date)),
+    [byYear],
+  );
+  const allItems: ScheduleItem[] = useMemo(() => {
+    const events = Object.values(byYear).flatMap(d => d.districtEvents || []);
+    return [...allMeetings, ...events].sort((a, b) =>
+      a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''));
+  }, [byYear, allMeetings]);
 
-      // UI楽観的更新
-      setMeetings(prev => prev.map(m => {
-        if (m.id !== meetingId) return m;
-        return {
-          ...m,
-          myAttendance: {
-            id: data.id || '',
-            participationType: finalType,
-            note: noteInputs[meetingId] || null,
-            isLateRegistration: !!data.isLateRegistration,
-          },
-        };
-      }));
+  const current = byYear[currentFy];
+  const memberType = current?.meta?.memberType || initialMemberType;
+  const nextMeeting = allMeetings.find(m => m.date >= today && m.status === 'open') ?? null;
 
-      const baseMessage =
-        finalType === 'absent' ? '欠席を登録しました' :
-        finalType === 'waitlist' ? 'キャンセル待ちで登録しました' :
-        `「${PARTICIPATION_LABELS[finalType]}」で登録しました 🎉`;
+  // 今年度の残りに予定がなければ、来年度も読み込んでおく（5〜6月に次の例会が出ないのを防ぐ）
+  useEffect(() => {
+    // サーバーからの読み込み（状態の更新は通信が終わってから行われる）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (current && !nextMeeting) void loadYear(currentFy + 1);
+  }, [current, nextMeeting, currentFy, loadYear]);
 
-      if (data.isLateRegistration) {
-        toast.warning(`${baseMessage}（遅延登録）`, {
-          description: '締切後の登録のため、運営が内容を確認します。次回は締切までにご登録ください。',
-          duration: 6000,
+  const todoMeetings = allMeetings.filter(m => needsAnswer(m, today));
+  const openItem = openKey ? allItems.find(it => `${it.kind}-${it.id}` === openKey) ?? null : null;
+
+  const handleRegister = useCallback((meetingId: string, participationType: string) => {
+    const run = async (finalType: string): Promise<void> => {
+      setSubmitting(meetingId);
+      try {
+        const res = await fetch('/api/my/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ meetingId, participationType: finalType, note: notes[meetingId] || null }),
         });
-      } else {
-        toast.success(baseMessage);
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 409 && data.canWaitlist && finalType !== 'waitlist') {
+          setSubmitting(null);
+          if (window.confirm('定員に達しています。キャンセル待ちとして登録しますか？')) await run('waitlist');
+          return;
+        }
+        if (!res.ok) throw new Error(data.error || '出欠を登録できませんでした');
+
+        setByYear(prev => {
+          const next: Record<number, ScheduleResponse> = {};
+          for (const [fy, d] of Object.entries(prev)) {
+            next[Number(fy)] = {
+              ...d,
+              meetings: (d.meetings || []).map(m => m.id !== meetingId ? m : {
+                ...m,
+                myAttendance: {
+                  id: data.id || m.myAttendance?.id || '',
+                  participationType: finalType,
+                  note: notes[meetingId] || null,
+                  isLateRegistration: !!data.isLateRegistration,
+                },
+              }),
+            };
+          }
+          return next;
+        });
+
+        const message = finalType === 'absent' ? '欠席で登録しました'
+          : finalType === 'waitlist' ? 'キャンセル待ちで登録しました'
+          : `「${PARTICIPATION_LABELS[finalType]}」で登録しました`;
+        if (data.isLateRegistration) {
+          toast.warning(`${message}（遅延登録）`, { description: '締切後の登録のため、運営が内容を確認します。', duration: 6000 });
+        } else {
+          toast.success(message);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : '出欠を登録できませんでした');
+      } finally {
+        setSubmitting(null);
       }
-    } catch (err: any) {
-      toast.error(err.message || '登録に失敗しました');
-    } finally {
-      setSubmitting(null);
-    }
-  }, [noteInputs]);
+    };
+    void run(participationType);
+  }, [notes]);
 
-  const memberType = meta?.memberType || initialMemberType;
-  const today = new Date().toISOString().split('T')[0];
+  const moveMonth = (delta: number) => {
+    setCursor(c => {
+      const d = new Date(c.year, c.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  };
+  const goToday = () => {
+    const d = parseYmd(today);
+    setCursor({ year: d.getFullYear(), month: d.getMonth() });
+    setSelected(today);
+  };
+  const selectDay = (ymd: string) => setSelected(ymd);
 
-  // 直近のopen例会を「次の例会」として使用
-  const nextMeeting = meetings.find(m => m.date >= today && m.status === 'open') ?? null;
+  const monthPrefix = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}`;
+  const monthItems = allItems.filter(it => it.date.startsWith(monthPrefix));
+  const selectedItems = allItems.filter(it => it.date === selected);
+  const selectedInMonth = selected.startsWith(monthPrefix);
 
-  if (loading) {
+  const futureItems = allItems.filter(it => it.date >= today);
+  const pastItems = allItems.filter(it => it.date < today && fiscalYearOf(it.date) === currentFy).reverse();
+
+  if (!current && failedYears.includes(currentFy)) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map(i => (
-          <Card key={i} className="border-0 shadow-md">
-            <CardContent className="p-6">
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-1/3" />
-                <div className="h-24 bg-gray-200 rounded" />
-                <div className="h-4 bg-gray-200 rounded w-2/3" />
-              </div>
-            </CardContent>
-          </Card>
+      <div className="rounded-2xl bg-white px-4 py-8 text-center ring-1 ring-gray-200">
+        <p className="text-sm text-gray-600">予定を読み込めませんでした。</p>
+        <button
+          type="button"
+          onClick={() => { void loadYear(currentFy); }}
+          className="mt-3 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white"
+        >
+          もう一度読み込む
+        </button>
+      </div>
+    );
+  }
+
+  if (!current) {
+    return (
+      <div className="space-y-4" aria-busy="true">
+        {[0, 1].map(i => (
+          <div key={i} className="animate-pulse rounded-2xl bg-white p-4 ring-1 ring-gray-200">
+            <div className="h-4 w-1/3 rounded bg-gray-200" />
+            <div className="mt-3 h-28 rounded bg-gray-100" />
+          </div>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      {/* グリーティング */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words">
-            こんにちは、{userName.split(' ')[0]}さん 👋
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <Building2 className="h-3.5 w-3.5" />
-            {meta?.clubName || clubName}
-            {memberType && (
-              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium ml-1">
-                {memberType}
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      {/* あいさつ */}
+      <header>
+        <h1 className="break-words text-xl font-bold text-gray-900">こんにちは、{userName.split(/[\s　]/)[0]}さん</h1>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500">
+          <Building2 className="h-3.5 w-3.5" />
+          {current?.meta?.clubName || clubName}
+          {memberType && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{memberType === 'OB_OG' ? 'OB・OG' : memberType}</span>}
+        </p>
+      </header>
 
-      {/* 次の例会カード（メインCTA） */}
-      {nextMeeting ? (
-        <NextMeetingCard
-          meeting={nextMeeting}
-          memberType={memberType}
-          submitting={submitting}
-          noteInputs={noteInputs}
-          noteOpen={noteOpen}
-          onRegister={handleRegister}
-          onNoteChange={(id, val) => setNoteInputs(prev => ({ ...prev, [id]: val }))}
-          onNoteToggle={id => setNoteOpen(prev => ({ ...prev, [id]: !prev[id] }))}
-        />
-      ) : (
-        <Card className="border-0 shadow-md">
-          <CardContent className="py-10 text-center text-gray-400">
-            <Calendar className="h-10 w-10 mx-auto mb-3 text-gray-200" />
-            <p className="text-sm">現在募集中の例会はありません</p>
-          </CardContent>
-        </Card>
+      {/* 未回答のお知らせ（次の例会以外にもあるとき） */}
+      {todoMeetings.filter(m => m.id !== nextMeeting?.id).length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            const m = todoMeetings.find(x => x.id !== nextMeeting?.id)!;
+            setOpenKey(`meeting-${m.id}`);
+          }}
+          className="flex w-full items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-left active:bg-orange-100"
+        >
+          <AlertCircle className="h-5 w-5 shrink-0 text-orange-600" />
+          <span className="min-w-0 flex-1 text-sm text-orange-900">
+            出欠が未回答の例会がほかに<span className="font-bold">{todoMeetings.filter(m => m.id !== nextMeeting?.id).length}件</span>あります
+          </span>
+          <ChevronRight className="h-4 w-4 text-orange-400" />
+        </button>
       )}
 
-      {/* 参加率 + 年間スケジュール（2カラム on md+） */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-        {/* 参加率（左 1/3） */}
-        {stats && (
-          <div className="md:col-span-1">
-            <AttendanceStatsCard stats={stats} />
+      {/* 次の例会 */}
+      {nextMeeting ? (
+        <NextMeeting
+          meeting={nextMeeting}
+          today={today}
+          memberType={memberType}
+          submitting={submitting === nextMeeting.id}
+          note={notes[nextMeeting.id] || ''}
+          onNoteChange={v => setNotes(prev => ({ ...prev, [nextMeeting.id]: v }))}
+          onRegister={type => handleRegister(nextMeeting.id, type)}
+          onOpen={() => setOpenKey(`meeting-${nextMeeting.id}`)}
+        />
+      ) : (
+        <section className="rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-gray-200">
+          <CalendarDays className="mx-auto h-8 w-8 text-gray-300" />
+          <p className="mt-2 text-sm text-gray-500">いま募集中の例会はありません。予定が決まると、ここに表示されます。</p>
+        </section>
+      )}
+
+      {/* スケジュール */}
+      <section aria-labelledby="schedule-title" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-200">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 id="schedule-title" className="text-base font-bold text-gray-900">スケジュール</h2>
+          <div className="flex rounded-lg bg-gray-100 p-0.5" role="tablist" aria-label="表示方法">
+            {([['calendar', 'カレンダー', CalendarDays], ['list', '一覧', List]] as const).map(([v, label, Icon]) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => changeView(v)}
+                className={cn(
+                  'flex h-9 items-center gap-1 rounded-md px-3 text-sm font-medium',
+                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {view === 'calendar' ? (
+          <>
+            <MonthCalendar
+              year={cursor.year}
+              month={cursor.month}
+              items={monthItems}
+              today={today}
+              selected={selectedInMonth ? selected : null}
+              onSelect={selectDay}
+              onPrev={() => moveMonth(-1)}
+              onNext={() => moveMonth(1)}
+              loading={!byYear[cursorFy] && !failedYears.includes(cursorFy)}
+            />
+            {!today.startsWith(monthPrefix) && (
+              <button type="button" onClick={goToday} className="mt-2 text-sm font-medium text-blue-700">
+                今月に戻る
+              </button>
+            )}
+
+            {/* 選んだ日の予定。日を選んでいなければ、その月の予定をすべて出す */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                {selectedInMonth ? formatMonthDay(selected) : `${cursor.month + 1}月の予定`}
+              </h3>
+              {(selectedInMonth ? selectedItems : monthItems).length === 0 ? (
+                <p className="rounded-xl bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
+                  {selectedInMonth
+                    ? monthItems.length > 0 ? '予定はありません。印のある日を押すと、その日の予定が出ます。' : 'この月の予定はありません。'
+                    : 'この月の予定はありません。'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {(selectedInMonth ? selectedItems : monthItems).map(it => (
+                    <ItemRow key={`${it.kind}-${it.id}`} item={it} today={today} onOpen={() => setOpenKey(`${it.kind}-${it.id}`)} />
+                  ))}
+                </div>
+              )}
+              {selectedInMonth && selectedItems.length === 0 && monthItems.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-medium text-gray-500">{cursor.month + 1}月の予定</p>
+                  {monthItems.map(it => (
+                    <ItemRow key={`m-${it.kind}-${it.id}`} item={it} today={today} onOpen={() => setOpenKey(`${it.kind}-${it.id}`)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            {futureItems.length === 0 && (
+              <p className="rounded-xl bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">これからの予定はまだありません。</p>
+            )}
+            {futureItems.map(it => (
+              <ItemRow key={`${it.kind}-${it.id}`} item={it} today={today} onOpen={() => setOpenKey(`${it.kind}-${it.id}`)} />
+            ))}
+            {pastItems.length > 0 && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPast(v => !v)}
+                  className="flex h-11 w-full items-center justify-center gap-1 text-sm text-gray-500"
+                >
+                  {showPast ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {showPast ? '過去の予定を隠す' : `今年度の過去の予定（${pastItems.length}件）`}
+                </button>
+                {showPast && (
+                  <div className="space-y-2">
+                    {pastItems.map(it => (
+                      <ItemRow key={`p-${it.kind}-${it.id}`} item={it} today={today} onOpen={() => setOpenKey(`${it.kind}-${it.id}`)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
+      </section>
 
-        {/* 年間スケジュール（右 2/3） */}
-        <div className={stats ? 'md:col-span-2' : 'md:col-span-3'}>
-          <YearlyScheduleCard
-            meetings={meetings}
-            districtEvents={districtEvents}
-            memberType={memberType}
-            submitting={submitting}
-            noteInputs={noteInputs}
-            noteOpen={noteOpen}
-            onRegister={handleRegister}
-            onNoteChange={(id, val) => setNoteInputs(prev => ({ ...prev, [id]: val }))}
-            onNoteToggle={id => setNoteOpen(prev => ({ ...prev, [id]: !prev[id] }))}
-          />
-        </div>
-      </div>
+      {current?.stats && <StatsCard stats={current.stats} />}
+
+      <MeetingDetailSheet
+        item={openItem}
+        onClose={() => setOpenKey(null)}
+        today={today}
+        memberType={memberType}
+        submitting={!!openItem && submitting === openItem.id}
+        note={openItem ? notes[openItem.id] || '' : ''}
+        onNoteChange={v => openItem && setNotes(prev => ({ ...prev, [openItem.id]: v }))}
+        onRegister={(id, type) => handleRegister(id, type)}
+      />
     </div>
   );
 }
