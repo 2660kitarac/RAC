@@ -3,9 +3,9 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, receipts, meetings, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { redirect, notFound } from 'next/navigation';
-import { formatDate, formatCurrency } from '@/lib/utils';
 import PrintToolbar from '@/components/receipts/PrintToolbar';
-import ReceiptStamp from '@/components/receipts/ReceiptStamp';
+import { ReceiptPreview, ReceiptPrintSheets, ReceiptStyles } from '@/components/receipts/ReceiptSlip';
+import { receiptPrintColumns } from '@/lib/receipts/print-columns';
 
 export default async function ReceiptPrintPage({
   params,
@@ -30,23 +30,7 @@ export default async function ReceiptPrintPage({
 
   // 領収書取得（自クラブのものに限定）
   const receipt = await db
-    .select({
-      id: receipts.id,
-      receiptNumber: receipts.receiptNumber,
-      receiptName: receipts.receiptName,
-      receiptClubName: receipts.receiptClubName,
-      amount: receipts.amount,
-      description: receipts.description,
-      issuedDate: receipts.issuedDate,
-      status: receipts.status,
-      meetingTitle: meetings.title,
-      clubName: clubs.name,
-      clubAddress: clubs.address,
-      clubPhone: clubs.phone,
-      stampImageUrl: clubs.stampImageUrl,
-      stampText: clubs.stampText,
-      stampEnabled: clubs.stampEnabled,
-    })
+    .select(receiptPrintColumns)
     .from(receipts)
     .leftJoin(meetings, eq(receipts.meetingId, meetings.id))
     .leftJoin(clubs, eq(receipts.clubId, clubs.id))
@@ -59,76 +43,23 @@ export default async function ReceiptPrintPage({
         isNull(receipts.deletedAt),
       )
     )
-    .then((r:any[])=>r[0]);
+    .then((r) => r[0]);
 
   if (!receipt) notFound();
 
   return (
     <div className="min-h-screen bg-gray-100 print:min-h-0 print:bg-white">
       {/* 操作バー（印刷時は非表示 / Client Component） */}
-      <PrintToolbar
-        backHref={`/club/${slug}/my/receipts`}
-        maxWidthClass="max-w-lg"
-      />
+      <PrintToolbar backHref={`/club/${slug}/my/receipts`} maxWidthClass="max-w-3xl" />
 
-      {/* 領収書本体 */}
-      <div className="max-w-md mx-auto p-6 print:p-0 print:max-w-none">
-        <div className="bg-white rounded-2xl shadow-sm p-8 print:shadow-none print:rounded-none">
-          {/* タイトル */}
-          <h1 className="text-3xl font-bold text-center text-gray-900 mb-1 tracking-widest">領 収 書</h1>
-          <p className="text-center text-xs text-gray-400 mb-6">No. {receipt.receiptNumber}</p>
-
-          {/* 宛名 */}
-          <div className="border-b-2 border-gray-900 pb-2 mb-6">
-            {receipt.receiptClubName && (
-              <p className="text-sm font-bold text-gray-700">{receipt.receiptClubName}</p>
-            )}
-            <p className="text-xl font-bold text-gray-900">{receipt.receiptName} 様</p>
-          </div>
-
-          {/* 金額 */}
-          <div className="text-center mb-6">
-            <p className="text-sm text-gray-500 mb-1">金額</p>
-            <p className="text-4xl font-bold text-gray-900">
-              ¥{receipt.amount.toLocaleString()}<span className="text-lg"> -</span>
-            </p>
-          </div>
-
-          {/* 但し書き */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-xs text-gray-500 mb-1">但し書き</p>
-            <p className="text-sm font-medium text-gray-800">{receipt.description}</p>
-            {receipt.meetingTitle && (
-              <p className="text-xs text-gray-500 mt-1">（{receipt.meetingTitle}）</p>
-            )}
-          </div>
-
-          {/* 発行情報 */}
-          <div className="flex justify-between items-end">
-            <div>
-              <p className="text-xs text-gray-500">発行日</p>
-              <p className="text-sm font-medium text-gray-800">{formatDate(receipt.issuedDate)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-gray-900">{receipt.clubName}</p>
-              {receipt.clubAddress && <p className="text-xs text-gray-500 mt-0.5">{receipt.clubAddress}</p>}
-              {receipt.clubPhone && <p className="text-xs text-gray-500">TEL: {receipt.clubPhone}</p>}
-            </div>
-          </div>
-
-          {/* 印章（電子印鑑） */}
-          <div className="flex justify-end mt-4">
-            <ReceiptStamp stamp={receipt} size="64px" />
-          </div>
-        </div>
+      {/* 画面プレビュー（印刷と同じレイアウトを縮小表示。印刷時は非表示） */}
+      <div className="rs-screen mx-auto max-w-3xl space-y-3 p-4 sm:p-6">
+        <ReceiptPreview receipt={receipt} />
+        <p className="text-xs text-gray-500">「印刷 / PDF保存」から、紙に印刷するかPDFとして保存できます。</p>
       </div>
 
-      <style>{`
-        @page {
-          size: A4 portrait;
-          margin: 12mm;
-        }
-      `}</style>
+      <ReceiptPrintSheets receipts={[receipt]} />
+      <ReceiptStyles />
     </div>
   );
 }
