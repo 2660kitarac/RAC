@@ -40,7 +40,7 @@ t('例会詳細は開けない', can('member', '/meetings/abc'), false);
 t('メール作成は開けない', can('member', '/emails/compose'), false);
 t('報告書は開けない', can('member', '/reports'), false);
 t('ユーザー権限は開けない', can('member', '/users'), false);
-t('設定は開けない', can('member', '/settings'), false);
+t('設定（プロフィール・パスワード変更）は開ける', can('member', '/settings'), true);
 t('CSVは開けない', can('member', '/csv'), false);
 t('領収書一覧は開けない', can('member', '/receipts'), false);
 console.log('--- 幹事（secretary） ---');

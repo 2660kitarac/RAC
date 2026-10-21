@@ -12,7 +12,7 @@
 - 地区のページ（`district/*`）と `district-submissions` は `requireDistrictPage` / `getSubmitter` で制限済み
 - 領収書（`receipts/*`）は #41・#46 で制限済み
 - `meetings/new`・`meetings/[id]/resume`・`approvals`・`clubs/accounts` は個別に制限済み
-- 下記 19 ページが未制限
+- 下記 18 ページが未制限（当初 19 ページとしたが `settings` は対象外にした）
 
 ## 2. ページごとに開けるロール
 
@@ -26,22 +26,23 @@
 | `/meetings` | 同上 | `canManageClub` |
 | `/clubs` | 同上 | `canManageClub`（`/clubs/accounts` はページ側でさらに限定済み） |
 | `/csv` | 同上 | `canManageClub` |
-| `/settings` | 同上 | `canManageClub` |
 | `/users` | system_owner・地区管理者・クラブアカウント・クラブ管理者 | 新規 `canManageAccounts` |
 | `/emails` | system_owner・地区管理者・クラブアカウント・クラブ管理者・会長・幹事 | 新規 `canSendEmails` |
 | `/reports` | system_owner・地区管理者・クラブアカウント・クラブ管理者・会長・幹事・会計・地区代表・地区幹事・ゾーン代表・提唱ロータリアン | 新規 `canViewReports` |
+
+`/settings` は対象外とする。プロフィール・パスワード変更など全員が使う項目があり、クラブ設定のタブは画面側でロールにより出し分け済みのため（実装中に確認して変更）。
 
 新規の3つのロール一覧は、クライアント側 `src/lib/hooks/useAuth.ts` の `isClubAccount`・`canSendEmails`・`canViewReports` と同じにする。
 
 ## 3. ページでの確認
 
-対象 19 ページで、`if (!session?.user) redirect('/login');` の直後に次を入れる。
+対象 18 ページで、`if (!session?.user) redirect('/login');` の直後に次を入れる。
 
 ```ts
 if (!canAccessPage(session.user.role, '<そのページのパス>')) redirect('/dashboard');
 ```
 
-対象：`finance/transactions`・`finance/annual-fees`・`finance/donations`・`members`・`members/mu-visits`・`users`・`emails/compose`・`emails/history`・`emails/templates`・`meetings`・`meetings/reception`・`meetings/[id]`・`meetings/[id]/attendances`・`meetings/[id]/edit`・`meetings/[id]/report`・`clubs`・`csv`・`reports`・`settings`
+対象：`finance/transactions`・`finance/annual-fees`・`finance/donations`・`members`・`members/mu-visits`・`users`・`emails/compose`・`emails/history`・`emails/templates`・`meetings`・`meetings/reception`・`meetings/[id]`・`meetings/[id]/attendances`・`meetings/[id]/edit`・`meetings/[id]/report`・`clubs`・`csv`・`reports`
 
 ## 4. サイドバー
 

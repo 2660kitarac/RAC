@@ -25,7 +25,10 @@ export const canSendEmails = hasRole(EMAIL_SENDER_ROLES);
 /** 例会報告書を見られるロール */
 export const canViewReports = hasRole(REPORT_VIEWER_ROLES);
 
-/** ページ（パスの先頭）→ 開けるロール。表にないパスは制限しない */
+/**
+ * ページ（パスの先頭）→ 開けるロール。表にないパスは制限しない。
+ * /settings はプロフィール・パスワード変更など全員が使うため載せない（クラブ設定のタブは画面側で出し分け済み）
+ */
 const PAGE_ACCESS_RULES: { prefix: string; allow: (role: Role) => boolean }[] = [
   { prefix: '/finance', allow: canManageFinance },
   { prefix: '/receipts', allow: canManageFinance },
@@ -33,7 +36,6 @@ const PAGE_ACCESS_RULES: { prefix: string; allow: (role: Role) => boolean }[] = 
   { prefix: '/meetings', allow: canManageClub },
   { prefix: '/clubs', allow: canManageClub },
   { prefix: '/csv', allow: canManageClub },
-  { prefix: '/settings', allow: canManageClub },
   { prefix: '/users', allow: canManageAccounts },
   { prefix: '/emails', allow: canSendEmails },
   { prefix: '/reports', allow: canViewReports },
