@@ -17,7 +17,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, attendances, meetingReports } from '@/lib/db/schema';
 import { eq, and, isNull, count } from 'drizzle-orm';
-import { canMutateClubRecord, isDistrictScope, canManageClub } from '@/lib/auth/tenant';
+import { canMutateClubRecord, isDistrictScope } from '@/lib/auth/tenant';
 
 /** 例会管理が可能なロール（useAuth.canManageMeetings と同じ定義をサーバー側で保持） */
 const MEETING_MANAGER_ROLES = [
@@ -107,8 +107,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-    // 取得もロールで制限（ページの対応表と同じ範囲。#50）
-    if (!canManageClub(session.user.role)) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     const { id } = await params;
     const db = await getDbFromContext();

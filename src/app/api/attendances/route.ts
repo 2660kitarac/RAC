@@ -8,6 +8,7 @@ import { resolveClubScope, canManageClub, canMutateClubRecord } from '@/lib/auth
 import { calculateFee } from '@/lib/utils';
 import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
 // クラブアカウント → 自クラブの例会の出席情報のみ（clubIdクエリは無視され自クラブに強制）
@@ -16,8 +17,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-    // 取得もロールで制限（ページの対応表と同じ範囲。#50）
-    if (!canManageClub(session.user.role)) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    // 取得もロールで制限。範囲は /meetings のページと同じ（対応表 page-access.ts。#50）
+    if (!canAccessPage(session.user.role, '/meetings')) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     const db = await getDbFromContext();
     const url = new URL(request.url);

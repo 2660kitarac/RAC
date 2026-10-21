@@ -5,7 +5,7 @@
  * 実行: node scripts/test-page-access.mjs
  */
 import { build } from 'esbuild';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -64,6 +64,19 @@ console.log('--- パスの一致 ---');
 t('/membersx は /members の規則に当たらない', can('member', '/membersx'), true);
 t('ロールなしは制限ページを開けない', can(null, '/members'), false);
 t('ロールなしでも表にないパスは開ける', can(undefined, '/dashboard'), true);
+
+console.log('--- API の取得（GET）もページと同じ範囲で制限している（#50） ---');
+const apiGuards = {
+  'users': '/users', 'members': '/members', 'attendances': '/meetings', 'meetings': '/meetings',
+  'meetings/[id]': '/meetings', 'reports': '/reports', 'emails/templates/[id]': '/emails',
+  'clubs': '/clubs', 'clubs/[id]': '/clubs',
+};
+for (const [route, page] of Object.entries(apiGuards)) {
+  const src = readFileSync(join(root, 'src/app/api', route, 'route.ts'), 'utf8');
+  const get = src.slice(src.indexOf('export async function GET'));
+  const body = get.slice(0, get.indexOf('\n}\n'));
+  t(`GET /api/${route} は ${page} の規則で判定`, body.includes(`canAccessPage(session.user.role, '${page}')`), true);
+}
 
 console.log(`\n${pass} passed / ${fail} failed`);
 process.exit(fail ? 1 : 0);

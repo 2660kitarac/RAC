@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { isDistrictScope, canManageClub } from '@/lib/auth/tenant';
+import { isDistrictScope } from '@/lib/auth/tenant';
+import { canAccessPage } from '@/lib/auth/page-access';
 
 // 注: 旧実装は存在しないロール 'admin' を含み、逆に district_representative /
 // district_secretary が漏れていたため、正規の判定関数へ統一する。
@@ -15,8 +16,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: '認証エラー' }, { status: 401 });
-    // 取得もロールで制限（ページの対応表と同じ範囲。#50）
-    if (!canManageClub(session.user.role)) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
+    // 取得もロールで制限。範囲は /clubs のページと同じ（対応表 page-access.ts。#50）
+    if (!canAccessPage(session.user.role, '/clubs')) return NextResponse.json({ error: '権限がありません' }, { status: 403 });
 
     const { id } = await params;
     const db = await getDbFromContext();
