@@ -28,6 +28,8 @@ interface MeetingDetailSheetProps {
   note: string;
   onNoteChange: (val: string) => void;
   onRegister: (meetingId: string, type: string) => void;
+  /** 見るだけ（出欠登録の欄を出さない）。クラブ管理側のトップページで使う */
+  readOnly?: boolean;
 }
 
 function mapUrl(name?: string | null, address?: string | null) {
@@ -147,7 +149,7 @@ function MeetingBody(props: Omit<MeetingDetailSheetProps, 'item' | 'onClose'> & 
         </div>
       )}
 
-      {!isPast && !isCancelled && (
+      {!props.readOnly && !isPast && !isCancelled && (
         <div>
           <h3 className="mb-2 text-sm font-semibold text-gray-900">出欠を登録</h3>
           <AttendancePanel

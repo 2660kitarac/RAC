@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, attendances, districtEvents, users, clubs } from '@/lib/db/schema';
 import { eq, and, isNull, gte, lte, asc, inArray, ne } from 'drizzle-orm';
+import { canManageClub } from '@/lib/auth/tenant';
 
 export async function GET(request: NextRequest) {
   try {
@@ -87,8 +88,8 @@ export async function GET(request: NextRequest) {
           .where(and(
             eq(meetings.clubId, clubId),
             isNull(meetings.deletedAt),
-            // 下書きの例会は会員には見せない
-            ne(meetings.status, 'draft'),
+            // 下書きの例会は会員には見せない（例会を管理する役員のトップページでは、下書きもカレンダーに出す）
+            canManageClub(session.user.role) ? undefined : ne(meetings.status, 'draft'),
             gte(meetings.date, startDate),
             lte(meetings.date, endDate),
           ))
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
     // 参加統計
     const today = now.toISOString().split('T')[0];
     // 中止になった例会は参加率の母数に入れない
-    const pastMeetings = enrichedMeetings.filter(m => m.date < today && m.status !== 'cancelled');
+    const pastMeetings = enrichedMeetings.filter(m => m.date < today && m.status !== 'cancelled' && m.status !== 'draft');
     const attendedCount = pastMeetings.filter(
       m => m.myAttendance &&
         m.myAttendance.participationType !== 'absent' &&
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest) {
       districtEvents: enrichedEvents,
       stats: {
         year: targetYear,
-        totalMeetings: clubMeetings.filter(m => m.status !== 'cancelled').length,
+        totalMeetings: clubMeetings.filter(m => m.status !== 'cancelled' && m.status !== 'draft').length,
         pastMeetings: totalPast,
         attendedCount,
         attendanceRate: totalPast > 0 ? Math.round((attendedCount / totalPast) * 100) : null,

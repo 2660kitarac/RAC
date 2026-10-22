@@ -119,11 +119,13 @@ export default async function DashboardPage() {
   // ────────────────────────────────────────────────────────
 
   const clubId = profile?.clubId ?? null;
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const threeDaysLaterStr = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  // 日付は日本時間で判定する（サーバーは UTC で動くため、0〜9時に前日扱いになるのを防ぐ）
+  const todayStr = todayJst();
+  const threeDaysLaterStr = new Date(Date.parse(`${todayStr}T00:00:00Z`) + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // 今月（日本時間）の初日と末日
+  const [jstYear, jstMonth] = todayStr.split('-').map(Number);
+  const firstDayOfMonth = `${todayStr.slice(0, 7)}-01`;
+  const lastDayOfMonth = `${todayStr.slice(0, 7)}-${String(new Date(Date.UTC(jstYear, jstMonth, 0)).getUTCDate()).padStart(2, '0')}`;
 
   // アナウンス用データ（クラブアカウント / 管理者向け）
   let pendingMembersCount = 0;
@@ -264,7 +266,7 @@ export default async function DashboardPage() {
     // 領収書未発行数：領収書は任意発行のため集計しない（お知らせにも出さない）
     Promise.resolve([{ value: 0 }]),
 
-    // 最近のMU登録
+    // 最近のMU登録（自クラブの例会への登録だけ。地区スタッフでクラブ未設定なら全クラブ）
     db.select({
       id: attendances.id,
       externalName: attendances.externalName,
@@ -273,7 +275,13 @@ export default async function DashboardPage() {
       meetingId: attendances.meetingId,
     })
       .from(attendances)
-      .where(and(isNull(attendances.userId), isNull(attendances.deletedAt)))
+      .innerJoin(meetings, eq(attendances.meetingId, meetings.id))
+      .where(and(
+        isNull(attendances.userId),
+        isNull(attendances.deletedAt),
+        isNull(meetings.deletedAt),
+        clubId ? eq(meetings.clubId, clubId) : undefined,
+      ))
       .orderBy(desc(attendances.registeredAt))
       .limit(5),
 
@@ -441,6 +449,7 @@ export default async function DashboardPage() {
 
       <DashboardContent
         user={profile as any}
+        today={todayStr}
         nextMeeting={nextMeeting as any}
         upcomingMeetings={upcomingMeetingsResult as any}
         totalMembers={membersCountResult[0]?.value || 0}

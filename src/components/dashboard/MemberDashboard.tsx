@@ -219,14 +219,15 @@ export default function MemberDashboard({ userName, clubName, memberType: initia
   const requested = useRef(new Set<number>());
 
   // 前回の表示方法を覚えておく（端末ごと。読めない環境ではカレンダー）
-  const [view, setView] = useState<View>(() => {
+  // サーバーの描画と食い違わないよう、最初はカレンダーで描いてから保存値を読み込む
+  const [view, setView] = useState<View>('calendar');
+  useEffect(() => {
     try {
-      const v = typeof window !== 'undefined' ? window.localStorage.getItem('member-dashboard-view') : null;
-      return v === 'list' ? 'list' : 'calendar';
-    } catch {
-      return 'calendar';
-    }
-  });
+      // 端末に保存された値を反映するだけ（初回のみ）
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem('member-dashboard-view') === 'list') setView('list');
+    } catch { /* 読めない環境ではカレンダーのまま */ }
+  }, []);
   const [cursor, setCursor] = useState(() => {
     const d = parseYmd(today);
     return { year: d.getFullYear(), month: d.getMonth() };
