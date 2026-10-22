@@ -204,7 +204,7 @@ export default function DashboardContent({
           </section>
         </div>
 
-        <ClubSchedule role={role} today={today} />
+        <ClubSchedule role={role} today={today} hasClub={!!user?.club?.id} />
       </div>
 
       {/* 履歴（スマホでは長くなるため折りたたむ） */}
@@ -251,11 +251,11 @@ export default function DashboardContent({
                   <p className="text-xs text-gray-500">{sentAt ? formatDateTime(sentAt) : '-'}</p>
                 </div>
                 {e.status === 'sent' ? (
-                  <CheckCircle className="h-4 w-4 shrink-0 text-green-500" aria-label="送信済み" />
+                  <CheckCircle className="h-4 w-4 shrink-0 text-green-500" role="img" aria-label="送信済み" />
                 ) : e.status === 'failed' ? (
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" aria-label="送信失敗" />
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" role="img" aria-label="送信失敗" />
                 ) : (
-                  <Clock className="h-4 w-4 shrink-0 text-gray-400" aria-label="送信待ち" />
+                  <Clock className="h-4 w-4 shrink-0 text-gray-400" role="img" aria-label="送信待ち" />
                 )}
               </li>
             );
@@ -328,24 +328,25 @@ function NextMeetingCard({
       </div>
       {canMeetings && (
         <div className="grid grid-cols-3 gap-2 p-3">
-          <Link
-            href="/meetings/reception"
-            className="flex h-11 items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700"
-          >
-            当日受付
-          </Link>
-          <Link
-            href={`/meetings/${meeting.id}/attendances`}
-            className="flex h-11 items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-800 active:bg-gray-50"
-          >
-            出席管理
-          </Link>
-          <Link
-            href={`/meetings/${meeting.id}`}
-            className="flex h-11 items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-800 active:bg-gray-50"
-          >
-            詳細
-          </Link>
+          {/* 例会の当日は「当日受付」、それ以外は「出席管理」を主なボタンにする */}
+          {[
+            { href: '/meetings/reception', label: '当日受付', primary: days <= 0 },
+            { href: `/meetings/${meeting.id}/attendances`, label: '出席管理', primary: days > 0 },
+            { href: `/meetings/${meeting.id}`, label: '詳細', primary: false },
+          ].map(b => (
+            <Link
+              key={b.href}
+              href={b.href}
+              className={cn(
+                'flex h-11 items-center justify-center rounded-xl text-sm font-semibold',
+                b.primary
+                  ? 'bg-blue-600 text-white active:bg-blue-700'
+                  : 'border border-gray-200 text-gray-800 active:bg-gray-50',
+              )}
+            >
+              {b.label}
+            </Link>
+          ))}
         </div>
       )}
     </section>

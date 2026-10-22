@@ -86,20 +86,24 @@ function ItemRow({
   );
 }
 
-export default function ClubSchedule({ role, today }: { role: string | null | undefined; today: string }) {
+export default function ClubSchedule({
+  role, today, hasClub = true,
+}: { role: string | null | undefined; today: string; hasClub?: boolean }) {
   const canOpenMeetings = canAccessPage(role, '/meetings');
   const currentFy = fiscalYearOf(today);
   const [byYear, setByYear] = useState<Record<number, ScheduleResponse>>({});
   const [failedYears, setFailedYears] = useState<number[]>([]);
   const requested = useRef(new Set<number>());
 
-  const [view, setView] = useState<View>(() => {
+  // 前回の表示方法（端末ごと）。サーバーの描画と食い違わないよう、最初はカレンダーで描いてから読み込む
+  const [view, setView] = useState<View>('calendar');
+  useEffect(() => {
     try {
-      return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'calendar';
-    } catch {
-      return 'calendar';
-    }
-  });
+      // 端末に保存された値を反映するだけ（初回のみ）
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(VIEW_KEY) === 'list') setView('list');
+    } catch { /* 読めない環境ではカレンダーのまま */ }
+  }, []);
   const [cursor, setCursor] = useState(() => {
     const d = parseYmd(today);
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -172,6 +176,17 @@ export default function ClubSchedule({ role, today }: { role: string | null | un
       onOpen={() => setOpenKey(`${it.kind}-${it.id}`)}
     />
   );
+
+  if (!hasClub) {
+    return (
+      <section className="rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-gray-200">
+        <CalendarDays className="mx-auto h-8 w-8 text-gray-300" />
+        <p className="mt-2 text-sm text-gray-500">
+          このアカウントにはクラブが設定されていないため、スケジュールは表示されません。各クラブの例会は「例会」から確認できます。
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="club-schedule-title" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-200">

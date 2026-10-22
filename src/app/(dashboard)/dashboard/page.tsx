@@ -279,6 +279,7 @@ export default async function DashboardPage() {
       .where(and(
         isNull(attendances.userId),
         isNull(attendances.deletedAt),
+        isNull(meetings.deletedAt),
         clubId ? eq(meetings.clubId, clubId) : undefined,
       ))
       .orderBy(desc(attendances.registeredAt))
