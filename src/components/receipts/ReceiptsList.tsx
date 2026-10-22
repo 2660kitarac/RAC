@@ -59,6 +59,24 @@ interface ReceiptsListProps {
   activeMeetingId?: string;
 }
 
+/**
+ * 印刷ページを別タブで開く（このタブから切り離す）
+ *
+ * opener を残すと、Safari では印刷タブとこの一覧タブが同じプロセスで動く。
+ * 印刷ダイアログを開いている間はプロセスが止まるため、裏にあるこの一覧タブが
+ * 「応答なし」とみなされてプロセスごと終了され、印刷タブも落ちて「名称未設定」になる（#54）。
+ *
+ * window.open(url, '_blank', 'noopener') だと Safari ではタブではなく別ウィンドウで開くことがあるため、
+ * rel="noopener" のリンクをクリックしたのと同じ開き方にする。
+ */
+function openPrintTab(url: string) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.click();
+}
+
 export default function ReceiptsList({
   receipts: init, meetings, clubId, clubName, userRole, totalCount,
   scope = 'recent', recentDays = 60, activeMeetingId = '',
@@ -306,7 +324,7 @@ export default function ReceiptsList({
       return;
     }
     const ids = Array.from(selectedForPrint).join(',');
-    window.open(`/receipts/bulk-print?ids=${ids}`, '_blank');
+    openPrintTab(`/receipts/bulk-print?ids=${ids}`);
   };
 
   const statusColors: Record<string, string> = {
@@ -521,7 +539,7 @@ export default function ReceiptsList({
                             variant="ghost"
                             size="icon-sm"
                             className="text-blue-500 hover:text-blue-700"
-                            onClick={() => window.open(`/receipts/${receipt.id}/print`, '_blank')}
+                            onClick={() => openPrintTab(`/receipts/${receipt.id}/print`)}
                             title="単票印刷"
                           >
                             <Printer className="h-4 w-4" />
@@ -824,7 +842,7 @@ export default function ReceiptsList({
                     className="bg-blue-600 hover:bg-blue-700"
                     onClick={() => {
                       const url = `/receipts/bulk-print?ids=${bulkCreatedIds.join(',')}`;
-                      window.open(url, '_blank');
+                      openPrintTab(url);
                     }}
                   >
                     <Printer className="h-4 w-4 mr-1" />
