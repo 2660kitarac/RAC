@@ -20,13 +20,16 @@ interface MonthCalendarProps {
   onPrev: () => void;
   onNext: () => void;
   loading?: boolean;
+  /** club = クラブ管理側の表示（自分の出欠ではなく、下書き・公開中などの例会の状態で印を付ける） */
+  mode?: 'member' | 'club';
 }
 
-type Mark = 'meeting-yes' | 'meeting-no' | 'meeting-todo' | 'meeting' | 'district' | 'cancelled';
+type Mark = 'meeting-yes' | 'meeting-no' | 'meeting-todo' | 'meeting' | 'district' | 'cancelled' | 'club-meeting' | 'draft';
 
-function markOf(item: ScheduleItem, today: string): Mark {
+function markOf(item: ScheduleItem, today: string, mode: 'member' | 'club' = 'member'): Mark {
   if (item.kind === 'district_event') return 'district';
   if (item.status === 'cancelled') return 'cancelled';
+  if (mode === 'club') return item.status === 'draft' ? 'draft' : 'club-meeting';
   const t = item.myAttendance?.participationType;
   if (t === 'absent') return 'meeting-no';
   if (t) return 'meeting-yes';
@@ -42,6 +45,8 @@ const MARK_TEXT: Record<Mark, string> = {
   meeting: '例会',
   district: '地区行事',
   cancelled: '例会・中止',
+  'club-meeting': '例会',
+  draft: '例会・下書き',
 };
 
 const MARK_CLASS: Record<Mark, string> = {
@@ -52,10 +57,16 @@ const MARK_CLASS: Record<Mark, string> = {
   district: 'bg-amber-400',
   // 中止は欠席と見分けられるよう、色ではなく形（斜線入りの白抜き）で表す
   cancelled: 'border border-gray-400 bg-[linear-gradient(135deg,transparent_45%,rgb(156_163_175)_45%,rgb(156_163_175)_55%,transparent_55%)]',
+  'club-meeting': 'bg-blue-600',
+  // 下書きは「まだ会員に見えていない」ことが分かるよう点線の白抜き
+  draft: 'border-2 border-dashed border-blue-400 bg-white',
 };
 
+/** 白抜きの印（選択中の日では白い枠線で表す） */
+const OUTLINE_MARKS: Mark[] = ['meeting-todo', 'draft'];
+
 export default function MonthCalendar({
-  year, month, items, today, selected, onSelect, onPrev, onNext, loading,
+  year, month, items, today, selected, onSelect, onPrev, onNext, loading, mode = 'member',
 }: MonthCalendarProps) {
   const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -116,7 +127,7 @@ export default function MonthCalendar({
           const isPast = ymd < today;
           const label = [
             `${month + 1}月${Number(ymd.slice(8))}日${isToday ? '（今日）' : ''}`,
-            ...dayItems.map(it => MARK_TEXT[markOf(it, today)]),
+            ...dayItems.map(it => MARK_TEXT[markOf(it, today, mode)]),
           ].join('、');
           return (
             <button
@@ -144,14 +155,15 @@ export default function MonthCalendar({
               {dayItems.length > 0 && (
                 <span className="mt-1 flex items-center gap-0.5">
                   {dayItems.slice(0, 3).map(it => {
-                    const m = markOf(it, today);
+                    const m = markOf(it, today, mode);
+                    const outline = OUTLINE_MARKS.includes(m);
                     return (
                       <span
                         key={`${it.kind}-${it.id}`}
                         className={cn(
                           'h-2 w-2 rounded-full',
-                          isSelected && m !== 'meeting-todo' ? 'bg-white' : MARK_CLASS[m],
-                          isSelected && m === 'meeting-todo' && 'border-2 border-white bg-transparent',
+                          isSelected && !outline ? 'bg-white' : MARK_CLASS[m],
+                          isSelected && outline && 'border-2 border-white bg-transparent',
                         )}
                       />
                     );
@@ -164,14 +176,23 @@ export default function MonthCalendar({
       </div>
 
       {/* 凡例 */}
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-600" />参加</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full border-2 border-orange-500" />未回答</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-400" />欠席</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-300" />例会</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />地区行事</span>
-        <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS.cancelled)} />中止</span>
-      </div>
+      {mode === 'club' ? (
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+          <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS['club-meeting'])} />例会</span>
+          <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS.draft)} />下書き</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />地区行事</span>
+          <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS.cancelled)} />中止</span>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-600" />参加</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full border-2 border-orange-500" />未回答</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-400" />欠席</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-300" />例会</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />地区行事</span>
+          <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', MARK_CLASS.cancelled)} />中止</span>
+        </div>
+      )}
     </div>
   );
 }

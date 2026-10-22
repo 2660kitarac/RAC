@@ -1,17 +1,28 @@
 'use client';
 
+/**
+ * クラブ管理側（クラブアカウント・会長・幹事・会計など）のトップページ
+ * スマホでの操作を中心に、上から「よく使う操作 → 対応が必要なこと → 次回例会 → スケジュール → 数字 → 履歴」の順に並べる。
+ *
+ *  ┌ クラブ名 ───────────────────┐
+ *  │ よく使う操作（4つ）           │
+ *  ├ 対応が必要なこと（あれば）───┤
+ *  ├ 次回例会（受付・出席管理・詳細）┤
+ *  ├ スケジュール［カレンダー｜一覧］┤
+ *  ├ 会員数・今月の収支 ──────────┤
+ *  └ 最近のMU登録・メール送信履歴（折りたたみ）┘
+ */
 import Link from 'next/link';
 import {
-  Calendar, Users, Receipt, Mail, TrendingUp, TrendingDown,
-  AlertCircle, CheckCircle, Clock, ArrowRight, Building2, Bell
+  AlertCircle, ArrowRight, Bell, Building2, CalendarPlus, CheckCircle, ChevronDown, Clock, Mail, MapPin,
+  Receipt, TrendingDown, TrendingUp, UserCheck, Users,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { formatDate, formatCurrency, formatDateTime } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import type { User, Meeting, Attendance, Email } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS } from '@/types';
 import { canAccessPage } from '@/lib/auth/page-access';
+import ClubSchedule from './club/ClubSchedule';
+import { DAYS_JA, parseYmd } from './member/types';
 
 interface DeadlineAlert {
   id: string;
@@ -38,6 +49,8 @@ interface CapacityAlert {
 
 interface DashboardContentProps {
   user: User;
+  /** 今日（日本時間 YYYY-MM-DD） */
+  today: string;
   nextMeeting: Meeting | null;
   upcomingMeetings: Meeting[];
   totalMembers: number;
@@ -53,10 +66,23 @@ interface DashboardContentProps {
   capacityAlerts?: CapacityAlert[];
 }
 
+/** サーバーからは camelCase、古い型定義は snake_case のため両方を見る */
+function field(m: object, camel: string, snake: string): string | null {
+  const r = m as Record<string, unknown>;
+  return (r[camel] as string | null | undefined) ?? (r[snake] as string | null | undefined) ?? null;
+}
+
+const quickActions = [
+  { href: '/meetings/new', icon: CalendarPlus, label: '例会を作成', className: 'bg-blue-50 text-blue-700' },
+  { href: '/meetings/reception', icon: UserCheck, label: '当日受付', className: 'bg-green-50 text-green-700' },
+  { href: '/emails/compose', icon: Mail, label: 'メール作成', className: 'bg-purple-50 text-purple-700' },
+  { href: '/receipts', icon: Receipt, label: '領収書', className: 'bg-orange-50 text-orange-700' },
+];
+
 export default function DashboardContent({
   user,
+  today,
   nextMeeting,
-  upcomingMeetings,
   totalMembers,
   unpaidAnnualFees,
   recentMuRegistrations,
@@ -68,313 +94,174 @@ export default function DashboardContent({
   unpaidAlerts = [],
   capacityAlerts = [],
 }: DashboardContentProps) {
-  // 領収書は任意発行のため、未発行件数はアラートに数えない
-  const totalAlerts = (unpaidAnnualFees > 0 ? 1 : 0)
-    + deadlineAlerts.length + unpaidAlerts.length + capacityAlerts.length;
+  const role = user?.role;
+  // 開けないページへのボタン・リンクは出さない（ページの制限と同じ対応表。#46・#48）
+  const can = (href: string) => canAccessPage(role, href);
+  const actions = quickActions.filter(a => can(a.href));
+
+  // 領収書は任意発行のため、未発行件数は「対応が必要なこと」に数えない
+  const alerts: { key: string; title: string; description: string; href: string; tone: 'warning' | 'error' | 'info' }[] = [
+    ...(unpaidAnnualFees > 0 ? [{
+      key: 'fees', title: '年会費未納', description: `${unpaidAnnualFees}名の年会費が未納です`,
+      href: '/finance/annual-fees', tone: 'warning' as const,
+    }] : []),
+    ...deadlineAlerts.map(m => ({
+      key: `d-${m.id}`, title: '登録締切が近い', description: `「${m.title}」の締切は${formatDate(m.registrationDeadline)}です`,
+      href: `/meetings/${m.id}`, tone: 'warning' as const,
+    })),
+    ...unpaidAlerts.map(u => ({
+      key: `u-${u.meetingId}`, title: '未払いの参加者', description: `「${u.title}」に未払いが${u.unpaidCount}名います`,
+      href: `/meetings/${u.meetingId}`, tone: 'error' as const,
+    })),
+    ...capacityAlerts.map(m => ({
+      key: `c-${m.id}`, title: '定員に近い', description: `「${m.title}」は${m.attendanceCount}／${m.capacity}名（${m.fillRate}%）です`,
+      href: `/meetings/${m.id}`, tone: 'info' as const,
+    })),
+  ].filter(a => can(a.href));
+
+  const showFinance = can('/finance/transactions');
+
   return (
-    <div className="space-y-6">
-      {/* ページヘッダー */}
-      <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          ダッシュボード
-        </h1>
-        <p className="text-gray-500 text-sm mt-1 break-words">
-          {user.club?.name || 'RAC Cloud'} の管理画面
+    <div className="mx-auto w-full max-w-5xl space-y-4 pb-6">
+      {/* クラブ名 */}
+      <header className="min-w-0">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+          <Building2 className="h-3.5 w-3.5" />
+          クラブ管理
         </p>
-      </div>
+        <h1 className="mt-0.5 break-words text-xl font-bold text-gray-900 sm:text-2xl">
+          {user?.club?.name || 'RAC Cloud'}
+        </h1>
+      </header>
 
-      {/* サマリーカード（スマホは2列、lg以上で4列） */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <SummaryCard
-          title="会員数"
-          value={`${totalMembers}名`}
-          icon={Users}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50"
-          href="/members"
-        />
-        <SummaryCard
-          title="今月の収入"
-          value={formatCurrency(monthlyIncome)}
-          icon={TrendingUp}
-          iconColor="text-green-600"
-          iconBg="bg-green-50"
-          href="/finance/transactions"
-        />
-        <SummaryCard
-          title="今月の支出"
-          value={formatCurrency(monthlyExpense)}
-          icon={TrendingDown}
-          iconColor="text-red-600"
-          iconBg="bg-red-50"
-          href="/finance/transactions"
-        />
-        <SummaryCard
-          title="今月の収支"
-          value={formatCurrency(monthlyBalance)}
-          icon={monthlyBalance >= 0 ? TrendingUp : TrendingDown}
-          iconColor={monthlyBalance >= 0 ? 'text-blue-600' : 'text-orange-600'}
-          iconBg={monthlyBalance >= 0 ? 'bg-blue-50' : 'bg-orange-50'}
-          href="/finance/transactions"
-        />
-      </div>
-
-      {/* アラートカード */}
-      {totalAlerts > 0 && (
-        <Card className="border-orange-200 bg-orange-50/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Bell className="h-4 w-4 text-orange-500" />
-              アラート
-              <Badge className="bg-orange-100 text-orange-700 border-0 text-xs">{totalAlerts}件</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {unpaidAnnualFees > 0 && (
-                <AlertCard
-                  title="年会費未納"
-                  description={`${unpaidAnnualFees}名の会員の年会費が未納です`}
-                  href="/finance/annual-fees"
-                  variant="warning"
-                />
+      {/* よく使う操作 */}
+      {actions.length > 0 && (
+        <nav aria-label="よく使う操作" className="grid grid-cols-4 gap-2 sm:gap-3">
+          {actions.map(({ href, icon: Icon, label, className }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                'flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 text-center transition-opacity active:opacity-70 hover:opacity-90',
+                className,
               )}
-              {deadlineAlerts.map(m => (
-                <AlertCard
-                  key={m.id}
-                  title="登録締切が近い例会"
-                  description={`「${m.title}」の締切は${m.registrationDeadline}です`}
-                  href={`/meetings/${m.id}`}
-                  variant="warning"
-                />
-              ))}
-              {unpaidAlerts.map(u => (
-                <AlertCard
-                  key={u.meetingId}
-                  title="未払い参加者が多い例会"
-                  description={`「${u.title}」に未払いが${u.unpaidCount}名います`}
-                  href={`/meetings/${u.meetingId}`}
-                  variant="error"
-                />
-              ))}
-              {capacityAlerts.map(m => (
-                <AlertCard
-                  key={m.id}
-                  title="定員に近い例会"
-                  description={`「${m.title}」は定員${m.capacity}名に対し${m.attendanceCount}名（${m.fillRate}%）です`}
-                  href={`/meetings/${m.id}`}
-                  variant="info"
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            >
+              <Icon className="h-6 w-6" />
+              <span className="text-[11px] font-semibold leading-tight sm:text-xs">{label}</span>
+            </Link>
+          ))}
+        </nav>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 次回例会 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-            <CardTitle className="text-base">次回例会</CardTitle>
-            <Link href="/meetings">
-              <Button variant="ghost" size="sm" className="text-xs">
-                一覧を見る <ArrowRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {nextMeeting ? (
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 break-words">{nextMeeting.title}</h3>
-                    {nextMeeting.theme && (
-                      <p className="text-sm text-gray-500 mt-0.5">テーマ: {nextMeeting.theme}</p>
-                    )}
-                  </div>
-                  <Badge className={`shrink-0 ${MEETING_STATUS_COLORS[nextMeeting.status]}`}>
-                    {MEETING_STATUS_LABELS[nextMeeting.status]}
-                  </Badge>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                    <span className="text-gray-700">{formatDate(nextMeeting.date)}</span>
-                  </div>
-                  {nextMeeting.start_time && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                      <span className="text-gray-700">{nextMeeting.start_time.substring(0, 5)}</span>
-                    </div>
-                  )}
-                  {nextMeeting.venue_name && (
-                    <div className="flex items-center gap-2 text-sm col-span-2">
-                      <Building2 className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                      <span className="text-gray-700 truncate">{nextMeeting.venue_name}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <Link href={`/meetings/${nextMeeting.id}`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full">詳細を見る</Button>
-                  </Link>
-                  <Link href={`/meetings/${nextMeeting.id}/attendances`} className="flex-1">
-                    <Button size="sm" className="w-full">出席管理</Button>
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">予定されている例会はありません</p>
-                <Link href="/meetings/new" className="mt-3 inline-block">
-                  <Button size="sm">例会を作成する</Button>
+      {/* 対応が必要なこと */}
+      {alerts.length > 0 && (
+        <section aria-labelledby="alerts-title" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-orange-200">
+          <h2 id="alerts-title" className="mb-2 flex items-center gap-2 text-base font-bold text-gray-900">
+            <Bell className="h-4 w-4 text-orange-500" />
+            対応が必要なこと
+            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">{alerts.length}件</span>
+          </h2>
+          <ul className="divide-y divide-gray-100">
+            {alerts.map(a => (
+              <li key={a.key}>
+                <Link href={a.href} className="flex items-center gap-3 py-3 active:bg-gray-50">
+                  <AlertCircle className={cn(
+                    'h-5 w-5 shrink-0',
+                    a.tone === 'error' ? 'text-red-500' : a.tone === 'warning' ? 'text-amber-500' : 'text-blue-500',
+                  )} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-gray-900">{a.title}</span>
+                    <span className="block break-words text-xs text-gray-500">{a.description}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-gray-300" />
                 </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-        {/* 直近の例会一覧 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-            <CardTitle className="text-base">直近の例会</CardTitle>
-            <Link href="/meetings">
-              <Button variant="ghost" size="sm" className="text-xs">
-                すべて見る <ArrowRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {upcomingMeetings.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {upcomingMeetings.map(meeting => (
-                  <Link
-                    key={meeting.id}
-                    href={`/meetings/${meeting.id}`}
-                    className="flex items-center justify-between px-4 sm:px-6 py-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{meeting.title}</p>
-                      <p className="text-xs text-gray-500">{formatDate(meeting.date)}</p>
-                    </div>
-                    <Badge className={`shrink-0 ${MEETING_STATUS_COLORS[meeting.status]}`}>
-                      {MEETING_STATUS_LABELS[meeting.status]}
-                    </Badge>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 px-4 sm:px-6">
-                <p className="text-gray-500 text-sm">例会がありません</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-4">
+          <NextMeetingCard meeting={nextMeeting} today={today} can={can} />
 
-        {/* 最近のMU登録 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-            <CardTitle className="text-base">最近のMU登録</CardTitle>
-            <Link href="/attendances">
-              <Button variant="ghost" size="sm" className="text-xs">
-                一覧を見る <ArrowRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recentMuRegistrations.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {recentMuRegistrations.map(attendance => (
-                  <div
-                    key={attendance.id}
-                    className="flex items-center justify-between px-4 sm:px-6 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {attendance.external_name || '名前なし'}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {(attendance as any).meeting?.title} · {formatDate(attendance.registered_at)}
-                      </p>
-                    </div>
-                    <Badge className="shrink-0" variant={attendance.payment_status === 'paid' ? 'success' : 'warning'}>
-                      {attendance.payment_status === 'paid' ? '支払済' : '未払い'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 px-4 sm:px-6">
-                <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">MU登録はありません</p>
-              </div>
+          {/* 会員数・今月の収支 */}
+          <section aria-label="クラブの数字" className="grid grid-cols-2 gap-2 sm:gap-3">
+            <StatTile title="会員数" value={`${totalMembers}名`} icon={Users} tone="blue" href={can('/members') ? '/members' : null} />
+            {showFinance && (
+              <>
+                <StatTile
+                  title="今月の収支"
+                  value={formatCurrency(monthlyBalance)}
+                  icon={monthlyBalance >= 0 ? TrendingUp : TrendingDown}
+                  tone={monthlyBalance >= 0 ? 'blue' : 'orange'}
+                  href="/finance/transactions"
+                />
+                <StatTile title="今月の収入" value={formatCurrency(monthlyIncome)} icon={TrendingUp} tone="green" href="/finance/transactions" />
+                <StatTile title="今月の支出" value={formatCurrency(monthlyExpense)} icon={TrendingDown} tone="red" href="/finance/transactions" />
+              </>
             )}
-          </CardContent>
-        </Card>
+          </section>
+        </div>
 
-        {/* 最近のメール送信 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-            <CardTitle className="text-base">メール送信履歴</CardTitle>
-            <Link href="/emails/history">
-              <Button variant="ghost" size="sm" className="text-xs">
-                すべて見る <ArrowRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recentEmails.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {recentEmails.map(email => (
-                  <div
-                    key={email.id}
-                    className="flex items-center justify-between px-4 sm:px-6 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{email.subject}</p>
-                      <p className="text-xs text-gray-500">
-                        {email.sent_at ? formatDateTime(email.sent_at) : '-'}
-                      </p>
-                    </div>
-                    <div className="ml-2 flex-shrink-0">
-                      {email.status === 'sent' ? (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      ) : email.status === 'failed' ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : (
-                        <Clock className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 px-4 sm:px-6">
-                <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">送信履歴はありません</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ClubSchedule role={role} today={today} />
       </div>
 
-      {/* クイックアクション */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">クイックアクション</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* 開けないページへのボタンは出さない（ページの制限と同じ対応表。#46・#48） */}
-            {quickActions
-              .filter((a) => canAccessPage(user?.role, a.href))
-              .map((a) => <QuickAction key={a.href} {...a} />)}
-          </div>
-        </CardContent>
-      </Card>
+      {/* 履歴（スマホでは長くなるため折りたたむ） */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <Collapsible
+          title="最近のMU登録"
+          count={recentMuRegistrations.length}
+          href={can('/attendances') ? '/attendances' : null}
+          empty="MU登録はありません"
+        >
+          {recentMuRegistrations.map(a => (
+            <li key={a.id} className="flex items-center justify-between gap-2 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">{field(a, 'externalName', 'external_name') || '名前なし'}</p>
+                <p className="truncate text-xs text-gray-500">{formatDate(field(a, 'registeredAt', 'registered_at') || '')}</p>
+              </div>
+              {(() => {
+                const paid = field(a, 'paymentStatus', 'payment_status') === 'paid';
+                return (
+                  <span className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    paid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700',
+                  )}>
+                    {paid ? '支払済' : '未払い'}
+                  </span>
+                );
+              })()}
+            </li>
+          ))}
+        </Collapsible>
+
+        <Collapsible
+          title="メール送信履歴"
+          count={recentEmails.length}
+          href={can('/emails/history') ? '/emails/history' : null}
+          empty="送信履歴はありません"
+        >
+          {recentEmails.map(e => {
+            const sentAt = field(e, 'sentAt', 'sent_at');
+            return (
+              <li key={e.id} className="flex items-center justify-between gap-2 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{e.subject}</p>
+                  <p className="text-xs text-gray-500">{sentAt ? formatDateTime(sentAt) : '-'}</p>
+                </div>
+                {e.status === 'sent' ? (
+                  <CheckCircle className="h-4 w-4 shrink-0 text-green-500" aria-label="送信済み" />
+                ) : e.status === 'failed' ? (
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" aria-label="送信失敗" />
+                ) : (
+                  <Clock className="h-4 w-4 shrink-0 text-gray-400" aria-label="送信待ち" />
+                )}
+              </li>
+            );
+          })}
+        </Collapsible>
+      </div>
     </div>
   );
 }
@@ -383,97 +270,152 @@ export default function DashboardContent({
 // サブコンポーネント
 // ============================================================
 
-function SummaryCard({
-  title, value, icon: Icon, iconColor, iconBg, href,
+function NextMeetingCard({
+  meeting, today, can,
+}: { meeting: Meeting | null; today: string; can: (href: string) => boolean }) {
+  if (!meeting) {
+    return (
+      <section className="rounded-2xl bg-white px-4 py-8 text-center shadow-sm ring-1 ring-gray-200">
+        <CalendarPlus className="mx-auto h-8 w-8 text-gray-300" />
+        <p className="mt-2 text-sm text-gray-500">予定されている例会はありません</p>
+        {can('/meetings/new') && (
+          <Link
+            href="/meetings/new"
+            className="mt-3 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white active:bg-blue-700"
+          >
+            例会を作成する
+          </Link>
+        )}
+      </section>
+    );
+  }
+
+  const d = parseYmd(meeting.date);
+  const days = Math.round((d.getTime() - parseYmd(today).getTime()) / 86400000);
+  const startTime = field(meeting, 'startTime', 'start_time');
+  const venueName = field(meeting, 'venueName', 'venue_name');
+  const canMeetings = can('/meetings');
+
+  return (
+    <section aria-labelledby="club-next-meeting" className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+      <div className="flex gap-4 bg-blue-600 px-4 py-4 text-white">
+        <div className="shrink-0 text-center">
+          <p className="text-xs text-blue-100">{d.getMonth() + 1}月</p>
+          <p className="text-4xl font-bold leading-none tabular-nums">{d.getDate()}</p>
+          <p className="mt-1 text-xs text-blue-100">{DAYS_JA[d.getDay()]}曜日</p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p id="club-next-meeting" className="flex flex-wrap items-center gap-2 text-xs font-semibold text-blue-100">
+            次回例会
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-white">
+              {days <= 0 ? '今日' : days === 1 ? '明日' : `あと${days}日`}
+            </span>
+            {MEETING_STATUS_LABELS[meeting.status] && (
+              <span className={cn('rounded-full px-2 py-0.5', MEETING_STATUS_COLORS[meeting.status])}>
+                {MEETING_STATUS_LABELS[meeting.status]}
+              </span>
+            )}
+          </p>
+          <p className="mt-1 break-words text-lg font-bold leading-snug">{meeting.title}</p>
+          {meeting.theme && <p className="mt-0.5 break-words text-sm text-blue-50">テーマ：{meeting.theme}</p>}
+          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-blue-50">
+            {startTime && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{startTime.substring(0, 5)}〜</span>}
+            {venueName && (
+              <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="break-words">{venueName}</span></span>
+            )}
+          </p>
+        </div>
+      </div>
+      {canMeetings && (
+        <div className="grid grid-cols-3 gap-2 p-3">
+          <Link
+            href="/meetings/reception"
+            className="flex h-11 items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white active:bg-blue-700"
+          >
+            当日受付
+          </Link>
+          <Link
+            href={`/meetings/${meeting.id}/attendances`}
+            className="flex h-11 items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-800 active:bg-gray-50"
+          >
+            出席管理
+          </Link>
+          <Link
+            href={`/meetings/${meeting.id}`}
+            className="flex h-11 items-center justify-center rounded-xl border border-gray-200 text-sm font-semibold text-gray-800 active:bg-gray-50"
+          >
+            詳細
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const TILE_TONES = {
+  blue: 'bg-blue-50 text-blue-600',
+  green: 'bg-green-50 text-green-600',
+  red: 'bg-red-50 text-red-600',
+  orange: 'bg-orange-50 text-orange-600',
+} as const;
+
+function StatTile({
+  title, value, icon: Icon, tone, href,
 }: {
   title: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
-  iconColor: string;
-  iconBg: string;
-  href: string;
+  tone: keyof typeof TILE_TONES;
+  href: string | null;
 }) {
-  return (
-    <Link href={href}>
-      <Card className="hover:shadow-md transition-shadow cursor-pointer">
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className={`p-2 rounded-lg ${iconBg}`}>
-              <Icon className={`h-5 w-5 ${iconColor}`} />
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mb-1 truncate">{title}</p>
-          {/* スマホでは金額が切れないよう1段小さく表示し、数字は等幅に揃える */}
-          <p className="text-lg sm:text-xl font-bold text-gray-900 tabular-nums truncate">{value}</p>
-        </CardContent>
-      </Card>
-    </Link>
+  const body = (
+    <>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', TILE_TONES[tone])}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[11px] text-gray-500">{title}</span>
+        {/* 金額が切れないよう、数字は等幅でやや小さめに */}
+        <span className="block truncate text-base font-bold tabular-nums text-gray-900 sm:text-lg">{value}</span>
+      </span>
+    </>
   );
+  const cls = 'flex items-center gap-2.5 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-200';
+  return href
+    ? <Link href={href} className={cn(cls, 'active:bg-gray-50 hover:shadow-md transition-shadow')}>{body}</Link>
+    : <div className={cls}>{body}</div>;
 }
 
-function AlertCard({
-  title, description, href, variant,
+function Collapsible({
+  title, count, href, empty, children,
 }: {
   title: string;
-  description: string;
-  href: string;
-  variant: 'warning' | 'info' | 'error';
+  count: number;
+  href: string | null;
+  empty: string;
+  children: React.ReactNode;
 }) {
-  const colors = {
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-  };
-
-  const iconColors = {
-    warning: 'text-yellow-500',
-    info: 'text-blue-500',
-    error: 'text-red-500',
-  };
-
   return (
-    <Link href={href}>
-      <div className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border ${colors[variant]} hover:opacity-80 transition-opacity cursor-pointer`}>
-        <AlertCircle className={`h-5 w-5 flex-shrink-0 ${iconColors[variant]}`} />
-        {/* 長い説明文が横にはみ出さないよう折り返す */}
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm">{title}</p>
-          <p className="text-xs opacity-75 mt-0.5 break-words">{description}</p>
-        </div>
-        <ArrowRight className="h-4 w-4 ml-auto flex-shrink-0" />
+    <details className="group rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+      <summary className="flex h-14 cursor-pointer list-none items-center justify-between gap-2 px-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 text-base font-bold text-gray-900">
+          {title}
+          {count > 0 && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{count}件</span>}
+        </span>
+        <ChevronDown className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-gray-100 px-4 pb-2">
+        {count > 0 ? (
+          <ul className="divide-y divide-gray-100">{children}</ul>
+        ) : (
+          <p className="py-5 text-center text-sm text-gray-500">{empty}</p>
+        )}
+        {href && (
+          <Link href={href} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-blue-700">
+            すべて見る <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
-    </Link>
-  );
-}
-
-const quickActions = [
-  { href: '/meetings/new', icon: Calendar, label: '例会を作成', color: 'blue' },
-  { href: '/meetings/reception', icon: Users, label: '当日受付', color: 'green' },
-  { href: '/emails/compose', icon: Mail, label: 'メールを作成', color: 'purple' },
-  { href: '/receipts', icon: Receipt, label: '領収書を発行', color: 'orange' },
-];
-
-function QuickAction({
-  href, icon: Icon, label, color,
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  color: string;
-}) {
-  const colors: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600 hover:bg-blue-100',
-    green: 'bg-green-50 text-green-600 hover:bg-green-100',
-    purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100',
-    orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100',
-  };
-
-  return (
-    <Link href={href}>
-      <div className={`flex flex-col items-center gap-2 p-4 rounded-lg ${colors[color]} transition-colors cursor-pointer`}>
-        <Icon className="h-6 w-6" />
-        <span className="text-xs font-medium text-center">{label}</span>
-      </div>
-    </Link>
+    </details>
   );
 }
