@@ -338,7 +338,14 @@ export default function MeetingDetail({
       const name = (a as any).display_name || (a as any).user_name || (a as any).external_name || '';
       const club = (a as any).display_club_name || (a as any).club_name || '';
       const matchName = !nameSearch || name.includes(nameSearch) || club.includes(nameSearch);
-      const matchStatus = statusFilter === 'all' || (a as any).attendance_status === statusFilter;
+      // 「参加予定」は欠席以外（当日の受付前は出席状況が「未回答」のままなので、出席だけで絞ると0名になる）
+      const st = (a as any).attendance_status;
+      const isAbsent = st === 'absent' || (a as any).participation_type === 'absent';
+      const matchStatus = statusFilter === 'all'
+        || (statusFilter === 'attending' ? !isAbsent
+          : statusFilter === 'absent' ? isAbsent
+          : statusFilter === 'undecided' ? (st === 'undecided' || !st) && !isAbsent
+          : st === statusFilter);
       const matchPayment = paymentFilter === 'all' || (a as any).payment_status === paymentFilter;
       const matchGroup = groupFilter === 'all' || (groupFilter === 'own' ? isOwnClub(a) : !isOwnClub(a));
       return matchName && matchStatus && matchPayment && matchGroup;
@@ -620,15 +627,18 @@ export default function MeetingDetail({
               <p className="text-lg font-bold text-blue-700">{localAttendances.length}名</p>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-center">
-              <p className="text-xs text-green-600">出席</p>
+              <p className="text-xs text-green-600">参加予定</p>
               <p className="text-lg font-bold text-green-700">
-                {localAttendances.filter(a => a.attendance_status === 'present').length}名
+                {localAttendances.filter(a => a.attendance_status !== 'absent' && (a as any).participation_type !== 'absent').length}名
+              </p>
+              <p className="text-[11px] text-green-600">
+                受付済 {localAttendances.filter(a => a.attendance_status === 'present').length}名
               </p>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-center">
               <p className="text-xs text-red-600">欠席</p>
               <p className="text-lg font-bold text-red-700">
-                {localAttendances.filter(a => a.attendance_status === 'absent').length}名
+                {localAttendances.filter(a => a.attendance_status === 'absent' || (a as any).participation_type === 'absent').length}名
               </p>
             </div>
             <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 text-center">
@@ -636,10 +646,8 @@ export default function MeetingDetail({
               <p className="text-lg font-bold text-teal-700">{ownCount}名</p>
             </div>
             <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-center">
-              <p className="text-xs text-indigo-600">MU登録</p>
-              <p className="text-lg font-bold text-indigo-700">
-                {localAttendances.filter(a => (a as any).registration_type === 'mu').length}名
-              </p>
+              <p className="text-xs text-indigo-600">MU・ビジター</p>
+              <p className="text-lg font-bold text-indigo-700">{muCount}名</p>
             </div>
           </div>
 
@@ -719,10 +727,11 @@ export default function MeetingDetail({
               onChange={e => setStatusFilter(e.target.value)}
               className="text-sm border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
-              <option value="all">出席：すべて</option>
-              <option value="present">出席のみ</option>
+              <option value="all">出欠：すべて</option>
+              <option value="attending">参加予定（欠席以外）</option>
+              <option value="present">受付済み（出席）</option>
+              <option value="undecided">未受付</option>
               <option value="absent">欠席のみ</option>
-              <option value="undecided">未回答のみ</option>
             </select>
             <select
               value={paymentFilter}

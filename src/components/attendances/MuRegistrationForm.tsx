@@ -132,6 +132,9 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
     loggedInUser.clubId === (meeting as any).club_id
   );
 
+  // 本人として紐づける会員。クラブアカウント（クラブの共用ログイン）は参加者本人ではないので除く
+  const prefillUser = loggedInUser && loggedInUser.role !== 'club_account' ? loggedInUser : null;
+
   const hasAfterParty = !!(meeting.has_after_party);
 
   // 締切・ステータスの判定（締切後でもポリシーによる遅延登録を認める）
@@ -152,10 +155,11 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
       meal_required: false,
       receipt_required: false,
       participation_type: 'meeting_only',
-      name: loggedInUser?.name ?? '',
-      email: loggedInUser?.email ?? '',
-      club_id: loggedInUser?.clubId ?? '',
-      club_name: loggedInUser?.clubName ?? '',
+      // クラブアカウントは他の人を代理登録するので自分の情報は入れない
+      name: prefillUser?.name ?? '',
+      email: prefillUser?.email ?? '',
+      club_id: prefillUser?.clubId ?? '',
+      club_name: prefillUser?.clubName ?? '',
     },
   });
 
@@ -210,7 +214,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meetingId: meeting.id,
-          userId: loggedInUser?.id ?? null,
+          // クラブアカウントでの代理登録は参加者本人ではないので会員と紐づけない
+          userId: prefillUser?.id ?? null,
           clubId: data.club_id || null,
           clubName: data.club_name,
           // 管理者系ロールの場合は入力値をそのまま外部名として送信
@@ -688,7 +693,9 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                     : 'text-green-600'
                 }`}>
                   {isAdminRole(loggedInUser.role)
-                    ? '管理者権限でログイン中です。お名前・メール・所属クラブは自由に入力できます。'
+                    ? loggedInUser.role === 'club_account'
+                      ? 'クラブアカウントでログイン中です。参加者のお名前・メール・所属クラブを入力して代理登録してください（クラブアカウントとは紐づけません）。'
+                      : '管理者権限でログイン中です。お名前・メール・所属クラブは自由に入力できます。'
                     : isOwnClubMember
                       ? 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
                       : 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
