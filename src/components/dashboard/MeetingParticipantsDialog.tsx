@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Users, Loader2, AlertCircle, Building2 } from 'lucide-react';
+import { Users, Loader2, AlertCircle, Building2, Download, FileSpreadsheet } from 'lucide-react';
+import { toast } from 'sonner';
+import { downloadCsv, downloadXlsx, type ExportTable } from '@/lib/export/table-export';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -97,6 +99,31 @@ function ParticipantRow({
   );
 }
 
+// ─── 書き出し用の表（画面に出している項目のみ） ─────────────
+const PARTICIPATION_LABEL: Record<string, string> = {
+  meeting_only: '例会のみ',
+  meeting_and_party: '例会＋懇親会',
+  party_only: '懇親会のみ',
+};
+
+function buildParticipantsTable(data: ParticipantsResponse): ExportTable {
+  const label = (t: string) => PARTICIPATION_LABEL[t] ?? t;
+  return {
+    header: ['区分', '氏名', '役職', '所属クラブ', '会員種別', '参加形式'],
+    rows: [
+      ...data.members.map(m => ['自クラブ', m.name, m.position ?? '', '', '', label(m.participationType)]),
+      ...data.visitors.map(v => [
+        'MU・ビジター',
+        v.name,
+        v.position ?? '',
+        v.clubName ?? '',
+        MEMBER_TYPE_LABELS[v.memberType as MemberType] ?? v.memberType,
+        label(v.participationType),
+      ]),
+    ],
+  };
+}
+
 // ─── セクション（自クラブ / MU・ビジター） ─────────────────
 function Section({ title, count, children, empty }: {
   title: string;
@@ -135,6 +162,26 @@ export function MeetingParticipantsDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ParticipantsResponse | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const fileName = `参加者一覧_${meetingDate}_${meetingTitle}`;
+  const exportCsv = () => {
+    if (!data) return;
+    downloadCsv(buildParticipantsTable(data), fileName);
+  };
+  const exportXlsx = async () => {
+    if (!data) return;
+    setExporting(true);
+    try {
+      await downloadXlsx(buildParticipantsTable(data), fileName, {
+        title: `${meetingTitle}（${formatDate(meetingDate)}）参加者一覧`,
+      });
+    } catch {
+      toast.error('Excelファイルを作成できませんでした');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
@@ -229,6 +276,20 @@ export function MeetingParticipantsDialog({
                   <p className="mt-0.5 text-xs text-yellow-700">キャンセル待ち {data.waitlistCount}名</p>
                 )}
               </div>
+
+              {/* 書き出し */}
+              {data.counts.total > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="outline" onClick={exportCsv} className="h-10 gap-1.5">
+                    <Download className="h-4 w-4" />
+                    CSV
+                  </Button>
+                  <Button type="button" variant="outline" onClick={exportXlsx} loading={exporting} className="h-10 gap-1.5">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Excel
+                  </Button>
+                </div>
+              )}
 
               <Section title="自クラブ" count={data.members.length} empty={data.members.length === 0}>
                 {data.members.map(m => (

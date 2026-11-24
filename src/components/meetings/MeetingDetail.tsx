@@ -7,7 +7,7 @@ import { isOwnClubAttendance } from '@/lib/meetings/own-club';
 import {
   Calendar, MapPin, Users, Clock, Edit, ExternalLink,
   FileText, Mail, DollarSign, ArrowLeft, Copy, CheckCircle, Share2,
-  Search, Download, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer, ScrollText } from 'lucide-react';
+  Search, Download, FileSpreadsheet, ChevronUp, ChevronDown, Pencil, X, Receipt, Printer, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import type { Meeting, Attendance, MeetingReport, UserRole } from '@/types';
 import { MEETING_STATUS_LABELS, MEETING_STATUS_COLORS, MeetingStatus } from '@/types';
 import { canManageMeetings, canManageFinance } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
+import { downloadCsv, downloadXlsx, type ExportTable } from '@/lib/export/table-export';
 import QrCodeModal from '@/components/ui/QrCodeModal';
 import FinishMeetingButton from '@/components/meetings/FinishMeetingButton';
 
@@ -270,27 +271,50 @@ export default function MeetingDetail({
     toast.success('URLをコピーしました');
   };
 
-  // CSV出力
-  const exportCSV = () => {
-    const rows = [
-      ['氏名', '所属', '区分', '参加形式', '出席状況', '支払状況', '登録料', '備考'],
-      ...attendances.map(a => [
-        (a as any).display_name || (a as any).user_name || (a as any).external_name || '',
-        (a as any).display_club_name || (a as any).club_name || '',
-        MEMBER_TYPE_LABELS[(a as any).member_type] || (a as any).member_type || '',
-        PARTICIPATION_TYPE_LABELS[(a as any).participation_type || 'meeting_only'] || '',
-        ATTENDANCE_STATUS_LABELS[(a as any).attendance_status] || '',
-        (a as any).payment_status === 'paid' ? '支払済' : '未払い',
-        String((a as any).fee_amount ?? 0),
-        (a as any).note || '',
-      ])
-    ];
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `参加者名簿_${meeting.title}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  // 参加者名簿の書き出し（CSV / Excel 共通の表）
+  const buildRosterTable = (): ExportTable => ({
+    header: ['氏名', '所属', '区分', '参加形式', '出席状況', '支払状況', '登録料', '懇親会費', 'メール', '電話', '備考'],
+    rows: attendances.map(att => {
+      const a = att as unknown as Record<string, unknown>;
+      const str = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = a[k];
+          if (v !== null && v !== undefined && v !== '') return String(v);
+        }
+        return '';
+      };
+      const num = (...keys: string[]) => Number(str(...keys) || 0) || 0;
+      const memberType = str('member_type');
+      const payment = str('payment_status');
+      return [
+        str('display_name', 'user_name', 'external_name'),
+        str('display_club_name', 'club_name'),
+        MEMBER_TYPE_LABELS[memberType] || memberType,
+        PARTICIPATION_TYPE_LABELS[str('participation_type') || 'meeting_only'] || '',
+        ATTENDANCE_STATUS_LABELS[str('attendance_status')] || '',
+        payment === 'paid' ? '支払済' : payment === 'exempt' ? '免除' : '未払い',
+        num('fee_amount', 'feeAmount'),
+        num('after_party_fee_amount', 'afterPartyFeeAmount'),
+        str('user_email', 'external_email'),
+        str('external_phone'),
+        str('note'),
+      ];
+    }),
+  });
+  const rosterFileName = `参加者名簿_${meeting.title}`;
+  const exportCSV = () => downloadCsv(buildRosterTable(), rosterFileName);
+  const [xlsxLoading, setXlsxLoading] = useState(false);
+  const exportXLSX = async () => {
+    setXlsxLoading(true);
+    try {
+      await downloadXlsx(buildRosterTable(), rosterFileName, {
+        title: `${meeting.title}（${formatDate(meeting.date)}）参加者名簿`,
+      });
+    } catch {
+      toast.error('Excelファイルを作成できませんでした');
+    } finally {
+      setXlsxLoading(false);
+    }
   };
 
   // 自クラブの会員か（MU登録・他クラブ・ゲストは「MU・ビジター」）
@@ -714,6 +738,10 @@ export default function MeetingDetail({
               <Button size="sm" variant="outline" onClick={exportCSV}>
                 <Download className="h-4 w-4" />
                 CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={exportXLSX} loading={xlsxLoading}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel
               </Button>
               <Link href={`/meetings/${meeting.id}/attendances`}>
                 <Button size="sm">

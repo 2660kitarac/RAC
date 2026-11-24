@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, AlertCircle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2, UserX } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Clock, Users, AlertTriangle, AlertCircle, LogIn, PartyPopper, ChevronDown, ChevronUp, FileText, Hash, Building2, UserX, UserPlus } from 'lucide-react';
 import type { Meeting, Club, MemberType } from '@/types';
 import { evaluateDeadlineSnake } from '@/lib/meetings/deadline';
 
@@ -92,6 +92,13 @@ interface MuRegistrationFormProps {
   meeting: MeetingWithParty;
   clubs: Club[];
   loggedInUser?: LoggedInUser | null;
+  /**
+   * 友達を登録するモード（会員が自分のスマホで友達の分を代わりに登録する）。
+   * このとき loggedInUser は null で渡され、外部参加者として登録される。
+   */
+  invitedBy?: { name: string; clubName: string | null } | null;
+  /** ログイン中の会員に「友達をこの場で登録する」導線を出すか */
+  canInviteFriend?: boolean;
 }
 
 /** 懇親会参加費を区分から算出 */
@@ -104,7 +111,7 @@ function calcAfterPartyFee(memberType: string, meeting: MeetingWithParty): numbe
   }
 }
 
-export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuRegistrationFormProps) {
+export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invitedBy = null, canInviteFriend = false }: MuRegistrationFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [absentLoading, setAbsentLoading] = useState(false);
@@ -192,6 +199,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
 
     // note に役職を付加
     const noteWithPosition = [
+      invitedBy ? `【紹介者】${invitedBy.name}${invitedBy.clubName ? `（${invitedBy.clubName}）` : ''}` : '',
       resolvedPosition ? `【役職】${resolvedPosition}` : '',
       data.note?.trim() || '',
     ].filter(Boolean).join('\n');
@@ -375,6 +383,15 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
             <p className="text-xs text-gray-400 mt-1">
               当日の受付でお名前をお伝えください。
             </p>
+            {(invitedBy || canInviteFriend) && (
+              <a
+                href="?friend=1"
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white text-sm font-semibold text-blue-700 active:bg-blue-50"
+              >
+                <UserPlus className="h-4 w-4" />
+                {invitedBy ? '続けて別の友達を登録する' : '友達をこの場で登録する'}
+              </a>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -621,8 +638,19 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
           </div>
         )}
 
-        {/* ログイン済みバナー */}
-        {loggedInUser ? (
+        {/* 友達登録モード（会員が友達の分を代わりに登録） */}
+        {invitedBy ? (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <UserPlus className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-800">友達の参加登録（MU登録）</p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                {invitedBy.name} さんの紹介として登録します。お友達のお名前・メールアドレス・所属を入力してください。確認メールはお友達に届きます。
+              </p>
+              <a href="?" className="mt-2 inline-block text-xs text-blue-700 underline">自分の登録に戻る</a>
+            </div>
+          </div>
+        ) : loggedInUser ? (
           <>
             <div className={`mb-4 border rounded-lg p-4 flex items-start gap-3 ${
               isAdminRole(loggedInUser.role)
@@ -666,6 +694,15 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser }: MuR
                       : 'お名前・メール・所属クラブを自動入力しました。参加登録は会員情報と紐づけて記録されます。'
                   }
                 </p>
+                {canInviteFriend && !isAdminRole(loggedInUser.role) && (
+                  <a
+                    href="?friend=1"
+                    className="mt-2 inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 border border-blue-200"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    友達をこの場で登録する（MU登録）
+                  </a>
+                )}
               </div>
             </div>
 

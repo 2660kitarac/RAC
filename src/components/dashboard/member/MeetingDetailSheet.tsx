@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import {
-  CalendarDays, Check, Clock, Copy, ExternalLink, MapPin, PartyPopper, Share2, Star, Users, Wallet,
+  CalendarDays, Check, Clock, Copy, ExternalLink, MapPin, PartyPopper, Share2, Star, Users, Wallet, UserPlus, QrCode,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -83,6 +83,7 @@ function Venue({ name, address }: { name?: string | null; address?: string | nul
 
 function ShareBlock({ meeting }: { meeting: MyMeeting }) {
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const url = muRegistrationUrl(meeting.muRegistrationSlug, meeting.muRegistrationUrl);
   if (!url) return null;
 
@@ -106,22 +107,68 @@ function ShareBlock({ meeting }: { meeting: MyMeeting }) {
     }
   };
 
+  // 自分のスマホで友達の分を代わりに登録する用（ログイン中でも外部参加者として登録される）
+  const friendUrl = (() => {
+    try {
+      const u = new URL(url);
+      u.searchParams.set('friend', '1');
+      return u.toString();
+    } catch {
+      return `${url}${url.includes('?') ? '&' : '?'}friend=1`;
+    }
+  })();
+
   return (
     <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
       <p className="flex items-center gap-1.5 text-sm font-semibold text-blue-900">
         <Share2 className="h-4 w-4" />
         友達・家族を誘う
       </p>
-      <p className="mt-0.5 text-xs text-blue-800">このURLから、ログインせずに申し込めます</p>
-      <p className="mt-2 select-all break-all rounded-lg bg-white px-3 py-2 text-xs text-gray-600">{url}</p>
-      <button
-        type="button"
-        onClick={share}
+      <p className="mt-0.5 text-xs text-blue-800">
+        その場で友達を誘ったら、MU登録をお願いします。友達のスマホでQRを読み取ってもらうか、下のボタンからあなたのスマホで代わりに登録できます。
+      </p>
+      <a
+        href={friendUrl}
+        target="_blank"
+        rel="noopener noreferrer"
         className="mt-2 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 text-sm font-semibold text-white active:bg-blue-700"
       >
-        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        {copied ? 'コピーしました' : 'URLを送る'}
-      </button>
+        <UserPlus className="h-4 w-4" />
+        この場で友達をMU登録する
+      </a>
+      <div className="mt-2 grid grid-cols-[auto_1fr] gap-2">
+        <button
+          type="button"
+          onClick={() => setShowQr(v => !v)}
+          aria-expanded={showQr}
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 text-sm font-semibold text-blue-700 active:bg-blue-50"
+        >
+          <QrCode className="h-4 w-4" />
+          {showQr ? 'QRを閉じる' : 'QRを表示'}
+        </button>
+        <button
+          type="button"
+          onClick={share}
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white text-sm font-semibold text-blue-700 active:bg-blue-50"
+        >
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {copied ? 'コピーしました' : 'URLを送る'}
+        </button>
+      </div>
+      {showQr && (
+        <div className="mt-2 flex flex-col items-center rounded-lg bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(url)}`}
+            alt="MU登録フォームのQRコード"
+            width={200}
+            height={200}
+            className="h-[200px] w-[200px]"
+          />
+          <p className="mt-1 text-xs text-gray-500">友達のスマホのカメラで読み取ってもらってください</p>
+        </div>
+      )}
+      <p className="mt-2 select-all break-all rounded-lg bg-white px-3 py-2 text-xs text-gray-600">{url}</p>
     </div>
   );
 }

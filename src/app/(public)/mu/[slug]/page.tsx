@@ -5,8 +5,16 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import MuRegistrationForm from '@/components/attendances/MuRegistrationForm';
 
-export default async function MuRegistrationPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function MuRegistrationPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const wantsFriendMode = sp.friend === '1';
 
   const db = await getDbFromContext();
 
@@ -167,11 +175,24 @@ export default async function MuRegistrationPage({ params }: { params: Promise<{
 
   const meetingWithClub = { ...meeting, club: club ?? null };
 
+  // 友達登録モード：ログイン中の会員が、その場で誘った友達の分を代わりに登録する。
+  // 本人としてではなく外部参加者として登録させるため、ログイン情報はフォームに渡さない。
+  // （管理者系ロールはもともと氏名などを自由に入力できるので対象外。
+  //   MuRegistrationForm の ADMIN_ROLES と同じ一覧）
+  const isAdmin = !!loggedInUser && ['admin', 'district_admin', 'club_account'].includes(loggedInUser.role);
+  const friendMode = wantsFriendMode && !!loggedInUser && !isAdmin;
+  const invitedBy = friendMode && loggedInUser
+    ? { name: loggedInUser.name, clubName: loggedInUser.clubName }
+    : null;
+
   return (
     <MuRegistrationForm
+      key={friendMode ? 'friend' : 'self'}
       meeting={meetingWithClub as any}
       clubs={clubList as any}
-      loggedInUser={loggedInUser}
+      loggedInUser={friendMode ? null : loggedInUser}
+      invitedBy={invitedBy}
+      canInviteFriend={!!loggedInUser && !isAdmin}
     />
   );
 }
