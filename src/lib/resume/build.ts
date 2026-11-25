@@ -36,6 +36,7 @@ import {
   monthOf,
   positionRank,
 } from './format';
+import { participantUserClubId, participantUserName } from '@/lib/meetings/participant-user';
 
 /** レジュメ用テーブルが未作成のときのエラーか（PostgreSQL: undefined_table） */
 export function isMissingTable(e: unknown): boolean {
@@ -257,8 +258,8 @@ export async function buildResume(db: Db, meetingId: string): Promise<ResumeView
       participationType: attendances.participationType,
       attendanceStatus: attendances.attendanceStatus,
       note: attendances.note,
-      userName: users.name,
-      userClubId: users.clubId,
+      userName: participantUserName,
+      userClubId: participantUserClubId,
       registeredAt: attendances.registeredAt,
     })
     .from(attendances)

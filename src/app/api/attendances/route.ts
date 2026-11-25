@@ -9,6 +9,7 @@ import { calculateFee } from '@/lib/utils';
 import { syncAttendanceIncomeSafely } from '@/lib/finance/attendance-income';
 import { evaluateDeadline } from '@/lib/meetings/deadline';
 import { canAccessPage } from '@/lib/auth/page-access';
+import { participantUserName, participantUserEmail } from '@/lib/meetings/participant-user';
 
 // GET /api/attendances?meetingId=xxx&clubId=xxx
 // クラブアカウント → 自クラブの例会の出席情報のみ（clubIdクエリは無視され自クラブに強制）
@@ -99,8 +100,8 @@ export async function GET(request: NextRequest) {
         note: attendances.note,
         registeredAt: attendances.registeredAt,
         createdAt: attendances.createdAt,
-        userName: users.name,
-        userEmail: users.email,
+        userName: participantUserName,
+        userEmail: participantUserEmail,
       })
       .from(attendances)
       .leftJoin(users, eq(attendances.userId, users.id))
@@ -226,7 +227,10 @@ export async function POST(request: NextRequest) {
       // 運営側の代理登録：入力値をそのまま使う（従来どおり）
       values = {
         ...common,
-        userId: userId || null,
+        // クラブアカウントはクラブの共用ログインで参加者本人ではない。
+        // クラブアカウントでの代理登録に自分の userId が付くと、参加者が自クラブ扱い・
+        // クラブ名表示になってしまうため、紐づけない
+        userId: userId && !(sessionUser?.role === 'club_account' && userId === sessionUser.id) ? userId : null,
         memberType: memberType || 'RAC',
         attendanceStatus: attendanceStatus || 'undecided',
         registrationType: registrationType || 'member',
@@ -239,7 +243,7 @@ export async function POST(request: NextRequest) {
       };
     } else {
       // 外部参加者・一般会員のMU登録：本人以外としては登録させない
-      const ownUserId = sessionUser?.id && userId && userId === sessionUser.id ? sessionUser.id : null;
+      const ownUserId = sessionUser?.id && userId && userId === sessionUser.id && sessionUser.role !== 'club_account' ? sessionUser.id : null;
       const isOwnClubMember = !!ownUserId && !!sessionUser?.clubId && sessionUser.clubId === meetingRow.clubId;
 
       const pType = participationType || 'meeting_only';

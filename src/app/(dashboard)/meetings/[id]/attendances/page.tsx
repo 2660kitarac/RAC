@@ -6,6 +6,7 @@ import { displayAffiliation } from '@/lib/meetings/own-club';
 import { eq, and, isNull, asc } from 'drizzle-orm';
 import AttendanceManagement from '@/components/attendances/AttendanceManagement';
 import { canAccessPage } from '@/lib/auth/page-access';
+import { participantUserClubId, participantUserName, participantUserEmail } from '@/lib/meetings/participant-user';
 
 export default async function AttendanceManagementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,9 +43,9 @@ export default async function AttendanceManagementPage({ params }: { params: Pro
       isLateRegistration: (attendances as any).isLateRegistration,
       registeredAfterDeadlineDays: (attendances as any).registeredAfterDeadlineDays,
       // users JOIN で会員名を取得（#issue1: userId あり会員の氏名が空欄になる問題を修正）
-      userName: users.name,
-      userEmail: users.email,
-      userClubId: users.clubId,
+      userName: participantUserName,
+      userEmail: participantUserEmail,
+      userClubId: participantUserClubId,
       userClubName: clubs.name,
       userClubShortName: clubs.shortName,
     })

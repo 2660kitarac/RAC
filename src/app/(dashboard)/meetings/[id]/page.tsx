@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import MeetingDetail from '@/components/meetings/MeetingDetail';
 import { displayAffiliation } from '@/lib/meetings/own-club';
 import { canAccessPage } from '@/lib/auth/page-access';
+import { participantUserClubId, participantUserName, participantUserEmail } from '@/lib/meetings/participant-user';
 
 export default async function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,9 +43,9 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       note:             attendances.note,
       registeredAt:     attendances.registeredAt,
       // users JOIN
-      userName:         users.name,
-      userEmail:        users.email,
-      userClubId:       users.clubId,
+      userName:         participantUserName,
+      userEmail:        participantUserEmail,
+      userClubId:       participantUserClubId,
       userClubName:     clubs.name,
       userClubShortName: clubs.shortName,
       userNameKana:     users.nameKana,

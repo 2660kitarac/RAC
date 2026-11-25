@@ -12,6 +12,7 @@ import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { meetings, attendances, users, clubs } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { isDistrictScope } from '@/lib/auth/tenant';
+import { participantUserClubId, participantUserName } from '@/lib/meetings/participant-user';
 
 // 参加扱いとする区分（欠席・キャンセル待ちは除く）
 const COMING_TYPES = ['meeting_only', 'meeting_and_party', 'party_only'] as const;
@@ -103,8 +104,8 @@ export async function GET(
         participationType: attendances.participationType,
         attendanceStatus: attendances.attendanceStatus,
         note: attendances.note, // 役職の抽出のみに使用し、レスポンスには含めない
-        userName: users.name,
-        userClubId: users.clubId,
+        userName: participantUserName,
+        userClubId: participantUserClubId,
         userPosition: users.position,
         userClubName: clubs.name,
         userClubShortName: clubs.shortName,
