@@ -25,6 +25,8 @@ export const canManageAccounts = hasRole(ACCOUNT_MANAGER_ROLES);
 export const canManageMuVisits = hasRole(MU_VISIT_MANAGER_ROLES);
 /** 例会報告書を見られるロール */
 export const canViewReports = hasRole(REPORT_VIEWER_ROLES);
+/** 年間スケジュール（自クラブの例会カレンダー）を開けるロール（#61: クラブアカウントのみ） */
+export const canViewClubSchedule = hasRole(['club_account']);
 
 /**
  * ページ（パスの先頭）→ 開けるロール。表にないパスは制限しない。
@@ -43,6 +45,7 @@ const PAGE_ACCESS_RULES: { prefix: string; allow: (role: Role) => boolean }[] = 
   // メールの API（/api/emails/*）と同じ範囲
   { prefix: '/emails', allow: canManageClub },
   { prefix: '/reports', allow: canViewReports },
+  { prefix: '/schedule', allow: canViewClubSchedule },
 ];
 
 /** そのロールでページ（path）を開いてよいか。前方一致（/x と /x/...）で規則を探す */

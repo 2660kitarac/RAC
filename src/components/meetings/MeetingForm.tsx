@@ -86,6 +86,8 @@ interface MeetingFormProps {
   copySource?: { id: string; title: string; date: string } | null;
   /** 作成モード: ?from= で指定された例会が見つからない／権限なし */
   copyNotFound?: boolean;
+  /** 作成モード: 開催日の初期値（年間スケジュールの「＋」から ?date= で渡される。'YYYY-MM-DD'） */
+  initialDate?: string;
 }
 
 function candidateLabel(c: CopyCandidate) {
@@ -96,7 +98,7 @@ function candidateLabel(c: CopyCandidate) {
 
 export default function MeetingForm({
   mode, clubId, meeting, members,
-  copyCandidates = [], copySource = null, copyNotFound = false,
+  copyCandidates = [], copySource = null, copyNotFound = false, initialDate,
 }: MeetingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -127,7 +129,7 @@ export default function MeetingForm({
       title: meeting?.title || '',
       meeting_number: meeting?.meeting_number?.toString() || '',
       theme: meeting?.theme || '',
-      date: meeting?.date || '',
+      date: meeting?.date || initialDate || '',
       start_time: meeting?.start_time?.substring(0, 5) || '',
       end_time: meeting?.end_time?.substring(0, 5) || '',
       venue_name: meeting?.venue_name || '',
@@ -168,7 +170,12 @@ export default function MeetingForm({
   const applyCopySource = (id: string | null) => {
     if (id === (copySource?.id ?? null)) return;
     if (isDirty && !window.confirm('入力中の内容は破棄されます。よろしいですか？')) return;
-    router.replace(id ? `/meetings/new?from=${encodeURIComponent(id)}` : '/meetings/new');
+    // 年間スケジュールから渡された開催日（?date=）はコピー元を選び直しても引き継ぐ
+    const q = new URLSearchParams();
+    if (id) q.set('from', id);
+    if (initialDate) q.set('date', initialDate);
+    const qs = q.toString();
+    router.replace(qs ? `/meetings/new?${qs}` : '/meetings/new');
   };
 
   const latestMeeting = copyCandidates[0];
