@@ -5,10 +5,9 @@ import { districtEvents, registrationForms } from '@/lib/db/schema';
 import { requireDistrictPage, todayJst } from '@/lib/district/context';
 import { sanitizeConfig } from '@/lib/event-registration/server';
 import { cn, formatTime } from '@/lib/utils';
+import { WEEKDAYS, buildMonthCells, monthKey, monthRange, parseMonth, shiftMonth, weekday } from '@/lib/calendar/month';
 
 export const metadata = { title: '地区カレンダー' };
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 type CalendarItem = {
   key: string;
@@ -24,26 +23,6 @@ const KIND_STYLE: Record<CalendarItem['kind'], { chip: string; label: string; do
   deadline: { chip: 'bg-amber-100 text-amber-800 hover:bg-amber-200', label: '申込締切', dot: 'bg-amber-500' },
 };
 
-/** ?month=YYYY-MM を検証（不正なら今月） */
-function parseMonth(v: string | string[] | undefined, today: string): { y: number; m: number } {
-  if (typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v)) {
-    const y = Number(v.slice(0, 4));
-    if (y >= 2000 && y <= 2100) return { y, m: Number(v.slice(5, 7)) };
-  }
-  return { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) };
-}
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const monthKey = (y: number, m: number) => `${y}-${pad(m)}`;
-function shiftMonth(y: number, m: number, diff: number): { y: number; m: number } {
-  const idx = y * 12 + (m - 1) + diff;
-  return { y: Math.floor(idx / 12), m: (idx % 12) + 1 };
-}
-function weekday(date: string): number {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-}
-
 export default async function DistrictCalendarPage({
   searchParams,
 }: {
@@ -53,9 +32,7 @@ export default async function DistrictCalendarPage({
   const today = todayJst();
   const sp = await searchParams;
   const { y, m } = parseMonth(sp.month, today);
-  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const start = `${monthKey(y, m)}-01`;
-  const end = `${monthKey(y, m)}-${pad(daysInMonth)}`;
+  const { start, end } = monthRange(y, m);
   const prev = shiftMonth(y, m, -1);
   const next = shiftMonth(y, m, 1);
   const thisMonth = today.slice(0, 7);
@@ -124,12 +101,7 @@ export default async function DistrictCalendarPage({
   items.forEach(it => byDate.set(it.date, [...(byDate.get(it.date) ?? []), it]));
 
   // カレンダーのマス（前月末の空白 + 当月）
-  const firstWd = weekday(start);
-  const cells: Array<string | null> = [
-    ...Array.from({ length: firstWd }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => `${monthKey(y, m)}-${pad(i + 1)}`),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  const cells = buildMonthCells(y, m);
 
   const navBtn = 'inline-flex h-9 items-center gap-1 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50';
 

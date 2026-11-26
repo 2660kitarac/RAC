@@ -67,6 +67,12 @@ export default function Sidebar({ user, onClose, pendingMembersCount = 0, distri
       href: '/dashboard',
       icon: LayoutDashboard,
     },
+    // 年間スケジュール（#61）。開けるロールは page-access の規則で絞る（クラブアカウントのみ）
+    {
+      label: '年間スケジュール',
+      href: '/schedule',
+      icon: CalendarDays,
+    },
     {
       label: '例会管理',
       icon: Calendar,

@@ -7,6 +7,7 @@ import MeetingForm, { type CopyCandidate } from '@/components/meetings/MeetingFo
 import { canMutateClubRecord, canManageClub } from '@/lib/auth/tenant';
 import { toCopiedMeetingFormValues } from '@/lib/meetings/form-mapping';
 import { canAccessPage } from '@/lib/auth/page-access';
+import { isValidDateString } from '@/lib/calendar/month';
 
 export const metadata = { title: '例会作成' };
 
@@ -16,14 +17,16 @@ const COPY_CANDIDATE_LIMIT = 50;
 export default async function NewMeetingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; date?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
   // ロールで開けるページを制限（#48）
   if (!canAccessPage(session.user.role, '/meetings/new')) redirect('/dashboard');
 
-  const { from: fromParam } = await searchParams;
+  const { from: fromParam, date: dateParam } = await searchParams;
+  // 年間スケジュールの「＋」から渡される開催日（正しい日付のときだけ使う）
+  const initialDate = isValidDateString(dateParam) ? dateParam : undefined;
   // 例会管理権限のないユーザーにはコピー機能を提供しない（多重防御）
   const canCopy = canManageClub(session.user.role);
   const from = canCopy ? fromParam : undefined;
@@ -89,7 +92,7 @@ export default async function NewMeetingPage({
   return (
     <MeetingForm
       // コピー元が切り替わったらフォームを再マウントして初期値を入れ直す
-      key={source?.id ?? 'blank'}
+      key={`${source?.id ?? 'blank'}:${initialDate ?? ''}`}
       mode="create"
       clubId={clubId || ''}
       members={membersResult}
@@ -97,6 +100,7 @@ export default async function NewMeetingPage({
       copyCandidates={copyCandidates}
       copySource={source ? { id: source.id, title: source.title, date: source.date } : null}
       copyNotFound={Boolean(fromParam) && !source}
+      initialDate={initialDate}
     />
   );
 }
