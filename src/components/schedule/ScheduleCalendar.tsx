@@ -49,6 +49,7 @@ const newMeetingHref = (date: string) => `/meetings/new?date=${date}`;
 type Popover = { meeting: ScheduleMeeting; left: number; top: number; anchorTop: number; anchorBottom: number };
 
 const POPOVER_WIDTH = 288; // w-72
+const MARGIN = 8;
 
 export default function ScheduleCalendar({
   year, month, today, fiscalLabel, prevMonth, nextMonth, meetings, loadError = false,
@@ -56,19 +57,32 @@ export default function ScheduleCalendar({
   const router = useRouter();
   const [popover, setPopover] = useState<Popover | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // 削除中の例会ID（削除中は枠を閉じない・他の例会を開かない）
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  // 枠を閉じたときにフォーカスを戻す先（押した例会のボタン）
+  const anchorElRef = useRef<HTMLElement | null>(null);
+  const deletingRef = useRef(false);
 
   const closePopover = useCallback(() => {
+    if (deletingRef.current) return;
     setPopover(null);
     setConfirmingDelete(false);
+    const anchor = anchorElRef.current;
+    anchorElRef.current = null;
+    if (anchor && anchor.isConnected) anchor.focus({ preventScroll: true });
   }, []);
 
   // 枠の外のクリック・Esc・スクロールで閉じる
+  const isOpen = popover !== null;
   useEffect(() => {
-    if (!popover) return;
+    if (!isOpen) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) closePopover();
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      // 開いている例会のボタン自身は onClick 側で開閉を切り替える
+      if (anchorElRef.current?.contains(target)) return;
+      closePopover();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePopover(); };
     window.addEventListener('pointerdown', onPointerDown);
@@ -81,9 +95,9 @@ export default function ScheduleCalendar({
       window.removeEventListener('scroll', closePopover, { capture: true });
       window.removeEventListener('resize', closePopover);
     };
-  }, [popover, closePopover]);
+  }, [isOpen, closePopover]);
 
-  // 描画前に高さを測り、下にはみ出す場合は例会の上側に出す
+  // 描画前に高さを測り、下にはみ出す場合は例会の上側に出す（削除確認で高さが変わったときも測り直す）
   const anchorBottom = popover?.anchorBottom;
   const anchorTop = popover?.anchorTop;
   useLayoutEffect(() => {
@@ -91,36 +105,57 @@ export default function ScheduleCalendar({
     if (!el || anchorBottom == null || anchorTop == null) return;
     const h = el.offsetHeight;
     const below = anchorBottom + 6;
-    const top = below + h > window.innerHeight - 8 ? Math.max(8, anchorTop - h - 6) : below;
+    const top = below + h > window.innerHeight - MARGIN ? Math.max(MARGIN, anchorTop - h - 6) : below;
     setPopover((p) => (p && p.top !== top ? { ...p, top } : p));
-  }, [anchorBottom, anchorTop]);
+  }, [anchorBottom, anchorTop, confirmingDelete, deletingId]);
+
+  // 開いたら枠の最初のボタンにフォーカスを移す（キーボード・読み上げで操作できるように）
+  const openMeetingId = popover?.meeting.id;
+  useEffect(() => {
+    if (!openMeetingId) return;
+    popoverRef.current?.querySelector<HTMLElement>('a, button:not([aria-label="閉じる"])')?.focus({ preventScroll: true });
+  }, [openMeetingId]);
 
   const openPopover = (e: React.MouseEvent<HTMLElement>, meeting: ScheduleMeeting) => {
     e.stopPropagation();
-    const r = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - POPOVER_WIDTH - 8);
+    if (deletingRef.current) return;
+    // 同じ例会をもう一度押したら閉じる
+    if (popover?.meeting.id === meeting.id) {
+      closePopover();
+      return;
+    }
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    // 画面が狭いときも左端からはみ出さないようにする（最後に左の余白で下限をかける）
+    const left = Math.max(MARGIN, Math.min(r.left, window.innerWidth - POPOVER_WIDTH - MARGIN));
+    anchorElRef.current = el;
     setConfirmingDelete(false);
     setPopover({ meeting, left, top: r.bottom + 6, anchorTop: r.top, anchorBottom: r.bottom });
   };
 
   const handleDelete = async () => {
-    if (!popover) return;
+    if (!popover || deletingRef.current) return;
     if (!confirmingDelete) {
       setConfirmingDelete(true);
       return;
     }
     const { id, title } = popover.meeting;
-    setDeleting(true);
+    deletingRef.current = true;
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('削除に失敗しました');
       toast.success(`「${title}」を削除しました`);
+      deletingRef.current = false;
+      anchorElRef.current = null; // 削除した例会のボタンは消えるのでフォーカスは戻さない
       closePopover();
       router.refresh();
     } catch {
-      toast.error('例会の削除に失敗しました');
+      toast.error(`「${title}」の削除に失敗しました`);
+      setConfirmingDelete(false);
     } finally {
-      setDeleting(false);
+      deletingRef.current = false;
+      setDeletingId(null);
     }
   };
 
@@ -269,9 +304,13 @@ export default function ScheduleCalendar({
       {/* その月の例会一覧（スマホではこちらがメイン） */}
       <section className="rounded-xl border bg-white">
         <h2 className="flex items-center gap-2 border-b px-4 py-3 text-sm font-semibold text-gray-900">
-          <CalendarDays className="h-4 w-4 text-indigo-600" />{month}月の例会（{meetings.length}件）
+          <CalendarDays className="h-4 w-4 text-indigo-600" />{month}月の例会{!loadError && `（${meetings.length}件）`}
         </h2>
-        {meetings.length === 0 ? (
+        {loadError ? (
+          <div className="px-4 py-10 text-center text-sm text-gray-500">
+            <p>例会を読み込めませんでした</p>
+          </div>
+        ) : meetings.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-gray-500">
             <p>この月の例会はありません</p>
             <p className="mt-1 text-xs">「例会を追加」またはカレンダーの「＋」から登録できます。</p>
@@ -345,7 +384,7 @@ export default function ScheduleCalendar({
           ref={popoverRef}
           popover={popover}
           confirmingDelete={confirmingDelete}
-          deleting={deleting}
+          deleting={deletingId === popover.meeting.id}
           onClose={closePopover}
           onDelete={handleDelete}
         />
@@ -374,7 +413,7 @@ function MeetingPopover({
       ref={ref}
       role="dialog"
       aria-label={`${it.title} の概要`}
-      className="fixed z-50 w-72 rounded-xl border bg-white p-4 shadow-xl"
+      className="fixed z-50 w-72 max-w-[calc(100vw-16px)] rounded-xl border bg-white p-4 shadow-xl"
       style={{ left, top }}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
