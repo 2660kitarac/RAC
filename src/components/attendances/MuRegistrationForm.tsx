@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -193,20 +193,26 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
     setValue('member_type', v, { shouldValidate: false });
     // 区分によって所属が必須かどうかが変わるので、前の区分で出たエラーを付け直す
     // （送信前ならエラーは出さない。送信後なら新しい区分で確かめ直す）
-    if (isSubmitted) setTimeout(() => { void trigger('club_name'); }, 0);
+    if (isSubmitted) void trigger('club_name');
     else clearErrors('club_name');
-    if (isGuestType(v) || v === 'RC') {
-      // ゲスト・ロータリアンはローターアクトクラブに紐づけない（クラブ名の文字だけ残し、書き換えられるようにする）
+    // ログイン中の会員（所属クラブは固定表示）は所属を変えない
+    const clubLocked = !!loggedInUser?.clubName && !isAdminRole(loggedInUser.role);
+    if (!clubLocked && (isGuestType(v) || v === 'RC') && clubIdValue) {
+      // 一覧から選んだローターアクトクラブは、ゲスト・ロータリアンの所属としては誤りなので消す
       setValue('club_id', '');
+      setValue('club_name', '');
     }
     if (isGuestType(v)) {
       setValue('position_select', '');
       setValue('position_custom', '');
     }
-    if (!isGuestType(v) && receiptNameType === 'club' && !clubNameValue?.trim()) {
-      setValue('receipt_name_type', 'personal');
-    }
   };
+
+  // 宛名「所属クラブ名」は所属が空になったら選べないので、個人名に戻す
+  const clubNameEmpty = !clubNameValue?.trim();
+  useEffect(() => {
+    if (clubNameEmpty && receiptNameType === 'club') setValue('receipt_name_type', 'personal');
+  }, [clubNameEmpty, receiptNameType, setValue]);
 
   // 例会登録料（meeting_only / meeting_and_party の場合）
   // 自クラブ会員は own_club_fee（null = 0円）を優先適用
@@ -896,7 +902,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
               <div className="form-group">
                 {loggedInUser?.clubName && !isAdminRole(loggedInUser.role) ? (
                   <>
-                    <Label htmlFor="club_name" required>所属クラブ</Label>
+                    <Label htmlFor="club_name" required={!guestType}>所属クラブ</Label>
                     <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
                       {loggedInUser.clubName}
                     </div>
@@ -931,7 +937,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                     <Label htmlFor="club_name" required>{memberType === 'OB_OG' ? '出身クラブ' : '所属クラブ'}</Label>
                     <div className="mt-1 space-y-2">
                       <Select
-                        value={clubIdValue || undefined}
+                        value={clubIdValue ?? ''}
                         onValueChange={v => {
                           setValue('club_id', v);
                           const club = clubs.find(c => c.id === v);
@@ -1125,8 +1131,8 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                   <div className="form-group">
                     <Label>領収書宛名</Label>
                     <Select
+                      value={receiptNameType ?? 'personal'}
                       onValueChange={v => setValue('receipt_name_type', v as 'club' | 'personal' | 'custom')}
-                      defaultValue="personal"
                     >
                       <SelectTrigger className="mt-1">
                         <SelectValue />
