@@ -19,7 +19,8 @@ import { evaluateDeadlineSnake } from '@/lib/meetings/deadline';
 
 // 役職の選択肢
 const POSITION_OPTIONS = [
-  { value: '', label: '（役職なし）' },
+  // 選択部品は空文字の値を受け付けないため、「なし」は 'none' で持ち、送るときに空にする
+  { value: 'none', label: '（役職なし）' },
   { value: '会長', label: '会長' },
   { value: '副会長', label: '副会長' },
   { value: '幹事', label: '幹事' },
@@ -31,7 +32,8 @@ const muSchema = z.object({
   name: z.string().min(1, 'お名前は必須です'),
   name_kana: z.string().optional(),
   club_id: z.string().optional(),
-  club_name: z.string().min(1, '所属クラブは必須です'),
+  // 所属はローターアクト・ロータリー・OBOGのときだけ必須（ゲスト・その他は任意。下の superRefine）
+  club_name: z.string().optional(),
   member_type: z.enum(['RAC', 'RC', 'OB_OG', 'GUEST', 'OTHER']),
   email: z.string().email('正しいメールアドレスを入力してください'),
   phone: z.string().optional(),
@@ -45,7 +47,16 @@ const muSchema = z.object({
   receipt_name_type: z.enum(['club', 'personal', 'custom']).optional(),
   receipt_name: z.string().optional(),
   note: z.string().optional(),
+}).superRefine((d, ctx) => {
+  if (!isGuestType(d.member_type) && !d.club_name?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['club_name'], message: '所属クラブを選ぶか入力してください' });
+  }
 });
+
+/** クラブに所属していない人の区分（所属は任意・役職欄なし） */
+function isGuestType(memberType: string | undefined): boolean {
+  return memberType === 'GUEST' || memberType === 'OTHER';
+}
 
 type MuFormData = z.infer<typeof muSchema>;
 
@@ -147,7 +158,9 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
+    clearErrors,
+    trigger,
+    formState: { errors, isSubmitted },
   } = useForm<MuFormData>({
     resolver: zodResolver(muSchema) as any,
     defaultValues: {
@@ -171,6 +184,29 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
   const participationType = watch('participation_type');
   const positionSelect = watch('position_select');
   const positionCustom = watch('position_custom');
+  const clubIdValue = watch('club_id');
+  const clubNameValue = watch('club_name');
+  const guestType = isGuestType(memberType);
+
+  /** 区分を変えたとき、その区分に合わない入力を消す */
+  const changeMemberType = (v: MemberType) => {
+    setValue('member_type', v, { shouldValidate: false });
+    // 区分によって所属が必須かどうかが変わるので、前の区分で出たエラーを付け直す
+    // （送信前ならエラーは出さない。送信後なら新しい区分で確かめ直す）
+    if (isSubmitted) setTimeout(() => { void trigger('club_name'); }, 0);
+    else clearErrors('club_name');
+    if (isGuestType(v) || v === 'RC') {
+      // ゲスト・ロータリアンはローターアクトクラブに紐づけない（クラブ名の文字だけ残し、書き換えられるようにする）
+      setValue('club_id', '');
+    }
+    if (isGuestType(v)) {
+      setValue('position_select', '');
+      setValue('position_custom', '');
+    }
+    if (!isGuestType(v) && receiptNameType === 'club' && !clubNameValue?.trim()) {
+      setValue('receipt_name_type', 'personal');
+    }
+  };
 
   // 例会登録料（meeting_only / meeting_and_party の場合）
   // 自クラブ会員は own_club_fee（null = 0円）を優先適用
@@ -199,7 +235,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
     const resolvedPosition =
       data.position_select === 'custom'
         ? (data.position_custom?.trim() || '')
-        : (data.position_select || '');
+        : (data.position_select && data.position_select !== 'none' ? data.position_select : '');
 
     // note に役職を付加
     const noteWithPosition = [
@@ -217,7 +253,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
           // クラブアカウントでの代理登録は参加者本人ではないので会員と紐づけない
           userId: prefillUser?.id ?? null,
           clubId: data.club_id || null,
-          clubName: data.club_name,
+          clubName: data.club_name?.trim() || null,
           // 管理者系ロールの場合は入力値をそのまま外部名として送信
           externalName: (loggedInUser && !isAdminRole(loggedInUser.role)) ? null : data.name,
           externalEmail: (loggedInUser && !isAdminRole(loggedInUser.role)) ? null : data.email,
@@ -234,7 +270,12 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
           afterPartyFeeAmount: afterPartyFee,
           receiptRequired: data.receipt_required,
           receiptNameType: data.receipt_required ? (data.receipt_name_type || null) : null,
-          receiptName: data.receipt_required ? (data.receipt_name || data.name) : null,
+          // 宛名：所属クラブ名 → クラブ名、自由入力 → 入力値、それ以外 → お名前
+          receiptName: data.receipt_required
+            ? (data.receipt_name_type === 'club' && data.club_name?.trim()
+              ? data.club_name.trim()
+              : (data.receipt_name_type === 'custom' && data.receipt_name?.trim()) || data.name)
+            : null,
           note: noteWithPosition || null,
         }),
       });
@@ -798,7 +839,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                   </div>
                 ) : (
                   <Select
-                    onValueChange={v => setValue('member_type', v as MemberType)}
+                    onValueChange={v => changeMemberType(v as MemberType)}
                     defaultValue="RAC"
                   >
                     <SelectTrigger className="mt-1">
@@ -813,9 +854,15 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                     </SelectContent>
                   </Select>
                 )}
+                {!(isOwnClubMember && !isAdminRole(loggedInUser?.role ?? '')) && (
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    ローターアクト・ロータリーに所属していない方は「ゲスト」を選んでください。所属クラブの入力は不要です。
+                  </p>
+                )}
               </div>
 
-              {/* 役職 */}
+              {/* 役職（ローターアクト等の役職。ゲスト・その他には出さない） */}
+              {!guestType && (
               <div className="form-group">
                 <Label htmlFor="position_select">役職</Label>
                 <Select
@@ -823,7 +870,6 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                     setValue('position_select', v);
                     if (v !== 'custom') setValue('position_custom', '');
                   }}
-                  defaultValue=""
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="役職を選択（任意）" />
@@ -845,38 +891,78 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                   />
                 )}
               </div>
+              )}
 
               <div className="form-group">
-                <Label htmlFor="club_name" required>所属クラブ</Label>
                 {loggedInUser?.clubName && !isAdminRole(loggedInUser.role) ? (
-                  <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
-                    {loggedInUser.clubName}
-                  </div>
-                ) : (
-                  <div className="mt-1 space-y-2">
-                    <Select onValueChange={v => {
-                      setValue('club_id', v);
-                      const club = clubs.find(c => c.id === v);
-                      if (club) setValue('club_name', club.name);
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="クラブを選択..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clubs.map(club => (
-                          <SelectItem key={club.id} value={club.id}>
-                            {club.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <>
+                    <Label htmlFor="club_name" required>所属クラブ</Label>
+                    <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
+                      {loggedInUser.clubName}
+                    </div>
+                  </>
+                ) : guestType ? (
+                  // ゲスト・その他：クラブの選択肢は出さず、所属は任意の自由入力
+                  <>
+                    <Label htmlFor="club_name">ご所属（任意）</Label>
                     <Input
                       id="club_name"
                       {...register('club_name')}
-                      placeholder="一覧にない場合はこちらに入力"
+                      placeholder="会社名・学校名など（空欄で大丈夫です）"
+                      autoComplete="organization"
                       error={errors.club_name?.message}
+                      className="mt-1"
                     />
-                  </div>
+                  </>
+                ) : memberType === 'RC' ? (
+                  // ロータリアン：一覧はローターアクトクラブなので出さず、ロータリークラブ名を入力
+                  <>
+                    <Label htmlFor="club_name" required>所属ロータリークラブ</Label>
+                    <Input
+                      id="club_name"
+                      {...register('club_name')}
+                      placeholder="例：大阪北ロータリークラブ"
+                      error={errors.club_name?.message}
+                      className="mt-1"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="club_name" required>{memberType === 'OB_OG' ? '出身クラブ' : '所属クラブ'}</Label>
+                    <div className="mt-1 space-y-2">
+                      <Select
+                        value={clubIdValue || undefined}
+                        onValueChange={v => {
+                          setValue('club_id', v);
+                          const club = clubs.find(c => c.id === v);
+                          if (club) setValue('club_name', club.name, { shouldValidate: true });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="クラブを選択..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clubs.map(club => (
+                            <SelectItem key={club.id} value={club.id}>
+                              {club.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        id="club_name"
+                        {...register('club_name', {
+                          // 手で書き換えたら、一覧で選んだクラブとの紐づけを外す
+                          onChange: e => {
+                            const picked = clubs.find(c => c.id === clubIdValue);
+                            if (picked && e.target.value !== picked.name) setValue('club_id', '');
+                          },
+                        })}
+                        placeholder="一覧にない場合はこちらに入力"
+                        error={errors.club_name?.message}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>
@@ -1046,7 +1132,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="club">所属クラブ名</SelectItem>
+                        {clubNameValue?.trim() && <SelectItem value="club">{guestType ? 'ご所属名' : '所属クラブ名'}</SelectItem>}
                         <SelectItem value="personal">個人名</SelectItem>
                         <SelectItem value="custom">自由入力</SelectItem>
                       </SelectContent>
