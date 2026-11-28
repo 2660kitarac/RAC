@@ -27,6 +27,15 @@ const POSITION_OPTIONS = [
   { value: 'custom', label: 'その他（記述）' },
 ] as const;
 
+/** 電話番号が必須の区分（RAC・RCに所属していない体験者・ゲスト） */
+const PHONE_REQUIRED_TYPES: string[] = ['GUEST', 'OTHER'];
+/** 数字（全角可）・ハイフン・括弧・スペース・+ のみで、数字が10〜15桁 */
+function isValidPhone(phone: string): boolean {
+  if (!/^[0-9０-９+\-－ー()（）\s]+$/.test(phone)) return false;
+  const digits = phone.replace(/[^0-9０-９]/g, '').length;
+  return digits >= 10 && digits <= 15;
+}
+
 const muSchema = z.object({
   name: z.string().min(1, 'お名前は必須です'),
   name_kana: z.string().optional(),
@@ -45,6 +54,16 @@ const muSchema = z.object({
   receipt_name_type: z.enum(['club', 'personal', 'custom']).optional(),
   receipt_name: z.string().optional(),
   note: z.string().optional(),
+}).superRefine((d, ctx) => {
+  // RAC・RCに所属していない体験者・ゲストは当日の連絡手段として電話番号を必須にする
+  if (PHONE_REQUIRED_TYPES.includes(d.member_type)) {
+    const phone = (d.phone ?? '').trim();
+    if (!phone) {
+      ctx.addIssue({ code: 'custom', path: ['phone'], message: 'ゲスト・体験者の方は電話番号が必須です' });
+    } else if (!isValidPhone(phone)) {
+      ctx.addIssue({ code: 'custom', path: ['phone'], message: '正しい電話番号を入力してください' });
+    }
+  }
 });
 
 type MuFormData = z.infer<typeof muSchema>;
@@ -164,6 +183,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
   });
 
   const memberType = watch('member_type');
+  const phoneRequired = PHONE_REQUIRED_TYPES.includes(memberType);
   // お弁当の締切後は選べない（サーバー側も締切後はお弁当なしで登録する）
   const mealRequired = watch('meal_required') && deadlineInfo.mealAllowed;
   const receiptRequired = watch('receipt_required');
@@ -808,7 +828,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                       <SelectItem value="RAC">ローターアクター（RAC）</SelectItem>
                       <SelectItem value="RC">ロータリアン（RC）</SelectItem>
                       <SelectItem value="OB_OG">OB・OG</SelectItem>
-                      <SelectItem value="GUEST">ゲスト</SelectItem>
+                      <SelectItem value="GUEST">ゲスト・体験者（RAC・RC未所属）</SelectItem>
                       <SelectItem value="OTHER">その他</SelectItem>
                     </SelectContent>
                   </Select>
@@ -906,7 +926,7 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
               </div>
 
               <div className="form-group">
-                <Label htmlFor="phone">電話番号</Label>
+                <Label htmlFor="phone" required={phoneRequired}>電話番号</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -914,8 +934,12 @@ export default function MuRegistrationForm({ meeting, clubs, loggedInUser, invit
                   autoComplete="tel"
                   {...register('phone')}
                   placeholder="090-0000-0000"
+                  error={errors.phone?.message}
                   className="mt-1"
                 />
+                {phoneRequired && (
+                  <p className="mt-1 text-xs text-gray-500">ゲスト・体験者の方は当日の連絡用に必ずご入力ください</p>
+                )}
               </div>
             </CardContent>
           </Card>
