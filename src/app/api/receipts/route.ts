@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
-import { receipts, meetings } from '@/lib/db/schema';
+import { receipts, meetings, attendances } from '@/lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { resolveClubScope, canManageFinance } from '@/lib/auth/tenant';
+import { receiptOwnerFromAttendance } from '@/lib/receipts/owner';
 
 // GET /api/receipts?clubId=xxx&meetingId=xxx&status=issued
 export async function GET(request: NextRequest) {
@@ -96,12 +97,26 @@ export async function POST(request: NextRequest) {
     // receiptNumberが未指定の場合、自動採番（YYYYMMDD-XXXX形式）
     const autoReceiptNumber = receiptNumber || `${issuedDate.replace(/-/g, '')}-${randomUUID().substring(0, 4).toUpperCase()}`;
 
+    // 出欠記録が指定されていれば、その会員を持ち主にする（自クラブの例会の出欠に限る。#43）
+    let ownerUserId: string | null = null;
+    if (attendanceId) {
+      const att = await db
+        .select({ userId: attendances.userId, meetingClubId: meetings.clubId })
+        .from(attendances)
+        .leftJoin(meetings, eq(attendances.meetingId, meetings.id))
+        .where(and(eq(attendances.id, attendanceId), isNull(attendances.deletedAt)))
+        .limit(1)
+        .then((r) => r[0]);
+      ownerUserId = receiptOwnerFromAttendance(att, resolvedClubId);
+    }
+
     const id = randomUUID();
     await db.insert(receipts).values({
       id,
       clubId: resolvedClubId,
       meetingId: meetingId || null,
       attendanceId: attendanceId || null,
+      userId: ownerUserId,
       transactionId: transactionId || null,
       receiptNumber: autoReceiptNumber,
       receiptName,

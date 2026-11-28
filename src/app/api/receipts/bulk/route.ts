@@ -166,6 +166,8 @@ export async function POST(request: NextRequest) {
           clubId: resolvedClubId,
           meetingId,
           attendanceId: att.id,
+          // 会員の出欠なら持ち主として記録（外部参加者は空）。会員画面の「マイ領収書」で使う（#43）
+          userId: att.userId ?? null,
           transactionId: null,
           receiptNumber,
           receiptName: name,
@@ -263,6 +265,8 @@ export async function POST(request: NextRequest) {
           clubId: resolvedClubId,
           meetingId: null,
           attendanceId: null,
+          // 年会費の会員を持ち主として記録（#43）
+          userId: fee.userId,
           transactionId: null,
           receiptNumber,
           receiptName: name,

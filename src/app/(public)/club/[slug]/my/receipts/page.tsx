@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getDbFromContext } from '@/lib/db/get-db-from-context';
 import { users, receipts, meetings } from '@/lib/db/schema';
 import { eq, and, isNull, desc, count } from 'drizzle-orm';
+import { ownReceiptsCondition } from '@/lib/receipts/owner';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -55,8 +56,8 @@ export default async function MyReceiptsPage({
       .where(
         and(
           eq(receipts.clubId, profile.clubId!),
-          eq(receipts.status, 'issued'),
-          isNull(receipts.deletedAt)
+          // 本人の発行済み領収書だけ（#43）
+          ownReceiptsCondition(profile.id),
         )
       )
       .orderBy(desc(receipts.issuedDate))
@@ -69,8 +70,8 @@ export default async function MyReceiptsPage({
       .where(
         and(
           eq(receipts.clubId, profile.clubId!),
-          eq(receipts.status, 'issued'),
-          isNull(receipts.deletedAt)
+          // 本人の発行済み領収書だけ（#43）
+          ownReceiptsCondition(profile.id),
         )
       ),
   ]);
