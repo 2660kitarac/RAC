@@ -155,6 +155,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'お名前は必須です' }, { status: 400 });
     }
 
+    // RAC・RCに所属していない体験者・ゲスト（区分 GUEST / OTHER）は電話番号必須
+    // 外部フォームからの登録（MU登録）にのみ適用。運営側の手動追加は従来どおり任意。
+    if (isMuRegistration && ['GUEST', 'OTHER'].includes(memberType)) {
+      const phone = typeof externalPhone === 'string' ? externalPhone.trim() : '';
+      const digits = phone.replace(/[^0-9０-９]/g, '').length;
+      if (!phone || !/^[0-9０-９+\-－ー()（）\s]+$/.test(phone) || digits < 10 || digits > 15) {
+        return NextResponse.json({ error: 'ゲスト・体験者の方は電話番号が必須です' }, { status: 400 });
+      }
+    }
+
     // ---- 締切・ステータス判定（ポリシー対応）----
     // MU登録（外部フォーム）にも同じルールを適用する。
     // 運営側からの代理登録（認証済み）は締切判定をスキップし、遅延フラグのみ付与する。
